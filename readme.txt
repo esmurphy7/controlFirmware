@@ -6,4 +6,5 @@ extinct by climate change.
 
 People involved with software:
 Michelle La Haye
+Markus Hager
 
