@@ -4,7 +4,15 @@ int tempValue =0;
 
 int strokeLength=500;
 int strokeSensor=500;
+int errorSignal =0;
 int tempSensor;
+
+float P=2;
+float D=0;
+
+int error=0;
+int oldError=0;
+int dError =0;
 
 boolean received = false;
 boolean standby = true;
@@ -42,57 +50,33 @@ void loop(){
 
   if(received == true){
     strokeLength =(inMSG[1]-'0')*1000+(inMSG[2]-'0')*100+(inMSG[3]-'0')*10+(inMSG[4]-'0');
-    strokeSensor= strokeLength;
-    analogWrite(2,strokeLength);
-}
-  /*if(strokeLength == 9999){
-    respond = true;
-  }
-  if(strokeLength == 9998){
-    standby = true;
-    respond = false;
-  }
-  if(strokeLength == 9997){
-    standby = false; 
-  }*/
-  /*if(k == 10){
-   strokeSensor = floor(tempValue/10);
-   tempValue = 0;
-   k=0;
-   }*/
+    strokeSensor= analogRead(2);
 
-  //analogRead(0);
-  //k++;
-  //tempSensor = analogRead(0);
-  //if(start == true){
-  //if(standby == false){
-    /*if(strokeSensor > ((strokeLength)+15)){
-      digitalWrite(46,HIGH); 
-      digitalWrite(48,LOW);
+    error = abs(strokeLength - strokeSensor);
+    dError = error-oldError;
+    errorSignal = P*error-D*dError;
+    if(errorSignal > 255){
+      errorSignal = 255; 
     }
-    if(strokeSensor < ((strokeLength)-15)){
-      digitalWrite(46,LOW); 
-      digitalWrite(48,HIGH);
+    if(strokeLength < strokeSensor-15){
+      analogWrite(9,0);
+      analogWrite(8,255);
     }
-    if(strokeSensor >= ((strokeLength)-15) && strokeSensor <= ((strokeLength)+15)){
-      digitalWrite(46,LOW); 
-      digitalWrite(48,LOW);
-    }*/
-  //}
-  /*if(standby == true){
-    digitalWrite(46,LOW); 
-    digitalWrite(48,LOW);   
+    else if(strokeLength > strokeSensor+15){
+      analogWrite(8,0);
+      analogWrite(9,255); 
+    }
+    else{
+      analogWrite(9,0);
+      analogWrite(8,0);
+    }
+    oldError = error;
+
   }
-  //}
-  /*if(start == false){
-   digitalWrite(46,LOW); 
-   digitalWrite(48,LOW);
-   }*/
-//  if(respond == true){
-    Serial.print('!');
-    number_print(strokeSensor);
-    Serial.print('*');
- // }
+  Serial.print('!');
+  number_print(strokeSensor);
+  Serial.print('*');
+  // }
 }
 
 void number_print(int number){
@@ -109,6 +93,8 @@ void number_print(int number){
   }
   Serial.print(number);
 }
+
+
 
 
 

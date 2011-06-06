@@ -1,11 +1,14 @@
 int i = 0;
 int inMSG[7];
 int sensors[5];
+int rightCal[3];
+int leftCal[3];
 
+boolean calibrated = false;
 boolean received = false;
 
 void setup(){
-  Serial3.begin(115200);
+  Serial.begin(9800);
 
   pinMode(26, OUTPUT);
   pinMode(27, OUTPUT);
@@ -19,9 +22,6 @@ void setup(){
   pinMode(35, OUTPUT);
   pinMode(36, OUTPUT);
 
-  pinMode(48, OUTPUT);
-  digitalWrite(48,LOW);
-
   sensors[0] = 126;
   sensors[1] = 126;
   sensors[2] = 126;
@@ -30,66 +30,91 @@ void setup(){
 }
 
 void loop(){
-  if(Serial3.available()>0){
-    inMSG[0] = Serial3.read();
+
+  if(Serial.available()>0){
+    inMSG[0] = Serial.read();
     i=0;
     if(inMSG[0] == 254){
       i++;
       while(inMSG[i-1] != 255){
-        digitalWrite(48, HIGH);
-        if(Serial3.available()>0){
-          inMSG[i] = Serial3.read();
+        if(Serial.available()>0){
+          inMSG[i] = Serial.read();
           i++;
         }
       }
-    }
-    if(i == 7){
-      for(int k = 0;k<10;k+=2){
 
-        if(126+10 < ((inMSG[k/2+1]))){
-          digitalWrite(26+k,LOW);
-          digitalWrite(26+k+1,HIGH);
-          //analogWrite(2+i,inMSG[i+1]);
+      if(i == 7){
+        if(calibrated == false){
+          calibrate();
         }
-        if(126-10 > ((inMSG[k/2+1]))){
-          digitalWrite(26+k,HIGH);
-          digitalWrite(26+k+1,LOW);
-          //analogWrite(2+i,inMSG[i+1]);
+        sensors[0] = map(analogRead(2),0,100,0,253);
+        sensors[1] = map(analogRead(8),0,100,0,253);
+        sensors[2] = map(analogRead(12),0,100,0,253);
+
+        for(int k = 0;k<10;k+=2){
+          //sensors[k/2] = map(sensors[k/2],leftCal[k/2],rightCal[k/2],0,253);
+
+          if(sensors[k/2] < inMSG[k/2+1]-10){
+            digitalWrite(26+k,LOW);
+            digitalWrite(26+k+1,HIGH);
+            //analogWrite(2+i,inMSG[i+1]);
+          }
+          else if(sensors[k/2] > inMSG[k/2+1]+10){
+            digitalWrite(26+k,HIGH);
+            digitalWrite(26+k+1,LOW);
+            //analogWrite(2+i,inMSG[i+1]);
+          }
+          else{
+            digitalWrite(26+k,LOW);
+            digitalWrite(26+k+1,LOW);
+            //analogWrite(2+i,inMSG[i+1]);
+          }
         }
-        if(126-10 <= ((inMSG[k/2+1])) && 126+10 >= ((inMSG[k/2+1]))){
-          digitalWrite(26+k,LOW);
-          digitalWrite(26+k+1,LOW);
-          //analogWrite(2+i,inMSG[i+1]);
-        }
-        digitalWrite(48,LOW);
+        Serial.write(254);
+        Serial.write(sensors[0]);
+        Serial.write(sensors[1]);
+        Serial.write(sensors[2]);
+        Serial.write(sensors[3]);
+        Serial.write(sensors[4]);  
+        Serial.write(255); 
       }
-      Serial3.write(254);
-      Serial3.write(inMSG[1]);
-      Serial3.write(inMSG[2]);
-      Serial3.write(inMSG[3]);
-      Serial3.write(inMSG[4]);
-      Serial3.write(inMSG[5]);  
-      Serial3.write(255);  
     }
   }
-
-  /*
-  sensors[0] = analogRead(0)>>2;
-   sensors[1] = analogRead(1)>>2;
-   sensors[2] = analogRead(2)>>2;
-   sensors[3] = analogRead(3)>>2;
-   sensors[4] = analogRead(4)>>2;
-   
-   
-   Serial3.write(254);
-   Serial3.write(sensors[0]);
-   Serial3.write(sensors[1]);
-   Serial3.write(sensors[2]);
-   Serial3.write(sensors[3]);
-   Serial3.write(sensors[4]);  
-   Serial3.write(255);
-   */
 }
+
+void calibrate(){
+  delay(5000);
+  digitalWrite(26,HIGH);
+  digitalWrite(28,HIGH);
+  digitalWrite(30,HIGH);
+  delay(2000);
+  leftCal[0] = map(analogRead(2),0,1024,0,200);
+  leftCal[1] = map(analogRead(8),0,1024,0,200);
+  leftCal[2] = map(analogRead(12),0,1024,0,200);
+  digitalWrite(26,LOW);
+  digitalWrite(28,LOW);
+  digitalWrite(30,LOW);
+  digitalWrite(27,HIGH);
+  digitalWrite(29,HIGH);
+  digitalWrite(31,HIGH);       
+  delay(2000); 
+  rightCal[0] = map(analogRead(2),0,1024,0,200);
+  rightCal[1] = map(analogRead(8),0,1024,0,200);
+  rightCal[2] = map(analogRead(12),0,1024,0,200);
+  digitalWrite(27,LOW);
+  digitalWrite(29,LOW);
+  digitalWrite(31,LOW);
+  leftCal[0] = 20;
+  leftCal[1] = 20;
+  leftCal[2] = 20;
+  rightCal[0] =100;
+  rightCal[1] = 100;
+  rightCal[2] = 100;
+
+  calibrated = true;
+}
+
+
 
 
 
