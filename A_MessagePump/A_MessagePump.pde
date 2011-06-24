@@ -2,9 +2,17 @@
 // Reads commands and responds as required
 #include "command.h"
 #include "canbus.h"
+#include "interface.h"
+
+Canbus bus;
+Interface interface;
 
 void setup()
 {
+  bus = Canbus();
+  bus.begin(115200);
+  interface = Interface();
+  interface.initializeSlave(bus);
   Serial.begin(115200);
   Serial1.begin(115200);
   Serial2.begin(115200);
@@ -13,10 +21,10 @@ void setup()
 
 void loop()
 {
-  char newCommand = getCommand();
-  switch(newCommand) {
+  switch(interface.getCommand()) {
+    case CMD_NONE:
+      break;
     case CMD_SET_HORIZ:
-      writeResponse(0x61,'q','q','q','q','q','q');
       break;
     case CMD_SET_VERT:
       break;
@@ -35,10 +43,10 @@ void loop()
     case CMD_SEND_BAT:
       break;
     case CMD_SEND_ID:
-      writeResponse(STATE_SEND_ID,getID(),'q','q','q','q','q');
+      interface.sendState(STATE_SEND_ID,interface.getID(),PAD,PAD,PAD,PAD,PAD);
       break;
     case CMD_BROADCAST:
-      broadcast();
+      interface.broadcast();
       break;
   }
   delay(50);

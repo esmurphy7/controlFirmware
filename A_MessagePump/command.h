@@ -1,6 +1,7 @@
 #pragma once
 
 enum Command {
+  CMD_NONE      =  0x00,
   CMD_SET_HORIZ =  0x61,
   CMD_SET_VERT  =  0x62,
   CMD_SET_MOTOR =  0x63,
@@ -16,10 +17,18 @@ enum Command {
 
 enum State {
   STATE_SEND_ID   = 0x6C,
-  // STATE_ALIVE is the same command as CMD_BROADCAST
-  // A STATE_ALIVE recived on Serial2 should be interperted
-  // As a CMD_BROADCAST
   STATE_ALIVE     = 0x6D
 };
 
 void broadcast();
+  
+void setHoriz(char,char,char,char,char);
+void setVert(char,char,char,char,char);
+void setMotor(char,char,char,char,char);
+void stopSnake();
+void startSnake();
+void standbySnake();
+void setPID(char,char,char);
+void setSensor(char,char,char,char,char);
+  
+char getBattery();
