@@ -17,6 +17,9 @@ void setup()
   Serial1.begin(115200);
   Serial2.begin(115200);
   Serial3.begin(115200);
+  
+  // Initialization routine
+  
 }
 
 void loop()

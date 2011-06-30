@@ -16,6 +16,12 @@ enum Command {
 };
 
 enum State {
+  STATE_HORIZ     = 0x61,
+  STATE_VERT      = 0x62,
+  STATE_MOTOR     = 0x63,
+  STATE_PID       = 0x67,
+  STATE_SENSR     = 0x68,
+  STATE_BAT       = 0x69,
   STATE_SEND_ID   = 0x6C,
   STATE_ALIVE     = 0x6D
 };
