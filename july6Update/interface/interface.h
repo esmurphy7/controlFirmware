@@ -7,33 +7,46 @@ enum Command {
   CMD_SET_HORIZ =  0x61,
   CMD_SET_VERT  =  0x62,
   CMD_SET_MOTOR =  0x63,
-  CMD_STOP      =  0x64,
-  CMD_START     =  0x65,
-  CMD_STANDBY   =  0x66,
-  CMD_SET_PID   =  0x67,
-  CMD_SET_SENSR =  0x68,
-  CMD_SEND_BAT  =  0x69,
-  CMD_SEND_ID   =  0x6C,
-  CMD_BROADCAST =  0x6D
+  CMD_SEND_BAT  =  0x64,
+  CMD_SET_PID   =  0x65,
+  CMD_SET_SENSR =  0x66,
+  CMD_BROADCAST =  0x67,
+  CMD_STOP      =  0x68,
+  CMD_START     =  0x69,
+  CMD_STANDBY   =  0x6A,
+  CMD_DIE       =  0x6C,
+  CMD_DATA_DUMP =  0x6D,
+//more master commands. interface should be for master and slave
+    //CMD_XBEE_INIT = 0x6E
+    //CMD_REINIT    = 0x6F
+
 };
 
 enum State {
   STATE_HORIZ     = 0x61,
   STATE_VERT      = 0x62,
   STATE_MOTOR     = 0x63,
-  STATE_PID       = 0x67,
-  STATE_SENSR     = 0x68,
-  STATE_BAT       = 0x69,
-  STATE_SEND_ID   = 0x6C,
-  STATE_ALIVE     = 0x6D
+  STATE_BAT       = 0x64,
+  STATE_PID       = 0x65,
+  STATE_SENSR     = 0x66,
+  STATE_ALIVE     = 0x67,//the state of broadcast. 
+ //we can always overload BROADCAST to either do just ID or other stuff. perhaps this will be good for debugging
+  STATE_STOPPED   = 0x68,
+  STATE_GOING     = 0x69,
+  STATE_STANDBY   = 0x6A,//initial pause
+  STATE_PAUSED    = 0x6B,//snake has been on but inactive for some amount of time
+  STATE_DEAD      = 0x6C,//last communication before total shutdown
+  STATE_DUMPING   = 0x6D,
 };
 
 #define PAD 'q'
+#define MASTER 1
+#define SLAVE  2
 
 class Interface {
   public:
     Interface (int);
-    void init();
+    void init(int);
     Frame getMessage();
     
     char getID();
@@ -57,6 +70,7 @@ class Interface {
     void sendUp();
     void sendDown();
     void broadcast();
+	
   private:
     MCP2515 CAN;
     byte _id;      // This Arduino's ID

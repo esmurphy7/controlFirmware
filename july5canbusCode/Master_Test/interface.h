@@ -59,7 +59,7 @@ class Interface {
     void broadcast();
   private:
     MCP2515 CAN;
-    byte _id;      // This Arduino's ID
+    char _id;      // This Arduino's ID
     Command cmd;   // Last Command
     char arg[6];   // Last Command's arguments
 };
