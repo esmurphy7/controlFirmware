@@ -40,10 +40,21 @@ class motorControl {
 			//Serial.print(" ");
 			//Serial.print(hmotorMax*2*(aSum/2550));
 			//Serial.print(" ");
-			motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
+			//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
 			//Serial.println(motorScaled);
 			//Serial.println();
-			digitalWrite(hmotorPin,abs(motorScaled));
+			if(abs(aSum) > 20)
+			{
+				motorScaled=80;
+			}
+			else
+			{
+				motorScaled=0;
+			}
+			if(abs(aSum) > 60){motorScaled=100;}
+			if(abs(aSum) > 100) {motorScaled=120;}
+			
+			analogWrite(hmotorPin,abs(motorScaled));
 		}
 		
 		int getSpeed(){

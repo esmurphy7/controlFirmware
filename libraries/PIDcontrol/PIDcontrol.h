@@ -152,15 +152,15 @@ public:
     if(output >= 0){
 //      analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, LOW);
-      analogWrite(actuatorPin+1, 0);
-      analogWrite(actuatorPin, output);
+      analogWrite(actuatorPin, 0);
+      analogWrite(actuatorPin+1, output);
     }
     else{
  //     analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, HIGH);
     
-	      analogWrite(actuatorPin, 0);
-      analogWrite(actuatorPin+1, -output);
+	      analogWrite(actuatorPin+1, 0);
+      analogWrite(actuatorPin, -output);
 	
 	}
     
