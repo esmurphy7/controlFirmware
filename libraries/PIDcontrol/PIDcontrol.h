@@ -145,23 +145,33 @@ public:
     //}
 	
     //add dithering regardless of trigger or not
-    output = output + 20*int(sin(float(millis()/2)));
+    //output = output + 20*int(sin(float(millis()/2)));
     output = constrain(output, -255, 255);
     
 	//here is where we need to set up some way to determine left and right. everything else  works fine
-    if(output >= 0){
+    
+	// We may have to give the actuators a "kick" here
+	// Possibly set motorspeed to 200 and then back
+	// Maybe do something like  void kick in motor class?
+	if(output > 5){
 //      analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, LOW);
-      analogWrite(actuatorPin, 0);
-      analogWrite(actuatorPin+1, output);
+      analogWrite(actuatorPin, 200);
+      analogWrite(actuatorPin+1, 0);
     }
-    else{
+    else if(output < -5){
  //     analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, HIGH);
     
-	      analogWrite(actuatorPin+1, 0);
-      analogWrite(actuatorPin, -output);
-	
+	    analogWrite(actuatorPin+1, 200);
+		analogWrite(actuatorPin, 0);
+		//if(millis() % 200){
+		//Serial.print("Wrote HIGH to ");
+		//Serial.println(actuatorPin);}
+	}
+	else{
+		analogWrite(actuatorPin+1,200);
+		analogWrite(actuatorPin,0);
 	}
     
     return output;

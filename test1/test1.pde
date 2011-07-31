@@ -75,7 +75,7 @@ void setup() {
       gogo = true;
     }
   }
-  PIDcontrollerX[0].setConstants(1, 0, 0);
+  PIDcontrollerX[0].setConstants(3, 1, 2);
   delay(1000);
   Serial.println("main program");
 }
@@ -158,7 +158,20 @@ void loop() {
       Serial.print(" ");
       Serial.print(tmp3);
       Serial.println(" ");
-      digitalWrite(motorPin,tmp3);
+      analogWrite(motorPin,tmp3);
+    }
+    if(tmp=='o') {
+      Serial.println(outputX);
+    }
+    if(tmp=='Q'){
+      analogWrite(3,200);
+      analogWrite(4,0);
+      analogWrite(motorPin,150);
+      delay(1000);
+      analogWrite(4,200);
+      analogWrite(3,0);
+      delay(1000);
+      analogWrite(motorPin,0);
     }
   }//end of tmp read
 

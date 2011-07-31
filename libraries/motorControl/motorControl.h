@@ -45,14 +45,14 @@ class motorControl {
 			//Serial.println();
 			if(abs(aSum) > 20)
 			{
-				motorScaled=80;
+				motorScaled=110;
 			}
 			else
 			{
 				motorScaled=0;
 			}
-			if(abs(aSum) > 60){motorScaled=100;}
-			if(abs(aSum) > 100) {motorScaled=120;}
+			if(abs(aSum) > 60){motorScaled=150;}
+			if(abs(aSum) > 100) {motorScaled=190;}
 			
 			analogWrite(hmotorPin,abs(motorScaled));
 		}
