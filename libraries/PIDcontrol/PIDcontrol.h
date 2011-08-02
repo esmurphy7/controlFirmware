@@ -8,6 +8,8 @@ and writes to output pin
 
 #include "WProgram.h"
 
+//can probably pass through suspected edge values here and use limit switches to correct?
+
 //class outputs PID control
 //out put constraint to between -255 and 255
 class PIDcontrol{
@@ -89,6 +91,18 @@ public:
     ki = newKi;
   }
   
+/*
+  void setConstantP(int newKp){
+    kp = newKp;
+  }
+  void setConstantD(int newKd){
+    kd = newKd;
+  }
+  void setConstantI(int newKi){
+    ki = newKi;
+  }  
+*/  
+  
   void setSetPoint(int newSetPoint){
     setPoint = newSetPoint;
   }
@@ -158,14 +172,14 @@ public:
 	if(output > 5){
 //      analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, LOW);
-      analogWrite(actuatorPin, 200);
+      analogWrite(actuatorPin, output);
       analogWrite(actuatorPin+1, 0);
     }
     else if(output < -5){
  //     analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, HIGH);
     
-	    analogWrite(actuatorPin+1, 200);
+	    analogWrite(actuatorPin+1, output);
 		analogWrite(actuatorPin, 0);
 		//if(millis() % 200){
 		//Serial.print("Wrote HIGH to ");

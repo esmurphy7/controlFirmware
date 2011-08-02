@@ -17,11 +17,11 @@ class motorControl {
 		}
 		//new value for an X actuator
 		void updateAX(int nActuator, int aValueX){
-			actuatorX[nActuator] = aValueX;
+			actuatorX[nActuator] = abs(aValueX);
 		}
 		//new value for a Z actuator
 		void updateAZ(int nActuator, int aValueX){
-			actuatorZ[nActuator] = aValueX;
+			actuatorZ[nActuator] = abs(aValueX);
 		}
 		//change the max value of the motor
 		void maxSet(int newMax){
@@ -43,17 +43,14 @@ class motorControl {
 			//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
 			//Serial.println(motorScaled);
 			//Serial.println();
-			if(abs(aSum) > 5)
-			{
-				motorScaled=110;
-			}
-			else
+			if(abs(aSum) < 5)
 			{
 				motorScaled=0;
 			}
-			if(abs(aSum) > 60){motorScaled=150;}
-			if(abs(aSum) > 100) {motorScaled=190;}
-			
+			else{
+			motorScaled = 255*2*(aSum/2550);
+			}
+
 			analogWrite(hmotorPin,abs(motorScaled));
 		}
 		

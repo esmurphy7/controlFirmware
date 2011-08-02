@@ -3,8 +3,6 @@
 
 /*X is for horizontal
   Z is for vertical*/
-//155 - 107 is our approximate POT range
-
 
 //analog pins for pot reading
 const int sensorPinX = A0;
@@ -67,6 +65,11 @@ void setup() {
 }
 
 int outputX = 0;
+//155 - 107 is our approximate POT range
+int Ain = 110;
+int Aout = 150;
+
+boolean motorTest = false;
 
 void loop() {  
   
@@ -149,6 +152,84 @@ void loop() {
     if(tmp=='c'){
       PERIOD-=100;
     }
+    //testing pid smootheness for single actuator
+    if(tmp=='f'){
+//******************************************************      
+//may need to be rearranged
+//ask for set point # then go to Ain, then test
+      cur_pid = PIDcontrollerX.getSensor();
+      PIDcontrollerX.setSetPoint(cur_pid);
+      motorController.updateAX(0,0);
+      motorController.updateMotor();
+      //should be off for sure now
+      cur_pid = Ain;
+      PIDcontrollerX.setSetPoint(cur_pid);
+      int cur_sensor = PIDcontrollerX.getSensor();
+      
+      
+     //choosing a valid motor value for the test
+      motorTest = false;
+      int testMi;
+      Serial.println("choose motor value");
+      while(motorTest == false){
+        if(Serial.available() > 2){
+          char testM[3];
+          for(int i=0;i<3;i++){
+            testM[i]=Serial.read();
+          }
+          testMi=atoi(testM);
+          if((testMi>0) && (testMi<=255)){
+            Serial.print("atoi Motor output");
+            Serial.print(" ");
+            Serial.print(testMi);
+            Serial.println(" ");
+            analogWrite(motorPin,testMi);
+            motorTest = true;
+          }//if valid number
+          else{
+            Serial.println("bad number");
+          }
+        }//if statement for valid number
+      }//end of getting motor value
+      
+      while(abs(cur_pid - cur_sensor) > 5){
+        PIDcontrollerX.updateOutput();
+        cur_sensor = PIDcontrollerX.getSensor();
+      }//move to start point
+      digitalWrite(motorPin,0);
+      //ask for number of points
+      Serial.println("how many target points?");
+      boolean pointSet = false;
+      int numPointI;
+      while(pointSet == false){
+        if(Serial.available()>0){
+          char numPointC = Serial.read();
+          numPointI=atoi(&numPointC);
+          Serial.print("number of points = ");
+          Serial.println(numPointI);
+          pointSet = true;
+        }
+      }
+      int PointArray[numPointI+1];
+      PointArray[0]=Ain;
+      for(int i=1;i<(numPointI-1);i++){
+        PointArray[i]=Ain + i*(abs(Ain-Aout)/numPointI);
+      }
+      PointArray[numPointI]=Aout;
+      PIDcontrollerX.setSetPoint(Ain);
+      PIDcontrollerX.updateOutput();
+      int timeStart = millis();
+      int timeStop;
+      int SPreached;
+      analogWrite(motorPin,testMi);
+   //   for(int i=;i<=numPointI;i++){
+        //going to leave now. START here
+        //while( not really close to position aka deadzone constantly update pid output
+      //go to position for that part of array
+      //record time difference
+      //output time difference and corresponding pid jump ie 1-2, 2-3  5-4 so on
+      //}
+    }//end of tmp f
   }//end of tmp read
 
   if(sineWave){
