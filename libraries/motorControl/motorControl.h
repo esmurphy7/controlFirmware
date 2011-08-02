@@ -43,7 +43,7 @@ class motorControl {
 			//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
 			//Serial.println(motorScaled);
 			//Serial.println();
-			if(abs(aSum) > 20)
+			if(abs(aSum) > 5)
 			{
 				motorScaled=110;
 			}

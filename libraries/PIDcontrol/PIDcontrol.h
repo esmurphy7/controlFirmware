@@ -51,6 +51,10 @@ public:
 */
   int getSensor(){
 	
+		sensorReading = analogRead(sensorPin);
+		sensorReading = map(sensorReading, 0, 1023, 0, 255);
+
+	
     return sensorReading;
   }
 
@@ -112,9 +116,7 @@ public:
 	}
 	else{//normal operation*/
     //map sensor readings to 0-255 range
-		sensorReading = analogRead(sensorPin);
-		sensorReading = map(sensorReading, 0, 1023, 0, 255);
-    
+		getSensor();    
 		error = sensorReading - setPoint;
 		//Serial.print("error: ");
 		//Serial.println(error);
@@ -170,7 +172,7 @@ public:
 		//Serial.println(actuatorPin);}
 	}
 	else{
-		analogWrite(actuatorPin+1,200);
+		analogWrite(actuatorPin+1,0);
 		analogWrite(actuatorPin,0);
 	}
     

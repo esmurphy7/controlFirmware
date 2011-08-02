@@ -80,9 +80,9 @@ void setup() {
   Serial.println("main program");
 }
 
-byte cur_pid[5] = {127,127,127,127,127};
+byte cur_pid[5] = {127,analogRead(sensorPinX[1]),analogRead(sensorPinX[2]),analogRead(sensorPinX[3]),analogRead(sensorPinX[4])};
 
-int outputX = 0;
+int outputX[5] = 0;
 
 void loop() {  
   if(Serial.available()){
@@ -161,7 +161,11 @@ void loop() {
       analogWrite(motorPin,tmp3);
     }
     if(tmp=='o') {
-      Serial.println(outputX);
+      for(int i=0;i<5;i++){
+        Serial.print(outputX[i]);
+        Serial.print(" ");
+      }
+      Serial.println(" ");
     }
     if(tmp=='Q'){
       analogWrite(3,200);
@@ -178,9 +182,9 @@ void loop() {
     for (int i=0;i<5;i++){
       PIDcontrollerX[i].setSetPoint(cur_pid[i]);
     }
-   // for(int i=0;i<5;i++){
-      outputX=PIDcontrollerX[0].updateOutput();
-      motorController.updateAX(0,abs(outputX));
-   // }
+    for(int i=0;i<5;i++){
+      outputX[i]=PIDcontrollerX[0].updateOutput();
+      motorController.updateAX(0,abs(outputX[i]));
+    }
   motorController.updateMotor();
 }
