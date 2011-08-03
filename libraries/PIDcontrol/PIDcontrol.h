@@ -25,10 +25,16 @@ private:
   int setPoint;
   
   int sensorReading;
+  
   int error;
   int derivative;
   int integral;
+  
   int output;
+  int dither,ditherFrequency;
+  int outOffset;
+  int inOffset;
+  
   unsigned long prevTime;
   int prevSensorReading;
   
@@ -72,7 +78,7 @@ public:
     kp = 0;
     kd = 0;
     ki = 0;
-    
+    ditherFrequency = 150;
     reset();
   }
   
@@ -90,6 +96,11 @@ public:
     kd = newKd;
     ki = newKi;
   }
+  
+  void setOutOffset(int o) { outOffset = o; }
+  int getOutOffset() { return outOffset; }
+  void setInOffset(int i) { inOffset = i; }
+  int getInOffset() { return inOffset; }
   
 /*
   void setConstantP(int newKp){
@@ -144,7 +155,7 @@ public:
 			derivative = 0;
 		}
     
-		if(prevSensorReading != sensorReading){
+		if(prevSensorReading != sensorReading) {
 			prevSensorReading = sensorReading;
 			prevTime = millis();
 		}
@@ -152,34 +163,37 @@ public:
     
 		//integral constraint for anti-windup
 		integral += error;
+		if(error == 0) {integral = 0;}
 		integral = constrain(integral, -1024, 1024);
     
 		//calculate output
 		//adjust fomula to change sensativity to constaints
 		output = kp*error - kd*derivative + ki*integral/256;
-		output = constrain(output, -235, 235);
+		output = constrain(output, -255, 255);
     //}
 	
     //add dithering regardless of trigger or not
-    //output = output + 20*int(sin(float(millis()/2)));
-    output = constrain(output, -255, 255);
+    //dither = int(255*sin(float(millis()/1000.0*2.0*PI*ditherFrequency)));
+    //dither = 0;
+    int realOutput = output;
+    realOutput = constrain(realOutput, -255, 255);
     
 	//here is where we need to set up some way to determine left and right. everything else  works fine
     
 	// We may have to give the actuators a "kick" here
 	// Possibly set motorspeed to 200 and then back
 	// Maybe do something like  void kick in motor class?
-	if(output > 5){
+	if(realOutput > 0){
 //      analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, LOW);
-      analogWrite(actuatorPin, output);
+      analogWrite(actuatorPin, realOutput);
       analogWrite(actuatorPin+1, 0);
     }
-    else if(output < -5){
+    else if(realOutput < 0){
  //     analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, HIGH);
     
-	    analogWrite(actuatorPin+1, output);
+	    analogWrite(actuatorPin+1, -realOutput);
 		analogWrite(actuatorPin, 0);
 		//if(millis() % 200){
 		//Serial.print("Wrote HIGH to ");
@@ -190,7 +204,7 @@ public:
 		analogWrite(actuatorPin,0);
 	}
     
-    return output;
+    return realOutput;
   }
   
 };

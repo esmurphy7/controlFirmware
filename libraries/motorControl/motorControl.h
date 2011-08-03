@@ -43,12 +43,13 @@ class motorControl {
 			//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
 			//Serial.println(motorScaled);
 			//Serial.println();
-			if(abs(aSum) < 5)
+			if(abs(aSum) < 10)
 			{
 				motorScaled=0;
 			}
 			else{
-			motorScaled = 255*2*(aSum/2550);
+				motorScaled = 160;
+				//motorScaled = (255*2*aSum)/2550;
 			}
 
 			analogWrite(hmotorPin,abs(motorScaled));
