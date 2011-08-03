@@ -35,6 +35,14 @@ int PERIOD=1000;
 
 boolean sineWave = false;
 
+int K_P = 3;
+int K_I = 3;
+int K_D = 1;
+
+//155 - 107 is our approximate POT range
+int Ain = 90;
+int Aout = 120;
+
 void setup() {
   Serial.begin(115200);
   
@@ -56,20 +64,42 @@ void setup() {
       gogo = true;
     }
   }
-  PIDcontrollerX.setConstants(3, 0, 1);
+  PIDcontrollerX.setConstants(K_P, K_I, K_D);
   delay(1000);
   Serial.println("main program");
   
   cur_pid = PIDcontrollerX.getSensor();
-  PIDcontrollerX.setSetPoint(cur_pid);
+  Serial.print("Moving to ");
+  Serial.println(cur_pid,DEC);
+  PIDcontrollerX.setSetPoint((Ain + Aout)/2);
 }
 
 int outputX = 0;
-//155 - 107 is our approximate POT range
-int Ain = 110;
-int Aout = 150;
 
 boolean motorTest = false;
+
+void updateSystem() {
+  PIDcontrollerX.setSetPoint(cur_pid);
+
+  outputX=PIDcontrollerX.updateOutput();
+  motorController.updateAX(0,abs(outputX));
+
+  motorController.updateMotor();
+}
+
+void bottom() {
+  cur_pid = Ain;
+  do {
+    updateSystem();
+  } while(motorController.getSpeed());
+}
+
+void top() {
+  cur_pid = Aout;
+  do {
+    updateSystem();
+  } while(motorController.getSpeed());
+}
 
 void loop() {  
   
@@ -87,6 +117,9 @@ void loop() {
     }
     if(tmp=='e'){
       cur_pid = PIDcontrollerX.getSensor();
+      Serial.print("Moving to ");
+      Serial.print(cur_pid,DEC);
+      Serial.print(" With motor speed ");
       PIDcontrollerX.setSetPoint(cur_pid);
       outputX=PIDcontrollerX.updateOutput();
       motorController.updateAX(0,outputX);
@@ -94,9 +127,7 @@ void loop() {
       Serial.println(motorController.getSpeed());
     }
     if(tmp=='r'){
-        Serial.print(PIDcontrollerX.getSensor());
-      
-      Serial.println(" ");
+        Serial.println(PIDcontrollerX.getSensor(),DEC);
     }
     if(tmp=='y'){
       Serial.print("200 speed ");
@@ -112,23 +143,27 @@ void loop() {
     }
     
     if(tmp=='u'){
-        Serial.print(PIDcontrollerX.getSetpoint());
-        Serial.print(" ");
-      
-      Serial.println();
+       Serial.println(PIDcontrollerX.getSetpoint(),DEC);
     }
     
     if(tmp == 'i'){
-      char tmp2[3];
-      for(int i=0;i<3;i++){
-        tmp2[i]=Serial.read();
-      }
-      int tmp3=atoi(tmp2);
-      Serial.print("atoi output");
-      Serial.print(" ");
-      Serial.print(tmp3);
-      Serial.println(" ");
-      analogWrite(motorPin,tmp3);
+      //if(Serial.available() < 3) {
+      ///  Serial.println("Needs 3 digits");
+     // }
+      //else {
+        char tmp2[3];
+        for(int i=0;i<3;i++){
+          tmp2[i]=Serial.read();
+        }
+        int tmp3=atoi(tmp2);
+        Serial.print("Motor set to ");
+        Serial.print(" ");
+        Serial.print(tmp3);
+        Serial.println(" ");
+        analogWrite(motorPin,tmp3);
+        delay(1000);
+        Serial.println("Done");
+      //}
     }
     if(tmp=='o') {
       Serial.println(outputX);
@@ -230,16 +265,95 @@ void loop() {
       //output time difference and corresponding pid jump ie 1-2, 2-3  5-4 so on
       //}
     }//end of tmp f
+    if(tmp == 'T') {
+      bottom();
+      int timeStart = millis();
+      top();
+      Serial.print("Up took ");
+      Serial.println(millis() - timeStart);
+      
+      timeStart = millis();
+      bottom();
+      Serial.print("Down took ");
+      Serial.println(millis() - timeStart);
+    }
+    if(tmp == 'B') {
+      bottom();
+    }
+    if(tmp == 'G') {
+      top();
+    }
+    if(tmp == 'P') {
+      if(!Serial.available()) {
+        Serial.println("Need Argument");
+      }
+      else {
+        byte increment = Serial.read();
+        if(increment == 'u' && K_P < 40) {
+          K_P ++;
+        }
+        else if (increment == 'd' && K_P > 0){
+          K_P --;
+        }
+        Serial.print("PID is ");
+        Serial.print(K_P,DEC);
+        Serial.print(" ");
+        Serial.print(K_I,DEC);
+        Serial.print(" ");
+        Serial.print(K_D,DEC);
+        Serial.println();
+        PIDcontrollerX.setConstants(K_P, K_I, K_D);
+      }
+    }
+    if(tmp == 'I') {
+      if(!Serial.available()) {
+        Serial.println("Need Argument");
+      }
+      else {
+        byte increment = Serial.read();
+        if(increment == 'u' && K_I < 40) {
+          K_I ++;
+        }
+        else if (increment == 'd' && K_I > 0){
+          K_I --;
+        }
+        Serial.print("PID is ");
+        Serial.print(K_P,DEC);
+        Serial.print(" ");
+        Serial.print(K_I,DEC);
+        Serial.print(" ");
+        Serial.print(K_D,DEC);
+        Serial.println();
+        PIDcontrollerX.setConstants(K_P, K_I, K_D);
+      }
+    }
+    if(tmp == 'D') {
+      if(!Serial.available()) {
+        Serial.println("Need Argument");
+      }
+      else {
+        byte increment = Serial.read();
+        if(increment == 'u' && K_D < 40) {
+          K_D ++;
+        }
+        else if (increment == 'd' && K_D > 0) {
+          K_D --;
+        }
+        Serial.print("PID is ");
+        Serial.print(K_P,DEC);
+        Serial.print(" ");
+        Serial.print(K_I,DEC);
+        Serial.print(" ");
+        Serial.print(K_D,DEC);
+        Serial.println();
+        PIDcontrollerX.setConstants(K_P, K_I, K_D);
+      }
+    }
   }//end of tmp read
 
   if(sineWave){
     cur_pid = 10*sin((millis()*2*PI)/PERIOD) + 130;
   }
-  
-  PIDcontrollerX.setSetPoint(cur_pid);
+  updateSystem();
 
-  outputX=PIDcontrollerX.updateOutput();
-  motorController.updateAX(0,abs(outputX));
-
-  motorController.updateMotor();
 }
