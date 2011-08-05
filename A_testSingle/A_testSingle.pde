@@ -35,11 +35,11 @@ int PERIOD=1000;
 
 boolean sineWave = false;
 
-int K_P = 3;
-int K_I = 3;
+int K_P = 1;
+int K_I = 1;
 int K_D = 1;
 
-//155 - 107 is our approximate POT range
+//155 - 107 was our approximate POT range
 int Ain = 90;
 int Aout = 120;
 
@@ -101,11 +101,31 @@ void top() {
   } while(motorController.getSpeed());
 }
 
+void calibrate() {
+  PIDcontrollerX.setConstants(10, 0, 0);
+  cur_pid = 0;
+  updateSystem();
+  delay(1000);
+  Ain = PIDcontrollerX.getSensor();
+  Serial.print("Low value is ");
+  Serial.println(Ain,DEC);
+  
+  cur_pid = 255;
+  updateSystem();
+  delay(1000);
+  Aout = PIDcontrollerX.getSensor();
+  Serial.print("High value is ");
+  Serial.println(Aout,DEC);
+}
+
 void loop() {  
   
   if(Serial.available()){
     byte tmp = Serial.read();
     Serial.println(tmp);
+    if(tmp == 'C') {
+      calibrate();
+    }
     if(tmp=='a') {cur_pid+=10;}
     if(tmp=='z') {cur_pid-=10;}
 
@@ -267,7 +287,7 @@ void loop() {
     }//end of tmp f
     if(tmp == 'T') {
       bottom();
-      int timeStart = millis();
+      long timeStart = millis();
       top();
       Serial.print("Up took ");
       Serial.println(millis() - timeStart);
@@ -352,7 +372,7 @@ void loop() {
   }//end of tmp read
 
   if(sineWave){
-    cur_pid = 10*sin((millis()*2*PI)/PERIOD) + 130;
+    cur_pid = (Aout-Ain)/2*sin((millis()*2*PI)/PERIOD) + (Ain + Aout)/2;
   }
   updateSystem();
 
