@@ -35,9 +35,9 @@ int PERIOD=1000;
 
 boolean sineWave = false;
 
-int K_P = 1;
-int K_I = 1;
-int K_D = 1;
+int K_P = 5;
+int K_I = 10;
+int K_D = 2;
 
 //155 - 107 was our approximate POT range
 int Ain = 90;
@@ -67,7 +67,7 @@ void setup() {
   PIDcontrollerX.setConstants(K_P, K_I, K_D);
   delay(1000);
   Serial.println("main program");
-  
+  motorController.maxSet(motorValue);
   cur_pid = PIDcontrollerX.getSensor();
   Serial.print("Moving to ");
   Serial.println(cur_pid,DEC);
@@ -91,14 +91,14 @@ void bottom() {
   cur_pid = Ain;
   do {
     updateSystem();
-  } while(motorController.getSpeed());
+  } while(PIDcontrollerX.getSensor() != Ain);
 }
 
 void top() {
   cur_pid = Aout;
   do {
     updateSystem();
-  } while(motorController.getSpeed());
+  } while(PIDcontrollerX.getSensor() != Aout);
 }
 
 void calibrate() {
@@ -116,22 +116,26 @@ void calibrate() {
   Aout = PIDcontrollerX.getSensor();
   Serial.print("High value is ");
   Serial.println(Aout,DEC);
+  PIDcontrollerX.setConstants(K_P, K_I, K_D);
+  cur_pid = Aout - (Aout-Ain)/5;
 }
+int ticks = 0;
+int ticksPsecond = 0;
+long lastmillis = 0;
 
 void loop() {  
   
   if(Serial.available()){
     byte tmp = Serial.read();
-    Serial.println(tmp);
+    if(tmp == 'f') {
+      Serial.print("Ticks per Second: ");
+      Serial.println(ticksPsecond);
+    }
     if(tmp == 'C') {
       calibrate();
     }
     if(tmp=='a') {cur_pid+=10;}
     if(tmp=='z') {cur_pid-=10;}
-
-    if(tmp=='q') {
-      Serial.println(motorController.getSpeed()); 
-    }
     if(tmp=='w'){
       Serial.println(motorController.getMax());
     }
@@ -146,27 +150,14 @@ void loop() {
       motorController.updateMotor();
       Serial.println(motorController.getSpeed());
     }
-    if(tmp=='r'){
-        Serial.println(PIDcontrollerX.getSensor(),DEC);
-    }
-    if(tmp=='y'){
-      Serial.print("200 speed ");
-      digitalWrite(motorPin,200);
-      delay(1000);
-      Serial.print("100 speed ");
-      digitalWrite(motorPin,100);
-      delay(1000);
-      Serial.print("0 speed ");
-      digitalWrite(motorPin,0);
-      delay(1000);
-      Serial.println("motor test done");
-    }
-    
     if(tmp=='u'){
-       Serial.println(PIDcontrollerX.getSetpoint(),DEC);
+      Serial.print("Sensor: ");
+      Serial.println(PIDcontrollerX.getSensor(),DEC);
+      Serial.print("Setpoint: ");
+      Serial.println(PIDcontrollerX.getSetpoint(),DEC);
     }
     
-    if(tmp == 'i'){
+    /*if(tmp == 'i'){
       //if(Serial.available() < 3) {
       ///  Serial.println("Needs 3 digits");
      // }
@@ -184,11 +175,14 @@ void loop() {
         delay(1000);
         Serial.println("Done");
       //}
-    }
+    }*/
     if(tmp=='o') {
+      Serial.print("Output: ");
       Serial.println(outputX);
+      Serial.print("Motor Speed: ");
+      Serial.println(motorController.getSpeed()); 
     }
-    if(tmp=='Q'){
+   /* if(tmp=='Q'){
       analogWrite(3,200);
       analogWrite(4,0);
       analogWrite(motorPin,150);
@@ -197,18 +191,22 @@ void loop() {
       analogWrite(3,0);
       delay(1000);
       analogWrite(motorPin,0);
-    }
+    }*/
     if(tmp == 's'){
       sineWave = !sineWave;
     }
     if(tmp == 'd'){
       PERIOD+=100;
+      Serial.print("Sine Period: ");
+      Serial.println(PERIOD);
     }
     if(tmp=='c'){
       PERIOD-=100;
+      Serial.print("Sine Period: ");
+      Serial.println(PERIOD);
     }
     //testing pid smootheness for single actuator
-    if(tmp=='f'){
+/*    if(tmp=='f'){
 //******************************************************      
 //may need to be rearranged
 //ask for set point # then go to Ain, then test
@@ -284,7 +282,7 @@ void loop() {
       //record time difference
       //output time difference and corresponding pid jump ie 1-2, 2-3  5-4 so on
       //}
-    }//end of tmp f
+    }//end of tmp f*/
     if(tmp == 'T') {
       bottom();
       long timeStart = millis();
@@ -296,6 +294,7 @@ void loop() {
       bottom();
       Serial.print("Down took ");
       Serial.println(millis() - timeStart);
+      cur_pid = (Aout + Ain)/2;
     }
     if(tmp == 'B') {
       bottom();
@@ -375,5 +374,11 @@ void loop() {
     cur_pid = (Aout-Ain)/2*sin((millis()*2*PI)/PERIOD) + (Ain + Aout)/2;
   }
   updateSystem();
+  ticks ++;
+  if(ticks == 200) {
+    ticksPsecond = 200000 / (millis()-lastmillis);
+    ticks = 0;
+    lastmillis = millis();
+  }
 
 }

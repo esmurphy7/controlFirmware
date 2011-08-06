@@ -2,7 +2,7 @@ class motorControl {
 	public:
 		motorControl(int NewMotorPin){
 			hmotorPin = NewMotorPin;
-			hmotorMax=200;
+			hmotorMax=160;
 			off();
 		}
 		//zero everything
@@ -29,28 +29,33 @@ class motorControl {
 		}
 		//update the motor output
 		void updateMotor(){
-			aSum = 0;
-			for(int i = 0; i < 5; i++){
-				aSum += actuatorX[i];
-				aSum += actuatorZ[i];
-			}
-			//Serial.print(aSum);
-			//Serial.print(" ");
-			//Serial.print(hmotorMax*2);
-			//Serial.print(" ");
-			//Serial.print(hmotorMax*2*(aSum/2550));
-			//Serial.print(" ");
-			//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
-			//Serial.println(motorScaled);
-			//Serial.println();
-			if(abs(aSum) < 10)
-			{
-				motorScaled=0;
-			}
-			else{
-				motorScaled = 160;
-				//motorScaled = (255*2*aSum)/2550;
-			}
+///			if(enableMotor){
+				aSum = 0;
+				for(int i = 0; i < 5; i++){
+					aSum += actuatorX[i];
+					aSum += actuatorZ[i];
+				}
+				//Serial.print(aSum);
+				//Serial.print(" ");
+				//Serial.print(hmotorMax*2);
+				//Serial.print(" ");
+				//Serial.print(hmotorMax*2*(aSum/2550));
+				//Serial.print(" ");
+				//motorScaled = (hmotorMax*2*aSum)/2550;//2550 or something else and linear?
+				//Serial.println(motorScaled);
+				//Serial.println();
+				if(abs(aSum) < 10)
+				{
+					motorScaled=0;
+				}
+				else{
+					motorScaled = hmotorMax;
+					//motorScaled = (255*2*aSum)/2550;
+				}
+//			}
+//			else{
+//				motorScaled = 0;
+//			}
 
 			analogWrite(hmotorPin,abs(motorScaled));
 		}
@@ -70,4 +75,5 @@ class motorControl {
 		int hmotorMax;//max value for motor
 		int hmotorPin;//what pin am i writing to
 		int aSum;//sum of all the < 255 values
+		bool enableMotor;
 };

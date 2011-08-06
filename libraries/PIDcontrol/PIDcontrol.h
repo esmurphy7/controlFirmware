@@ -141,8 +141,13 @@ public:
 	}
 	else{//normal operation*/
     //map sensor readings to 0-255 range
-		getSensor();    
+		getSensor();
 		error = sensorReading - setPoint;
+		if(abs(error) < 2) {
+			error = 0;
+			integral = 0;
+			prevSensorReading = -1;
+		} 
 		//Serial.print("error: ");
 		//Serial.println(error);
     
@@ -163,7 +168,6 @@ public:
     
 		//integral constraint for anti-windup
 		integral += error;
-		if(error == 0) {integral = 0;}
 		integral = constrain(integral, -1024, 1024);
     
 		//calculate output
@@ -180,29 +184,34 @@ public:
     
 	//here is where we need to set up some way to determine left and right. everything else  works fine
     
-	// We may have to give the actuators a "kick" here
-	// Possibly set motorspeed to 200 and then back
-	// Maybe do something like  void kick in motor class?
+	// We map the output to 120 to 255 here because the
+	// Valves won't open enough below 120 duty cycle
 	if(realOutput > 0){
 //      analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, LOW);
-      analogWrite(actuatorPin, realOutput);
+      analogWrite(actuatorPin, map(realOutput, 0, 255, 120, 255));
       analogWrite(actuatorPin+1, 0);
     }
     else if(realOutput < 0){
  //     analogWrite(actuatorPin, output);
 //      analogWrite(valve_select, HIGH);
     
-	    analogWrite(actuatorPin+1, -realOutput);
+	    analogWrite(actuatorPin+1, -map(realOutput, -255, 0, -255, -120));
 		analogWrite(actuatorPin, 0);
 		//if(millis() % 200){
 		//Serial.print("Wrote HIGH to ");
 		//Serial.println(actuatorPin);}
 	}
-	else{
+	/*else{
+		if(dither >= 0){
+		analogWrite(actuatorPin,dither);
 		analogWrite(actuatorPin+1,0);
+}
+		else{
+		analogWrite(actuatorPin+1,-dither);
 		analogWrite(actuatorPin,0);
-	}
+		}
+	}*/
     
     return realOutput;
   }
