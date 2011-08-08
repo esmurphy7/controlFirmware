@@ -29,7 +29,7 @@ class motorControl {
 		}
 		//update the motor output
 		void updateMotor(){
-///			if(enableMotor){
+//			if(enableMotor){
 				aSum = 0;
 				for(int i = 0; i < 5; i++){
 					aSum += actuatorX[i];
