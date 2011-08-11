@@ -37,8 +37,10 @@ class PIDcontrol{
 
 	unsigned long prevTime;
 	int prevSensorReading;
-
-
+	
+	bool even;//this is to determine the side of the actuator
+	//JULIAN'S FIX for left-right side placement
+	//even TRUE means that Ain is low sensor, Aout is high sensor
 
 	public:
 
@@ -102,6 +104,12 @@ class PIDcontrol{
 	void calibrated(int newAin, int newAout){
 		Ain = newAin;
 		Aout = newAout;
+		if(Ain < Aout){
+			even = true;
+		}
+		else{
+			even = false;
+		}
 	}
 	void setSetPoint(int newSetPoint){
 		setPoint = newSetPoint;
@@ -131,7 +139,7 @@ class PIDcontrol{
 		else{//normal operation*/
 		//map sensor readings to 0-255 range
 		getSensor();
-		error = sensorReading - setPoint;
+		error = setPoint - sensorReading;
 		if(abs(error) < 2) {
 			error = 0;
 			integral = 0;
@@ -173,12 +181,22 @@ class PIDcontrol{
 		// We map the output to 120 to 255 here because the
 		// Valves won't open enough below 120 duty cycle
 		if(realOutput > 0){
-		  analogWrite(actuatorPin, map(realOutput, 0, 255, 120, 255));
-		  digitalWrite(valve_select, LOW);
+			analogWrite(actuatorPin, map(realOutput, 0, 255, 120, 255));
+			if(even){
+				digitalWrite(valve_select, HIGH);
+			}
+			else{
+				digitalWrite(valve_select, LOW);
+			}
 		}
 		else if(realOutput < 0){
 			analogWrite(actuatorPin, -map(realOutput, -255, 0, -255, -120));
-			analogWrite(valve_select, HIGH);
+			if(even){
+				digitalWrite(valve_select, LOW);
+			}
+			else{
+				digitalWrite(valve_select, HIGH);
+			}
 
 		}
 		else{

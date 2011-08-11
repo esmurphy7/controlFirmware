@@ -6,13 +6,13 @@
   Z is for vertical*/
 
 //analog pins for pot reading
-const int sensorPinX = VERT_POS_SENSOR_1;
+const int sensorPinX = HORZ_POS_SENSOR_1;
 
 //PID signal pins
-const int actuatorPinX = VERT_ACTUATOR_1;
+const int actuatorPinX = HORZ_ACTUATOR_1;
 
 //Valve select pins because we don't have enough PWM
-const int valveSelectX = VERT_ACTUATOR_CTRL_1;
+const int valveSelectX = HORZ_ACTUATOR_CTRL_1;
 
 //Dither will be fed into all unselected valves
 const int ditherPin = DITHER;
@@ -29,7 +29,7 @@ const int limit_switchX = HORZ_LIMIT_SWITCH_1;
 PIDcontrol PIDcontrollerX( sensorPinX, actuatorPinX, limit_switchX, valveSelectX);
 
 //motor
-int motorValue = 130;
+int motorValue = 150;
 
 byte cur_pid;
 
@@ -41,8 +41,8 @@ int K_I = 10;
 int K_D = 1;
 
 //155 - 107 WAS our approximate POT range for sensor test 1
-int Ain = 83;
-int Aout = 129;
+int Ain = 0;
+int Aout = 255;
 
 int ditherFreq = 200;
 
@@ -74,7 +74,7 @@ void setup() {
   delay(1000);
   Serial.println("main program");
   motorController.maxSet(motorValue);
-  cur_pid = PIDcontrollerX.getSensor();
+  //cur_pid = PIDcontrollerX.getSensor();
   Serial.print("Moving to ");
   Serial.println(cur_pid,DEC);
   PIDcontrollerX.setSetPoint((Ain + Aout)/2);
@@ -108,7 +108,7 @@ void top() {
 }
 
 void calibrate() {
-  PIDcontrollerX.setConstants(10, 0, 0);
+  /*PIDcontrollerX.setConstants(10, 0, 0);
   cur_pid = 0;
   updateSystem();
   delay(1000);
@@ -124,6 +124,30 @@ void calibrate() {
   Serial.println(Aout,DEC);
   PIDcontrollerX.setConstants(K_P, K_I, K_D);
   cur_pid = Aout - (Aout-Ain)/5;
+  */
+  //why you no work
+  analogWrite(motorPin,130);
+  analogWrite(actuatorPinX,0);
+  digitalWrite(valveSelectX,HIGH);
+  analogWrite(actuatorPinX,255);
+  delay(2100);
+  analogWrite(actuatorPinX,0);
+  Aout = PIDcontrollerX.getSensor();
+  Serial.print("High value is ");
+  Serial.println(Aout,DEC);
+  
+  digitalWrite(valveSelectX,LOW);
+  analogWrite(actuatorPinX,250);
+  delay(2100);
+  analogWrite(actuatorPinX,0);
+  Ain = PIDcontrollerX.getSensor();
+  analogWrite(motorPin,0);
+  Serial.print("Low value is ");
+  Serial.println(Ain,DEC);
+
+  PIDcontrollerX.calibrated(Ain,Aout);
+
+  cur_pid = Aout - (Aout-Ain)/5;
 }
 
 void ditherF(){
@@ -134,6 +158,7 @@ void ditherF(){
   else{
     digitalWrite(ditherPin,LOW);
   }
+  //analogWrite(ditherPin,127);
 }
 int ticks = 0;
 int ticksPsecond = 0;
