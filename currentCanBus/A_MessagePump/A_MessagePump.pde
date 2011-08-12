@@ -3,7 +3,10 @@
 #include "interface.h"
 #include "MCP2515.h"
 #include <SPI.h>
-#include "PIDcontrol.h" //Julian PID header
+#include "PIDcontrolBOA.h"
+#include  "boashield_pins.h"
+#include <motorControl.h>
+
 
 #define CS_PIN 53
 
@@ -12,35 +15,70 @@ Interface interface(CS_PIN);
 /*X is for horizontal
   Z is for vertical*/
  
-#define  DITHERPWM  127
+#define  ditherFreq  200
 
 //THESE PINS WERE CHECKED ON JULY 20 2011
 //analog pins for pot reading
-const int sensorPinX[] = { 0, 1, 2, 3, 4 };
-const int sensorPinZ[] = { 5, 6, 7, 8, 9 };
+const int sensorPinX[] = {HORZ_POS_SENSOR_1, 
+                          HORZ_POS_SENSOR_2, 
+                          HORZ_POS_SENSOR_3, 
+                          HORZ_POS_SENSOR_4, 
+                          HORZ_POS_SENSOR_5};
+const int sensorPinZ[] = { VERT_POS_SENSOR_1, 
+                          VERT_POS_SENSOR_2,
+                          VERT_POS_SENSOR_3,
+                          VERT_POS_SENSOR_4,
+                          VERT_POS_SENSOR_5};
 
 //PID signal pins
-const int actuatorPinX[] = { 3, 4, 5, 6, 7 };
-const int actuatorPinZ[] = { 8, 9, 10, 11, 12 };
+const int actuatorPinX[] = {HORZ_ACTUATOR_1, 
+                            HORZ_ACTUATOR_2, 
+                            HORZ_ACTUATOR_3, 
+                            HORZ_ACTUATOR_4, 
+                            HORZ_ACTUATOR_5};
+
+const int actuatorPinZ[] = {VERT_ACTUATOR_1, 
+                            VERT_ACTUATOR_2, 
+                            VERT_ACTUATOR_3, 
+                            VERT_ACTUATOR_4, 
+                            VERT_ACTUATOR_5};
 
 //Valve select pins because we don't have enough PWM
-const int valveSelectX[] = { 36, 37, 38, 39, 40 };
-const int valveSelectZ[] = { 41, 42, 43, 44, 45 };
+const int valveSelectX[] = {HORZ_ACTUATOR_CTRL_1, 
+                            HORZ_ACTUATOR_CTRL_2, 
+                            HORZ_ACTUATOR_CTRL_3, 
+                            HORZ_ACTUATOR_CTRL_4, 
+                            HORZ_ACTUATOR_CTRL_5};
+
+const int valveSelectZ[] = {VERT_ACTUATOR_CTRL_1, 
+                            VERT_ACTUATOR_CTRL_2, 
+                            VERT_ACTUATOR_CTRL_3, 
+                            VERT_ACTUATOR_CTRL_4, 
+                            VERT_ACTUATOR_CTRL_5};
 
 //Dither will be fed into all unselected valves
-const int ditherPin = 13;
+const int ditherPin = DITHER;
 
 //motor write speed
-const int motorPin = 2;
+const int motorPin = MOTOR_CONTROL;
 
-motorController	motorControl(motorPin);
+motorControl	motorController(motorPin);
 
 /*limit switches in series. will determine L/R through math*/
-const int limit_switchX[] = { 26, 27, 28, 29, 30 };
-const int limit_switchZ[] = { 31, 32, 33, 34, 35 };
+const int limit_switchX[] = {HORZ_LIMIT_SWITCH_1, 
+                             HORZ_LIMIT_SWITCH_2,
+                             HORZ_LIMIT_SWITCH_3, 
+                             HORZ_LIMIT_SWITCH_4, 
+                             HORZ_LIMIT_SWITCH_5};
+                             
+const int limit_switchZ[] = {VERT_LIMIT_SWITCH_1, 
+                             VERT_LIMIT_SWITCH_2, 
+                             VERT_LIMIT_SWITCH_3, 
+                             VERT_LIMIT_SWITCH_4, 
+                             VERT_LIMIT_SWITCH_5};
 
 //have to check battery voltage
-const int batPin = 00;
+const int batPin = BAT_LEVEL_24V;
 
 //arduinos need to kill
 
@@ -52,7 +90,7 @@ PIDcontrol PIDcontrollerX[5] = {
   PIDcontrol( sensorPinX[3], actuatorPinX[3], limit_switchX[3], valveSelectX[3]),
   PIDcontrol( sensorPinX[4], actuatorPinX[4], limit_switchX[4], valveSelectX[4])
 };
-/*
+///*
 PIDcontrol PIDcontrollerZ[5] = {
   PIDcontrol( sensorPinZ[0], actuatorPinZ[0], limit_switchZ[0], valveSelectZ[0]),
   PIDcontrol( sensorPinZ[1], actuatorPinZ[1], limit_switchZ[1], valveSelectZ[1]),
@@ -60,7 +98,7 @@ PIDcontrol PIDcontrollerZ[5] = {
   PIDcontrol( sensorPinZ[3], actuatorPinZ[3], limit_switchZ[3], valveSelectZ[3]),
   PIDcontrol( sensorPinZ[4], actuatorPinZ[4], limit_switchZ[4], valveSelectZ[4])
 };
-*/
+//*/
 
 //defaul values for stuff
 //motor
@@ -68,6 +106,10 @@ int motorValue = 127;
 
 //PID calibrate
 boolean pidCalibrated = false;
+
+int Ain[5];
+int Aout[5];
+int cur_pid[5];
 
 void setup()
 {
@@ -91,35 +133,78 @@ void setup()
   //make sure actuators are off and set pin modes
   
   pinMode(ditherPin, OUTPUT);
-  digitalWrite(ditherPin,DITHERPWM);
+//  digitalWrite(ditherPin,DITHERPWM);
 
   for(int i=0;i<5;i++){
     pinMode(actuatorPinX[i], OUTPUT);
     analogWrite(actuatorPinX[i], 0);
     
     pinMode(valveSelectX[i], OUTPUT);
- 
-  /*  
+   
     pinMode(actuatorPinZ[i], OUTPUT);
     analogWrite(actuatorPinZ[i], 0);
     
     pinMode(valveSelectZ[i], OUTPUT);
-    */
+ 
   }
-  
-  delay(100);  
   
   //make set point current value(so it dosen't move)
   for(int i=0;i<5;i++){
     PIDcontrollerX[i].setSetPoint(analogRead(sensorPinX[i]));
-    
-    //PIDcontrollerZ[i].setSetPoint(analogRead(sensorPinZ[i]));
-    
+    PIDcontrollerZ[i].setSetPoint(analogRead(sensorPinZ[i]));
   }
-  /*++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-}
+}//setup end
 
 Frame command;
+
+void ditherF(){
+  int Dout = int(sin(float(millis()/1000.0*2.0*PI*ditherFreq)));
+  if(Dout > 0){
+    digitalWrite(ditherPin,HIGH);
+  }
+  else{
+    digitalWrite(ditherPin,LOW);
+  }
+  //analogWrite(ditherPin,127);
+}
+
+/*void calibrate(){
+  analogWrite(motorPin,130);
+  for(int i=0; i<5; i++){
+    analogWrite(actuatorPinX[i],0);
+  }
+  for(int i=0; i<5; i++){
+    digitalWrite(valveSelectX[i],HIGH);
+    analogWrite(actuatorPinX[i],255);
+  }
+  delay(2100);
+  for(int i=0; i<5; i++){
+    analogWrite(actuatorPinX[i],0);
+    Aout[i] = PIDcontrollerX.getSensor();
+  }
+  Serial.print("High value is ");
+  for(int i=0; i<5; i++){  
+    Serial.println(Aout,DEC);
+  }
+  for(int i=0; i<5; i++){    
+    digitalWrite(valveSelectX[i],LOW);
+    analogWrite(actuatorPinX[i],250);
+  }
+  delay(2100);
+  for(int i=0; i<5; i++){  
+    analogWrite(actuatorPinX[i],0);
+    Ain[i] = PIDcontrollerX.getSensor();
+  }
+  analogWrite(motorPin,0);
+  Serial.print("Low value is ");
+  for(int i=0; i<5; i++){  
+    Serial.println(Ain,DEC);
+  }
+  for(int i=0; i<5; i++){  
+    PIDcontrollerX[i].calibrated(Ain[i],Aout[i]);
+  }
+  cur_pid[i] = (Aout + Ain)/2 + 2;//little bit of curve
+}*/
 
 void loop(){
   command = interface.getMessage();
@@ -159,11 +244,11 @@ void loop(){
     break;
     case CMD_SET_MOTOR:
       Serial.println("CMD_SET_MOTOR");
-	  motorController.maxSet(command.data[1]);
-      interface.sendState(STATE_MOTOR,command.data[1],motorController.getSpeed(),PAD,PAD,PAD,PAD);
-      break;
+	motorController.maxSet(command.data[1]);
+        interface.sendState(STATE_MOTOR,command.data[1],motorController.getSpeed(),PAD,PAD,PAD,PAD);
+        break;
     case CMD_PRINT_MOT:
-      interface.sendState(STATE,MOTOR,motorController.getMax(),motorController.getSpeed(),PAD,PAD,PAD,PAD);
+      interface.sendState(STATE_MOTOR,motorController.getMax(),motorController.getSpeed(),PAD,PAD,PAD,PAD);
     break;
     case CMD_SEND_BAT:
       //Serial.println("CMD_SEND_BAT");
@@ -183,7 +268,7 @@ void loop(){
    
    break;
    case CMD_PID_CAL:
-     
+     //calibrate();     
      pidCalibrated = true;
    break;
     case CMD_SET_SENSR://CRAP about limit switches. do we really need now?
@@ -217,9 +302,19 @@ void loop(){
     //always run every cycle
     for(int i=0;i<5;i++){
       PIDcontrollerX[i].updateOutput();
-      /*
+     // /*
       PIDcontrollerZ[i].updateOutput();
-      */
+    //  */
+    }
+  }
+  else{
+    for(int i=0;i<5;i++){
+      PIDcontrollerX[i].setSetPoint(PIDcontrollerX[i].getSensor());
+      PIDcontrollerX[i].updateOutput();
+     // /*
+      PIDcontrollerZ[i].setSetPoint(PIDcontrollerZ[i].getSensor());
+      PIDcontrollerZ[i].updateOutput();
+    //  */
     }
   }
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++*/
