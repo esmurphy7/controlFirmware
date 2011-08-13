@@ -14,7 +14,6 @@ class motorControl {
 			aSum = 0;
 			motorScaled=0;
 			digitalWrite(hmotorPin,0);
-			enableMotor = false;
 		}
 		//new value for an X actuator
 		void updateAX(int nActuator, int aValueX){
@@ -30,7 +29,7 @@ class motorControl {
 		}
 		//update the motor output
 		void updateMotor(){
-			if(enableMotor){
+//			if(enableMotor){
 				aSum = 0;
 				for(int i = 0; i < 5; i++){
 					aSum += actuatorX[i];
@@ -53,10 +52,10 @@ class motorControl {
 					motorScaled = hmotorMax;
 					//motorScaled = (255*2*aSum)/2550;
 				}
-			}
-			else{
-				motorScaled = 0;
-			}
+//			}
+//			else{
+//				motorScaled = 0;
+//			}
 
 			analogWrite(hmotorPin,abs(motorScaled));
 		}
@@ -68,8 +67,6 @@ class motorControl {
 		int getMax(){
 			return hmotorMax;
 		}
-		
-		void setON(){enableMotor = true;}
 
 	private:
 		int actuatorX[5];//values between 0 and 255

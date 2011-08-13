@@ -78,7 +78,7 @@ void loop()
   slaveSpeak = interface.getMessage();
   if(slaveSpeak.id) {
     // Special Master handling for each command
-    switch(slaveSpeak.data[0]) {
+   // switch(slaveSpeak.data[0]) {
     // Print debug
     /*  default:
         Serial.print(slaveSpeak.id,HEX);
@@ -99,7 +99,7 @@ void loop()
         Serial.print(" ");
         Serial.print(slaveSpeak.data[7],HEX);
         Serial.println();*/
-    }
+  //  }
     // Forward message to controller
     Serial3.print(slaveSpeak.id);
     Serial3.print(slaveSpeak.data[0]);
@@ -114,20 +114,21 @@ void loop()
   
   // Pump XBee messages
   // Recieved 5 bytes per slave plus one command byte
-  if(Serial3.available() >= num_slaves*5 + 1) {
+  if(Serial3.available() >= 8) {
+    byte slave_number = Serial.read();
     byte slave_command = Serial.read();
     Serial3.println("=====");
     Serial3.println(slave_command,HEX);
     Serial3.println("=====");
-    for(byte i = 1; i <= num_slaves; i++) {
+  //  for(byte i = 1; i <= num_slaves; i++) {
       // Forward the command with 5 single byte args
-      interface.sendCommand(i,(Command)slave_command,Serial3.read(),
+      interface.sendCommand(slave_number,(Command)slave_command,Serial3.read(),
                                                      Serial3.read(),
                                                      Serial3.read(),
                                                      Serial3.read(),
                                                      Serial3.read(),
-                                                     PAD);
+                                                     Serial3.read());//should be pad
       delay(5);
-    }
+   // }
   }
 }

@@ -21,11 +21,7 @@ enum Command {
   CMD_PRINT_V	=  0x72,//
   CMD_PRINT_H	=  0x73,//
   CMD_PRINT_MOT =  0x74,//
-  CMD_GET_PID   =  0x75,//
-  CMD_SET_ANGLEX=  0x76,
-  CMD_SET_ANGLEZ=  0x77,
-  CMD_GET_ANGLEX=  0x78,
-  CMD_GET_ANGLEZ=  0x79,
+  CMD_GET_PID   =  0x75//
 };
 
 enum State {
@@ -46,13 +42,8 @@ enum State {
   STATE_DEAD      = 0x6C,//last communication before total shutdown
   STATE_DUMPING   = 0x6D,
   STATE_PID_CAL	  = 0x6E,
-  STATE_BAT_SET	  = 0x71,
+  STATE_BAT_SET	  = 0x71
   
-  STATE_ANGLEX	  = 0x76,
-  STATE_ANGLEZ	  = 0x77,
-  
-  STATE_AIN		  = 0x78,
-  STATE_AOUT	  = 0x79,
 };
 
 #define PAD 0xff

@@ -101,21 +101,6 @@ class PIDcontrol{
 	}  
 	*/  
 
-	int getPID(int num){
-		if(num == 0){return kp;}
-		else if(num == 1){return ki;}
-		else if(num == 2){return kd;}
-		else{return NULL;}
-	}
-	
-	int getAIN(){
-		return Ain;
-	}
-	
-	int getAOUT(){
-		return Aout;
-	}
-	
 	void calibrated(int newAin, int newAout){
 		Ain = newAin;
 		Aout = newAout;
@@ -126,19 +111,10 @@ class PIDcontrol{
 			even = false;
 		}
 	}
-	
 	void setSetPoint(int newSetPoint){
 		setPoint = newSetPoint;
 	}
-	
-	void setAngle(int newAngle){
-		setPoint = map(newAngle,-25,25,Ain,Aout);
-		}
-	
-	int getAngle(){
-		return map(setPoint,Ain,Aout,-25,25);
-	}
-		
+
 	int getSetpoint(){
 		return setPoint;
 	}

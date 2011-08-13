@@ -107,8 +107,6 @@ int motorValue = 127;
 //PID calibrate
 boolean pidCalibrated = false;
 
-int Ain[5];
-int Aout[5];
 int cur_pid[5];
 
 void setup()
@@ -145,7 +143,6 @@ void setup()
     analogWrite(actuatorPinZ[i], 0);
     
     pinMode(valveSelectZ[i], OUTPUT);
- 
   }
   
   //make set point current value(so it dosen't move)
@@ -168,7 +165,11 @@ void ditherF(){
   //analogWrite(ditherPin,127);
 }
 
-/*void calibrate(){
+void calibrate(){
+  int Ain[5];
+  int Aout[5];
+  int cur_pid[5];
+  
   analogWrite(motorPin,130);
   for(int i=0; i<5; i++){
     analogWrite(actuatorPinX[i],0);
@@ -177,47 +178,57 @@ void ditherF(){
     digitalWrite(valveSelectX[i],HIGH);
     analogWrite(actuatorPinX[i],255);
   }
-  delay(2100);
+  delay(2100);//should actually be until all the limit switches go off
   for(int i=0; i<5; i++){
     analogWrite(actuatorPinX[i],0);
-    Aout[i] = PIDcontrollerX.getSensor();
+    Aout[i] = PIDcontrollerX[i].getSensor();
   }
   Serial.print("High value is ");
   for(int i=0; i<5; i++){  
-    Serial.println(Aout,DEC);
+    Serial.println(Aout[i],DEC);
   }
   for(int i=0; i<5; i++){    
     digitalWrite(valveSelectX[i],LOW);
     analogWrite(actuatorPinX[i],250);
   }
-  delay(2100);
+  delay(2100);//should actually be until all the limit switches go off
   for(int i=0; i<5; i++){  
     analogWrite(actuatorPinX[i],0);
-    Ain[i] = PIDcontrollerX.getSensor();
+    Ain[i] = PIDcontrollerX[i].getSensor();
   }
   analogWrite(motorPin,0);
   Serial.print("Low value is ");
   for(int i=0; i<5; i++){  
-    Serial.println(Ain,DEC);
+    Serial.println(Ain[i],DEC);
   }
-  for(int i=0; i<5; i++){  
+  for(int i=0; i<5; i++){
     PIDcontrollerX[i].calibrated(Ain[i],Aout[i]);
+    cur_pid[i] = (Aout[i] + Ain[i])/2 + 2;//little bit of curve
   }
-  cur_pid[i] = (Aout + Ain)/2 + 2;//little bit of curve
-}*/
+}
+
+int checkBat(){
+  int batIN = analogRead(BAT_LEVEL_24V);
+  int batREAL = map(batIN,0,1023,0,25000);
+  return batREAL;
+}
+
+int batDIE;
 
 void loop(){
   command = interface.getMessage();
-  switch(command.data[0]) {
+  switch(command.data[0]){
+    
     case CMD_NONE:
       //Serial.println("CMD_NONE");
       break;
+      
     case CMD_SET_HORIZ:
         //Serial.println("CMD_SET_HORIZ");
-    for (int i=1;i<=5;i++){
-      PIDcontrollerX[i-1].setSetPoint(0|command.data[i]);
-    }
-    interface.sendState(STATE_HORIZ,PIDcontrollerX[0].getSensor(),PIDcontrollerX[1].getSensor(),PIDcontrollerX[2].getSensor(),PIDcontrollerX[3].getSensor(),PIDcontrollerX[4].getSensor(),PAD);
+      for (int i=1;i<=5;i++){
+        PIDcontrollerX[i-1].setSetPoint(0|command.data[i]);
+      }
+      interface.sendState(STATE_HORIZ,PIDcontrollerX[0].getSensor(),PIDcontrollerX[1].getSensor(),PIDcontrollerX[2].getSensor(),PIDcontrollerX[3].getSensor(),PIDcontrollerX[4].getSensor(),PAD);
 /*      Serial.print(PIDcontrollerX[0].getSensor(),DEC);
       Serial.print(" ");
       Serial.print(PIDcontrollerX[1].getSensor(),DEC);
@@ -229,83 +240,136 @@ void loop(){
       Serial.print(PIDcontrollerX[4].getSensor(),DEC);
       Serial.println();*/
       break;
+      
     case CMD_SET_VERT:
       //Serial.println("CMD_SET_VERT");
-/*        for (int i=1;i<=5;i++){
-          PIDcontrollerZ[i-1].setSetPoint(0|command.data[i]);
-        }
+      for (int i=1;i<=5;i++){
+        PIDcontrollerZ[i-1].setSetPoint(0|command.data[i]);
+      }
       interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
-      */break;
+      break;
+      
+    case CMD_SET_ANGLEX:
+      for (int i=1;i<=5;i++){
+        PIDcontrollerX[i-1].setAngle(0|command.data[i]);
+      }
+      interface.sendState(STATE_ANGLEX,PIDcontrollerX[0].getAngle(),PIDcontrollerX[1].getAngle(),PIDcontrollerX[2].getAngle(),PIDcontrollerX[3].getAngle(),PIDcontrollerX[4].getAngle(),PAD);
+      break;
+      
+    case CMD_SET_ANGLEZ:
+      for (int i=1;i<=5;i++){
+        PIDcontrollerZ[i-1].setAngle(0|command.data[i]);
+      }
+      interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
+      break;
+      
     case CMD_PRINT_H:
-          interface.sendState(STATE_HORIZ,PIDcontrollerX[0].getSensor(),PIDcontrollerX[1].getSensor(),PIDcontrollerX[2].getSensor(),PIDcontrollerX[3].getSensor(),PIDcontrollerX[4].getSensor(),PAD);
-    break;
+      interface.sendState(STATE_HORIZ,PIDcontrollerX[0].getSensor(),PIDcontrollerX[1].getSensor(),PIDcontrollerX[2].getSensor(),PIDcontrollerX[3].getSensor(),PIDcontrollerX[4].getSensor(),PAD);
+      break;
+      
     case CMD_PRINT_V:
-  //          interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
-    break;
+      interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
+      break;
+      
+    case CMD_GET_ANGLEX:
+      interface.sendState(STATE_ANGLEX,PIDcontrollerX[0].getAngle(),PIDcontrollerX[1].getAngle(),PIDcontrollerX[2].getAngle(),PIDcontrollerX[3].getAngle(),PIDcontrollerX[4].getAngle(),PAD);
+      break;
+      
+    case CMD_GET_ANGLEZ:
+       interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
+       break;
+       
     case CMD_SET_MOTOR:
       Serial.println("CMD_SET_MOTOR");
-	motorController.maxSet(command.data[1]);
-        interface.sendState(STATE_MOTOR,command.data[1],motorController.getSpeed(),PAD,PAD,PAD,PAD);
-        break;
+      motorController.maxSet(command.data[1]);
+      interface.sendState(STATE_MOTOR,command.data[1],motorController.getSpeed(),PAD,PAD,PAD,PAD);
+      break;
+      
     case CMD_PRINT_MOT:
       interface.sendState(STATE_MOTOR,motorController.getMax(),motorController.getSpeed(),PAD,PAD,PAD,PAD);
-    break;
+      break;
+      
     case CMD_SEND_BAT:
       //Serial.println("CMD_SEND_BAT");
-      //interface.sendState(STATE_BAT,___Read(batPin)
+      interface.sendState(STATE_BAT,checkBat(),batDIE,PAD,PAD,PAD,PAD);
       break;
+      
     case CMD_SET_DIE:// battery kill level
-    
+      batDIE = command.data[1];
       break;
+      
     case CMD_SET_PID:
       Serial.println("CMD_SET_PID");
-      for(int i=1;i<=5;i++){
-        PIDcontrollerX[i-1].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
- //     PIDcontrollerZ[i-1].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
+      for(int i=0;i<5;i++){
+        PIDcontrollerX[i].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
+  //      PIDcontrollerZ[i-1].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
       }
+     //NEED to make it so that PID constants can be set per actuator
+     // interface.sendState(STATE_PID,
       break;
-   case CMD_GET_PID:
-   
-   break;
-   case CMD_PID_CAL:
-     //calibrate();     
+      
+    case CMD_GET_PID:
+    //same problem as PID SET
+    //  interface.sendState(STATE_PID,
+      break;
+      
+    case CMD_PID_CAL:
+     calibrate();     
      pidCalibrated = true;
-   break;
-    case CMD_SET_SENSR://CRAP about limit switches. do we really need now?
+     interface.sendState(STATE_PID_CAL,PAD,PAD,PAD,PAD,PAD,PAD);
+     break;
+     
+    case CMD_SET_SENSR://CRAP about limit switches.
       //Serial.println("CMD_SET_SENSR");
+      interface.sendState(STATE_AIN,PIDcontrollerX[0].getAIN(),PIDcontrollerX[1].getAIN(),PIDcontrollerX[2].getAIN(),PIDcontrollerX[3].getAIN(),PIDcontrollerX[4].getAIN(),PAD);
+      delay(100);
+      interface.sendState(STATE_AOUT,PIDcontrollerX[0].getAOUT(),PIDcontrollerX[1].getAOUT(),PIDcontrollerX[2].getAOUT(),PIDcontrollerX[3].getAOUT(),PIDcontrollerX[4].getAOUT(),PAD);
       break;
+      
     case CMD_BROADCAST:
       //Serial.println("CMD_BROADCAST");
-      //interface.broadcast();
-      break;   
-    case CMD_STOP:
-      //Serial.println("CMD_STOP");
+      interface.broadcast();
       break;
+      
+    case CMD_STOP:
+      //should do some relay killing
+      //all but arduino off
+      //Serial.println("CMD_STOP");
+      motorController.off();
+      interface.sendState(STATE_STOPPED,PAD,PAD,PAD,PAD,PAD,PAD);
+      break;
+      
     case CMD_START:
       //Serial.println("CMD_START");
+      motorController.setON();
+      interface.sendState(STATE_GOING,PAD,PAD,PAD,PAD,PAD,PAD);      
       break;
+      
     case CMD_STANDBY:
       //Serial.println("CMD_STANDBY");
+      motorController.off();
+      interface.sendState(STATE_STANDBY,PAD,PAD,PAD,PAD,PAD,PAD);
       break;
-   case CMD_DIE:
-     //ack die and power down
+      
+    case CMD_DIE:
+      motorController.off();
+      //ack die and power down
       break;
-   case CMD_DATA_DUMP://master command. not slave. really need here?
-     //send back what needs to be sent
-     break;
-
-  }
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-
+      
+    case CMD_DATA_DUMP://master command. not slave. really need here?
+      //send back what needs to be sent
+      break;
+  }//end of switch
+/*++++++++++++++++++++output++++++++++++++++++++++++++++++++*/
   if(pidCalibrated == true){
     //use PID to make actuator adjustments
-    //always run every cycle
     for(int i=0;i<5;i++){
       PIDcontrollerX[i].updateOutput();
      // /*
       PIDcontrollerZ[i].updateOutput();
     //  */
     }
+    motorController.updateMotor();
   }
   else{
     for(int i=0;i<5;i++){
@@ -315,8 +379,8 @@ void loop(){
       PIDcontrollerZ[i].setSetPoint(PIDcontrollerZ[i].getSensor());
       PIDcontrollerZ[i].updateOutput();
     //  */
+      motorController.updateMotor();
     }
   }
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-  //delay(50);
+/*++++++++++++++++++++output++++++++++++++++++++++++++++++++*/
 }

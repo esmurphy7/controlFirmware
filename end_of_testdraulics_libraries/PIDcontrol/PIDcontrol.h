@@ -3,19 +3,20 @@ PID control library
 calculates the PID output
 and writes to output pin
 */
-//can probably pass through suspected edge values here and use limit switches to correct?
+#ifndef PIDcontrol_h
+#define PIDcontrol_h
 
-#include "Wprogram.h"
+#include "WProgram.h"
+
+//can probably pass through suspected edge values here and use limit switches to correct?
 
 //class outputs PID control
 //out put constraint to between -255 and 255
 class PIDcontrol{
 	private:
-
+	//variables
 	int sensorPin;
 	int actuatorPin;
-	int limit_switch;
-	int valve_select;
 
 	int kp;
 	int kd;
@@ -24,8 +25,7 @@ class PIDcontrol{
 	int setPoint;
 
 	int sensorReading;
-	int Ain, Aout;
-	
+
 	int error;
 	int derivative;
 	int integral;
@@ -37,13 +37,28 @@ class PIDcontrol{
 
 	unsigned long prevTime;
 	int prevSensorReading;
-	
-	bool even;//this is to determine the side of the actuator
-	//JULIAN'S FIX for left-right side placement
-	//even TRUE means that Ain is low sensor, Aout is high sensor
+
+	int limit_switch;
+	int valve_select;
+
+	int Ain, Aout;
 
 	public:
 
+	/*  void debugging(){
+	Serial.print(sensorReading,HEX);
+	Serial.print(" ");
+	Serial.print(setPoint,HEX);
+	Serial.print(" ");
+	Serial.print(output,HEX);
+	Serial.print(" ");
+	Serial.print(kp,HEX);
+	Serial.print(" ");
+	Serial.print(kd,HEX);
+	Serial.print(" ");
+	Serial.print(ki,HEX);
+	}
+	*/
 	int getSensor(){
 
 		sensorReading = analogRead(sensorPin);
@@ -65,7 +80,7 @@ class PIDcontrol{
 		kp = 0;
 		kd = 0;
 		ki = 0;
-		ditherFrequency = 200;
+		ditherFrequency = 150;
 		reset();
 	}
 
@@ -101,44 +116,14 @@ class PIDcontrol{
 	}  
 	*/  
 
-	int getPID(int num){
-		if(num == 0){return kp;}
-		else if(num == 1){return ki;}
-		else if(num == 2){return kd;}
-		else{return NULL;}
-	}
-	
-	int getAIN(){
-		return Ain;
-	}
-	
-	int getAOUT(){
-		return Aout;
-	}
-	
 	void calibrated(int newAin, int newAout){
 		Ain = newAin;
 		Aout = newAout;
-		if(Ain < Aout){
-			even = true;
-		}
-		else{
-			even = false;
-		}
 	}
-	
 	void setSetPoint(int newSetPoint){
 		setPoint = newSetPoint;
 	}
-	
-	void setAngle(int newAngle){
-		setPoint = map(newAngle,-25,25,Ain,Aout);
-		}
-	
-	int getAngle(){
-		return map(setPoint,Ain,Aout,-25,25);
-	}
-		
+
 	int getSetpoint(){
 		return setPoint;
 	}
@@ -149,26 +134,26 @@ class PIDcontrol{
 	// if limit switch == true and < middle value
 	//middle value can be found during calibration
 	/*	if(digitalRead(limit_switch) == HIGH){
-			if(map(analogRead(sensorPin), 0, 1023, 0, 255) > 127){
-				setPoint = analogRead(sensorPin);
-				setPoint = setPoint-20;
-				Serial.println("left? limit switch tripped");
-			}
-		  //else if(map(analogRead(sensorPin), 0, 1023, 0, 255) < 127){
-				setPoint = analogRead(sensorPin);
-				setPoint = setPoint+20;
-				Serial.println("right? limit switch tripped");
-			}
+		if(map(analogRead(sensorPin), 0, 1023, 0, 255) > 127){
+			setPoint = analogRead(sensorPin);
+			setPoint = setPoint-20;
+			Serial.println("left? limit switch tripped");
 		}
-		else{//normal operation*/
-		//map sensor readings to 0-255 range
+	//		else if(map(analogRead(sensorPin), 0, 1023, 0, 255) < 127){
+			setPoint = analogRead(sensorPin);
+			setPoint = setPoint+20;
+			Serial.println("right? limit switch tripped");
+		}
+	}
+	else{//normal operation*/
+	//map sensor readings to 0-255 range
 		getSensor();
-		error = setPoint - sensorReading;
+		error = sensorReading - setPoint;
 		if(abs(error) < 2) {
 			error = 0;
 			integral = 0;
 			prevSensorReading = -1;
-		}
+		} 
 		//Serial.print("error: ");
 		//Serial.println(error);
 
@@ -195,48 +180,48 @@ class PIDcontrol{
 		//adjust fomula to change sensativity to constaints
 		output = kp*error - kd*derivative + ki*integral/256;
 		output = constrain(output, -255, 255);
-		//}
+	//}
 
-		int realOutput = output;
-		realOutput = constrain(realOutput, -255, 255);
+	//add dithering regardless of trigger or not
+	//dither = int(255*sin(float(millis()/1000.0*2.0*PI*ditherFrequency)));
+	//dither = 0;
+	int realOutput = output;
+	realOutput = constrain(realOutput, -255, 255);
 
-		//here is where we need to set up some way to determine left and right. everything else  works fine
+	//here is where we need to set up some way to determine left and right. everything else  works fine
 
-		// We map the output to 120 to 255 here because the
-		// Valves won't open enough below 120 duty cycle
-		if(realOutput > 0){
-			analogWrite(actuatorPin, map(realOutput, 0, 255, 120, 255));
-			if(even){
-				digitalWrite(valve_select, HIGH);
-			}
-			else{
-				digitalWrite(valve_select, LOW);
-			}
-		}
-		else if(realOutput < 0){
-			analogWrite(actuatorPin, -map(realOutput, -255, 0, -255, -120));
-			if(even){
-				digitalWrite(valve_select, LOW);
-			}
-			else{
-				digitalWrite(valve_select, HIGH);
-			}
+	// We map the output to 120 to 255 here because the
+	// Valves won't open enough below 120 duty cycle
+	if(realOutput > 0){
+	//analogWrite(actuatorPin, output);
+	//analogWrite(valve_select, LOW);
+	  analogWrite(actuatorPin, map(realOutput, 0, 255, 120, 255));
+	  analogWrite(actuatorPin+1, 0);
+	}
+	else if(realOutput < 0){
+	//  analogWrite(actuatorPin, output);
+	//  analogWrite(valve_select, HIGH);
 
-		}
+		analogWrite(actuatorPin+1, -map(realOutput, -255, 0, -255, -120));
+		analogWrite(actuatorPin, 0);
+		//if(millis() % 200){
+		//Serial.print("Wrote HIGH to ");
+		//Serial.println(actuatorPin);}
+	}
+	/*else{
+		if(dither >= 0){
+		analogWrite(actuatorPin,dither);
+		analogWrite(actuatorPin+1,0);
+	}
 		else{
-			/*dither = int(sin(float(millis()/1000.0*2.0*PI*ditherFrequency)));
-			if(dither > 0){
-				digitalWrite(actuatorPin,HIGH);
-				digitalWrite(valve_select,HIGH);
-			}
-			else{
-				digitalWrite(actuatorPin,LOW);
-				digitalWrite(valve_select,HIGH);
-			}*/
-			analogWrite(actuatorPin,0);
+		analogWrite(actuatorPin+1,-dither);
+		analogWrite(actuatorPin,0);
 		}
+	}*/
 
 		return realOutput;
 	}
 
 };
+
+#endif
