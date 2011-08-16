@@ -338,12 +338,16 @@ void loop(){
       
     case CMD_SET_PID:
       Serial.println("CMD_SET_PID");
-      for(int i=0;i<5;i++){
-        PIDcontrollerX[i].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
-  //      PIDcontrollerZ[i-1].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
+      if(command.data[1] > 4) {
+        for(int i = 0; i<5; i++) {
+          PIDcontrollerX[i].setConstants(0|command.data[2],0|command.data[3],0|command.data[4]);
+        }
       }
-     //NEED to make it so that PID constants can be set per actuator
-     // interface.sendState(STATE_PID,
+      else {
+        PIDcontrollerX[command.data[1]].setConstants(0|command.data[2],0|command.data[3],0|command.data[4]);
+  //    PIDcontrollerZ[i-1].setConstants(0|command.data[1],0|command.data[2],0|command.data[3]);
+        interface.sendState(STATE_PID,command.data[2], command.data[3], command.data[4], PAD,PAD,PAD);
+      }
       break;
       
     case CMD_GET_PID:
