@@ -20,39 +20,39 @@ Interface interface(CS_PIN);
 //THESE PINS WERE CHECKED ON JULY 20 2011
 //analog pins for pot reading
 // Pins defined in boashield_pins.h
-const int sensorPinX[] = {HORZ_POS_SENSOR_1, 
+const int sensorPinX[5] = {HORZ_POS_SENSOR_1, 
                           HORZ_POS_SENSOR_2, 
                           HORZ_POS_SENSOR_3, 
                           HORZ_POS_SENSOR_4, 
                           HORZ_POS_SENSOR_5};
 
-const int sensorPinZ[] = { VERT_POS_SENSOR_1, 
+const int sensorPinZ[5] = { VERT_POS_SENSOR_1, 
                           VERT_POS_SENSOR_2,
                           VERT_POS_SENSOR_3,
                           VERT_POS_SENSOR_4,
                           VERT_POS_SENSOR_5};
 
 //PID signal pins
-const int actuatorPinX[] = {HORZ_ACTUATOR_1, 
+const int actuatorPinX[5] = {HORZ_ACTUATOR_1, 
                             HORZ_ACTUATOR_2, 
                             HORZ_ACTUATOR_3, 
                             HORZ_ACTUATOR_4, 
                             HORZ_ACTUATOR_5};
 
-const int actuatorPinZ[] = {VERT_ACTUATOR_1, 
+const int actuatorPinZ[5] = {VERT_ACTUATOR_1, 
                             VERT_ACTUATOR_2, 
                             VERT_ACTUATOR_3, 
                             VERT_ACTUATOR_4, 
                             VERT_ACTUATOR_5};
 
 //Valve select pins because we don't have enough PWM
-const int valveSelectX[] = {HORZ_ACTUATOR_CTRL_1, 
+const int valveSelectX[5] = {HORZ_ACTUATOR_CTRL_1, 
                             HORZ_ACTUATOR_CTRL_2, 
                             HORZ_ACTUATOR_CTRL_3, 
                             HORZ_ACTUATOR_CTRL_4, 
                             HORZ_ACTUATOR_CTRL_5};
 
-const int valveSelectZ[] = {VERT_ACTUATOR_CTRL_1, 
+const int valveSelectZ[5] = {VERT_ACTUATOR_CTRL_1, 
                             VERT_ACTUATOR_CTRL_2, 
                             VERT_ACTUATOR_CTRL_3, 
                             VERT_ACTUATOR_CTRL_4, 
@@ -67,13 +67,13 @@ const int motorPin = MOTOR_CONTROL;
 motorControl	motorController(motorPin);
 
 /*limit switches in series. will determine L/R through math*/
-const int limit_switchX[] = {HORZ_LIMIT_SWITCH_1, 
+const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1, 
                              HORZ_LIMIT_SWITCH_2,
                              HORZ_LIMIT_SWITCH_3, 
                              HORZ_LIMIT_SWITCH_4, 
                              HORZ_LIMIT_SWITCH_5};
                              
-const int limit_switchZ[] = {VERT_LIMIT_SWITCH_1, 
+const int limit_switchZ[5] = {VERT_LIMIT_SWITCH_1, 
                              VERT_LIMIT_SWITCH_2, 
                              VERT_LIMIT_SWITCH_3, 
                              VERT_LIMIT_SWITCH_4, 
@@ -108,8 +108,6 @@ int motorValue = 127;
 
 //PID calibrate
 boolean pidCalibrated = false;
-
-int cur_pid[5];
 
 void setup()
 {
@@ -152,6 +150,8 @@ void setup()
     PIDcontrollerX[i].setSetPoint(analogRead(sensorPinX[i]));
     PIDcontrollerZ[i].setSetPoint(analogRead(sensorPinZ[i]));
   }
+  checkBat();
+  BcheckTIME = millis();
 }//setup end
 
 Frame command;
@@ -198,6 +198,8 @@ void delayForLimitSwitches() {
 }
 
 void calibrate(){
+  //extend then retract all at once until
+
   int Ain[5];
   int Aout[5];
   int cur_pid[5];
@@ -248,10 +250,15 @@ void calibrate(){
 int checkBat(){
   int batIN = analogRead(BAT_LEVEL_24V);
   int batREAL = map(batIN,0,1023,0,25000);
+  if(batREAL < batDIE){
+    //whatever we do to trigger kill switches
+  }
   return batREAL;
 }
 
-int batDIE;
+unsigned long BcheckTIME;
+//remember, it's in mV
+int batDIE=21000;
 
 void loop(){
   command = interface.getMessage();
@@ -352,8 +359,15 @@ void loop(){
       
     case CMD_GET_PID:
     //same problem as PID SET
-    //  interface.sendState(STATE_PID,
-      break;
+      if(command.data[1] > 4) {	  
+	    for(int i=0;i<4;i++){
+	  	  interface.sendState(STATE_PID, i,PIDcontrollerX[i].getPID(0), PIDcontrollerX[i].getPID(1), PIDcontrollerX[i].getPID(2),PAD,PAD);
+	    }
+	  }
+	  else{
+		interface.sendState(STATE_PID, command.data[1]],PIDcontrollerX[command.data[1]]].getPID(0), PIDcontrollerX[command.data[1]]].getPID(1), PIDcontrollerX[command.data[1]]].getPID(2),PAD,PAD);
+      }
+	  break;
       
     case CMD_PID_CAL:
      calibrate();     
@@ -406,7 +420,8 @@ void loop(){
   if(pidCalibrated == true){
     //use PID to make actuator adjustments
     for(int i=0;i<5;i++){
-      PIDcontrollerX[i].updateOutput();
+      outputX[i]=PIDcontrollerX[i].updateOutput();
+      motorController.updateAX(i,outputX[i]);
      // /*
 //      PIDcontrollerZ[i].updateOutput();
     //  */
@@ -425,4 +440,9 @@ void loop(){
     }
   }
 /*++++++++++++++++++++output++++++++++++++++++++++++++++++++*/
+  if((millis()-BcheckTIME)>50000){
+    checkBat();
+	BcheckTIME=millis();
+  }
+
 }
