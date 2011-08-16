@@ -19,11 +19,13 @@ Interface interface(CS_PIN);
 
 //THESE PINS WERE CHECKED ON JULY 20 2011
 //analog pins for pot reading
+// Pins defined in boashield_pins.h
 const int sensorPinX[] = {HORZ_POS_SENSOR_1, 
                           HORZ_POS_SENSOR_2, 
                           HORZ_POS_SENSOR_3, 
                           HORZ_POS_SENSOR_4, 
                           HORZ_POS_SENSOR_5};
+
 const int sensorPinZ[] = { VERT_POS_SENSOR_1, 
                           VERT_POS_SENSOR_2,
                           VERT_POS_SENSOR_3,
@@ -165,33 +167,69 @@ void ditherF(){
   //analogWrite(ditherPin,127);
 }
 
+//
+// Blocks until all five horizontal limit switches have
+// been tripped. If a switch is tripped the actuator is
+// turned off and the trip is registered. When all five
+// switches have been tripped the function returns
+void delayForLimitSwitches() {
+  boolean tripped[] = {false, false, false, false, false};
+  // Loop until all limit switches are tripped
+  while(1) {
+    int num_tripped = 0;
+    // Loop through each switch
+    for(int i = 0; i<5; i++) {
+      // If the switch has been tripped turn off the actuator
+      //    and store the sensor values
+      if(digitalRead(limit_switchX[i])) {
+        tripped[i] = true;
+      }
+      // Sum the number of switches tripped while checking
+      if(tripped[i] == true) {
+        num_tripped++;
+      }
+    }
+    // If all five limit switches were tripped break out of the loop
+    if(num_tripped == 5) {
+      break;
+    }
+    delay(10);
+  }
+}
+
 void calibrate(){
   int Ain[5];
   int Aout[5];
   int cur_pid[5];
   
+  // Turn on the motor
   analogWrite(motorPin,130);
-  for(int i=0; i<5; i++){
-    analogWrite(actuatorPinX[i],0);
-  }
+  
+  // Turn on actuators to HIGH side
   for(int i=0; i<5; i++){
     digitalWrite(valveSelectX[i],HIGH);
     analogWrite(actuatorPinX[i],255);
   }
-  delay(2100);//should actually be until all the limit switches go off
-  for(int i=0; i<5; i++){
+  delayForLimitSwitches();
+  
+  // Turn off all actuators and get thier sensor values
+  for(int i=0; i<5; i++){  
     analogWrite(actuatorPinX[i],0);
     Aout[i] = PIDcontrollerX[i].getSensor();
   }
+  
   Serial.print("High value is ");
   for(int i=0; i<5; i++){  
     Serial.println(Aout[i],DEC);
   }
+  
+  // Turn on actuators to LOW side
   for(int i=0; i<5; i++){    
     digitalWrite(valveSelectX[i],LOW);
     analogWrite(actuatorPinX[i],250);
   }
-  delay(2100);//should actually be until all the limit switches go off
+  delayForLimitSwitches();
+  
   for(int i=0; i<5; i++){  
     analogWrite(actuatorPinX[i],0);
     Ain[i] = PIDcontrollerX[i].getSensor();
