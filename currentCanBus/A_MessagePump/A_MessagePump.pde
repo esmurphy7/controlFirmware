@@ -404,7 +404,7 @@ void loop(){
     for(int i=0;i<5;i++){
       PIDcontrollerX[i].updateOutput();
      // /*
-      PIDcontrollerZ[i].updateOutput();
+//      PIDcontrollerZ[i].updateOutput();
     //  */
     }
     motorController.updateMotor();
@@ -414,8 +414,8 @@ void loop(){
       PIDcontrollerX[i].setSetPoint(PIDcontrollerX[i].getSensor());
       PIDcontrollerX[i].updateOutput();
      // /*
-      PIDcontrollerZ[i].setSetPoint(PIDcontrollerZ[i].getSensor());
-      PIDcontrollerZ[i].updateOutput();
+//      PIDcontrollerZ[i].setSetPoint(PIDcontrollerZ[i].getSensor());
+//      PIDcontrollerZ[i].updateOutput();
     //  */
       motorController.updateMotor();
     }
