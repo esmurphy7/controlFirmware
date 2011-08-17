@@ -11,21 +11,61 @@ const int sensorPinX[5] = {HORZ_POS_SENSOR_1,
                           HORZ_POS_SENSOR_3, 
                           HORZ_POS_SENSOR_4, 
                           HORZ_POS_SENSOR_5};
-
+                          
+/*
+const int sensorPinX[5] = {VERT_POS_SENSOR_1, 
+                          VERT_POS_SENSOR_2, 
+                          VERT_POS_SENSOR_3, 
+                          VERT_POS_SENSOR_4, 
+                          VERT_POS_SENSOR_5};
+*/
 //PID signal pins
+// /*
 const int actuatorPinX[5] = {HORZ_ACTUATOR_1, 
                             HORZ_ACTUATOR_2, 
                             HORZ_ACTUATOR_3, 
                             HORZ_ACTUATOR_4, 
                             HORZ_ACTUATOR_5};
+// */
+/*
+const int actuatorPinX[5] = {VERT_ACTUATOR_1, 
+                            VERT_ACTUATOR_2, 
+                            VERT_ACTUATOR_3, 
+                            VERT_ACTUATOR_4, 
+                            VERT_ACTUATOR_5};
+*/
 
 //Valve select pins because we don't have enough PWM
+// /*
 const int valveSelectX[5] = {HORZ_ACTUATOR_CTRL_1, 
                             HORZ_ACTUATOR_CTRL_2, 
                             HORZ_ACTUATOR_CTRL_3, 
                             HORZ_ACTUATOR_CTRL_4, 
                             HORZ_ACTUATOR_CTRL_5};
+// */
+/*
+const int valveSelectX[5] = {VERT_ACTUATOR_CTRL_1, 
+                            VERT_ACTUATOR_CTRL_2, 
+                            VERT_ACTUATOR_CTRL_3, 
+                            VERT_ACTUATOR_CTRL_4, 
+                            VERT_ACTUATOR_CTRL_5};
+*/
+/*limit switches in series. will determine L/R through math*/
+// /*
+const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1, 
+                             HORZ_LIMIT_SWITCH_2,
+                             HORZ_LIMIT_SWITCH_3, 
+                             HORZ_LIMIT_SWITCH_4, 
+                             HORZ_LIMIT_SWITCH_5};
+// */  
+/*
+const int limit_switchX[5] = {VERT_LIMIT_SWITCH_1, 
+                             VERT_LIMIT_SWITCH_2,
+                             VERT_LIMIT_SWITCH_3, 
+                             VERT_LIMIT_SWITCH_4, 
+                             VERT_LIMIT_SWITCH_5};
 
+*/
 //Dither will be fed into all unselected valves
 const int ditherPin = DITHER;
 
@@ -33,13 +73,6 @@ const int ditherPin = DITHER;
 const int motorPin = MOTOR_CONTROL;
 
 motorControl	motorController(motorPin);
-
-/*limit switches in series. will determine L/R through math*/
-const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1, 
-                             HORZ_LIMIT_SWITCH_2,
-                             HORZ_LIMIT_SWITCH_3, 
-                             HORZ_LIMIT_SWITCH_4, 
-                             HORZ_LIMIT_SWITCH_5};
 
 //PID controllers
 PIDcontrol PIDcontrollerX[5] = {

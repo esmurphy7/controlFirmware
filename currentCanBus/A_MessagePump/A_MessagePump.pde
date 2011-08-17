@@ -1,12 +1,18 @@
 // Command pump for slave Arduino
 // Reads commands and responds as required
+
+//In the version made around august 16, no PIDZ
+//to still allow for vertical movement
+// 0x00 means off
+//
 #include "interface.h"
 #include "MCP2515.h"
 #include <SPI.h>
 #include "PIDcontrolBOA.h"
-#include  "boashield_pins.h"
+#include "boashield_pins.h"
 #include <motorControl.h>
-
+#include "batteryInfo.h"
+#include "PinInit.h"
 
 #define CS_PIN 53
 
@@ -17,72 +23,7 @@ Interface interface(CS_PIN);
  
 #define  ditherFreq  200
 
-//THESE PINS WERE CHECKED ON JULY 20 2011
-//analog pins for pot reading
-// Pins defined in boashield_pins.h
-const int sensorPinX[5] = {HORZ_POS_SENSOR_1, 
-                          HORZ_POS_SENSOR_2, 
-                          HORZ_POS_SENSOR_3, 
-                          HORZ_POS_SENSOR_4, 
-                          HORZ_POS_SENSOR_5};
-
-const int sensorPinZ[5] = { VERT_POS_SENSOR_1, 
-                          VERT_POS_SENSOR_2,
-                          VERT_POS_SENSOR_3,
-                          VERT_POS_SENSOR_4,
-                          VERT_POS_SENSOR_5};
-
-//PID signal pins
-const int actuatorPinX[5] = {HORZ_ACTUATOR_1, 
-                            HORZ_ACTUATOR_2, 
-                            HORZ_ACTUATOR_3, 
-                            HORZ_ACTUATOR_4, 
-                            HORZ_ACTUATOR_5};
-
-const int actuatorPinZ[5] = {VERT_ACTUATOR_1, 
-                            VERT_ACTUATOR_2, 
-                            VERT_ACTUATOR_3, 
-                            VERT_ACTUATOR_4, 
-                            VERT_ACTUATOR_5};
-
-//Valve select pins because we don't have enough PWM
-const int valveSelectX[5] = {HORZ_ACTUATOR_CTRL_1, 
-                            HORZ_ACTUATOR_CTRL_2, 
-                            HORZ_ACTUATOR_CTRL_3, 
-                            HORZ_ACTUATOR_CTRL_4, 
-                            HORZ_ACTUATOR_CTRL_5};
-
-const int valveSelectZ[5] = {VERT_ACTUATOR_CTRL_1, 
-                            VERT_ACTUATOR_CTRL_2, 
-                            VERT_ACTUATOR_CTRL_3, 
-                            VERT_ACTUATOR_CTRL_4, 
-                            VERT_ACTUATOR_CTRL_5};
-
-//Dither will be fed into all unselected valves
-const int ditherPin = DITHER;
-
-//motor write speed
-const int motorPin = MOTOR_CONTROL;
-
 motorControl	motorController(motorPin);
-
-/*limit switches in series. will determine L/R through math*/
-const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1, 
-                             HORZ_LIMIT_SWITCH_2,
-                             HORZ_LIMIT_SWITCH_3, 
-                             HORZ_LIMIT_SWITCH_4, 
-                             HORZ_LIMIT_SWITCH_5};
-                             
-const int limit_switchZ[5] = {VERT_LIMIT_SWITCH_1, 
-                             VERT_LIMIT_SWITCH_2, 
-                             VERT_LIMIT_SWITCH_3, 
-                             VERT_LIMIT_SWITCH_4, 
-                             VERT_LIMIT_SWITCH_5};
-
-//have to check battery voltage
-const int batPin = BAT_LEVEL_24V;
-
-//arduinos need to kill
 
 //PID controllers
 PIDcontrol PIDcontrollerX[5] = {
@@ -101,13 +42,11 @@ PIDcontrol PIDcontrollerZ[5] = {
   PIDcontrol( sensorPinZ[4], actuatorPinZ[4], limit_switchZ[4], valveSelectZ[4])
 };
 //*/
-
-//defaul values for stuff
-//motor
-int motorValue = 127;
-
+#include "Calibration.h"
 //PID calibrate
 boolean pidCalibrated = false;
+
+Frame command;
 
 void setup()
 {
@@ -122,6 +61,8 @@ void setup()
   SPI.begin();
   
   int type = SLAVE;
+  //the solution to our probable power on initialization
+  interface.sendState(STATE_INITING,PAD,PAD,PAD,PAD,PAD,PAD);
   
   interface.init(type);
   delay(10);
@@ -154,8 +95,6 @@ void setup()
   BcheckTIME = millis();
 }//setup end
 
-Frame command;
-
 void ditherF(){
   int Dout = int(sin(float(millis()/1000.0*2.0*PI*ditherFreq)));
   if(Dout > 0){
@@ -166,101 +105,13 @@ void ditherF(){
   }
   //analogWrite(ditherPin,127);
 }
-
-//
-// Blocks until all five horizontal limit switches have
-// been tripped. If a switch is tripped the actuator is
-// turned off and the trip is registered. When all five
-// switches have been tripped the function returns
-void delayForLimitSwitches() {
-  boolean tripped[] = {false, false, false, false, false};
-  // Loop until all limit switches are tripped
-  while(1) {
-    int num_tripped = 0;
-    // Loop through each switch
-    for(int i = 0; i<5; i++) {
-      // If the switch has been tripped turn off the actuator
-      //    and store the sensor values
-      if(digitalRead(limit_switchX[i])) {
-        tripped[i] = true;
-      }
-      // Sum the number of switches tripped while checking
-      if(tripped[i] == true) {
-        num_tripped++;
-      }
-    }
-    // If all five limit switches were tripped break out of the loop
-    if(num_tripped == 5) {
-      break;
-    }
-    delay(10);
-  }
-}
-
-void calibrate(){
-  //extend then retract all at once until
-
-  int Ain[5];
-  int Aout[5];
-  int cur_pid[5];
-  
-  // Turn on the motor
-  analogWrite(motorPin,130);
-  
-  // Turn on actuators to HIGH side
-  for(int i=0; i<5; i++){
-    digitalWrite(valveSelectX[i],HIGH);
-    analogWrite(actuatorPinX[i],255);
-  }
-  delayForLimitSwitches();
-  
-  // Turn off all actuators and get thier sensor values
-  for(int i=0; i<5; i++){  
-    analogWrite(actuatorPinX[i],0);
-    Aout[i] = PIDcontrollerX[i].getSensor();
-  }
-  
-  Serial.print("High value is ");
-  for(int i=0; i<5; i++){  
-    Serial.println(Aout[i],DEC);
-  }
-  
-  // Turn on actuators to LOW side
-  for(int i=0; i<5; i++){    
-    digitalWrite(valveSelectX[i],LOW);
-    analogWrite(actuatorPinX[i],250);
-  }
-  delayForLimitSwitches();
-  
-  for(int i=0; i<5; i++){  
-    analogWrite(actuatorPinX[i],0);
-    Ain[i] = PIDcontrollerX[i].getSensor();
-  }
-  analogWrite(motorPin,0);
-  Serial.print("Low value is ");
-  for(int i=0; i<5; i++){  
-    Serial.println(Ain[i],DEC);
-  }
-  for(int i=0; i<5; i++){
-    PIDcontrollerX[i].calibrated(Ain[i],Aout[i]);
-    cur_pid[i] = (Aout[i] + Ain[i])/2 + 2;//little bit of curve
-  }
-}
-
-int checkBat(){
-  int batIN = analogRead(BAT_LEVEL_24V);
-  int batREAL = map(batIN,0,1023,0,25000);
-  if(batREAL < batDIE){
-    //whatever we do to trigger kill switches
-  }
-  return batREAL;
-}
-
-unsigned long BcheckTIME;
-//remember, it's in mV
-int batDIE=21000;
+//they want vertical actuation so vertical actuation I will give them
+//boolean flags and timers will do the trick
+boolean openVertB[5]={false,false,false,false,false};
+unsigned int openVertT[5]={0,0,0,0,0};
 
 void loop(){
+  int outputX[5];
   command = interface.getMessage();
   switch(command.data[0]){
     
@@ -288,10 +139,34 @@ void loop(){
       
     case CMD_SET_VERT:
       //Serial.println("CMD_SET_VERT");
-      for (int i=1;i<=5;i++){
-        PIDcontrollerZ[i-1].setSetPoint(0|command.data[i]);
+ //     for (int i=1;i<=5;i++){
+   //     PIDcontrollerZ[i-1].setSetPoint(0|command.data[i]);
+     // }
+      //interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
+      
+      //the open loop case
+      //true or false
+      for(int i = 1; i<=5; i++){
+        //turning off for sure case
+        if(command.data[i]==0){
+          openVertB[i-1]=false;
+          analogWrite(actuatorPinZ[i-1],0);
+        }
+        //the going in case
+        else if(command.data[i]<128){
+          openVertB[i-1]=true;
+          digitalWrite(valveSelectZ[i-1],LOW);
+          analogWrite(actuatorPinZ[i-1],200);
+          openVertT[i-1]=millis();
+        }
+        //the going out case
+        else{
+          digitalWrite(valveSelectZ[i-1],HIGH);
+          analogWrite(actuatorPinZ[i-1],200);
+          openVertT[i-1]=millis();
+        }
       }
-      interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
+      interface.sendState(STATE_VERT,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);
       break;
       
     case CMD_SET_ANGLEX:
@@ -302,10 +177,33 @@ void loop(){
       break;
       
     case CMD_SET_ANGLEZ:
-      for (int i=1;i<=5;i++){
-        PIDcontrollerZ[i-1].setAngle(0|command.data[i]);
+//      for (int i=1;i<=5;i++){
+  //      PIDcontrollerZ[i-1].setAngle(0|command.data[i]);
+    //  }
+      //interface.sendState(STATE_ANGLEZ,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
+      //the open loop case
+      //true or false
+      for(int i = 1; i<=5; i++){
+        //turning off for sure case
+        if(command.data[i]==0){
+          openVertB[i-1]=false;
+          analogWrite(actuatorPinZ[i-1],0);
+        }
+        //the going in case
+        else if(command.data[i]<128){
+          openVertB[i-1]=true;
+          digitalWrite(valveSelectZ[i-1],LOW);
+          analogWrite(actuatorPinZ[i-1],200);
+          openVertT[i-1]=millis();
+        }
+        //the going out case
+        else{
+          digitalWrite(valveSelectZ[i-1],HIGH);
+          analogWrite(actuatorPinZ[i-1],200);
+          openVertT[i-1]=millis();
+        }
       }
-      interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
+      interface.sendState(STATE_ANGLEZ,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);
       break;
       
     case CMD_PRINT_H:
@@ -313,7 +211,8 @@ void loop(){
       break;
       
     case CMD_PRINT_V:
-      interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
+      //interface.sendState(STATE_VERT,PIDcontrollerZ[0].getSensor(),PIDcontrollerZ[1].getSensor(),PIDcontrollerZ[2].getSensor(),PIDcontrollerZ[3].getSensor(),PIDcontrollerZ[4].getSensor(),PAD);
+       interface.sendState(STATE_VERT,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);     
       break;
       
     case CMD_GET_ANGLEX:
@@ -321,8 +220,8 @@ void loop(){
       break;
       
     case CMD_GET_ANGLEZ:
-       interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
-       break;
+       //interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
+      interface.sendState(STATE_ANGLEZ,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);       break;
        
     case CMD_SET_MOTOR:
       Serial.println("CMD_SET_MOTOR");
@@ -365,8 +264,8 @@ void loop(){
 	    }
 	  }
 	  else{
-		interface.sendState(STATE_PID, command.data[1]],PIDcontrollerX[command.data[1]]].getPID(0), PIDcontrollerX[command.data[1]]].getPID(1), PIDcontrollerX[command.data[1]]].getPID(2),PAD,PAD);
-      }
+		interface.sendState(STATE_PID, command.data[1],PIDcontrollerX[command.data[1]].getPID(0), PIDcontrollerX[command.data[1]].getPID(1), PIDcontrollerX[command.data[1]].getPID(2),PAD,PAD);
+          }
 	  break;
       
     case CMD_PID_CAL:
@@ -415,6 +314,11 @@ void loop(){
     case CMD_DATA_DUMP://master command. not slave. really need here?
       //send back what needs to be sent
       break;
+    
+    case CMD_REINIT:
+    //this will happen if a new module turns on or resets
+      interface.init(SLAVE);
+      break;
   }//end of switch
 /*++++++++++++++++++++output++++++++++++++++++++++++++++++++*/
   if(pidCalibrated == true){
@@ -425,10 +329,15 @@ void loop(){
      // /*
 //      PIDcontrollerZ[i].updateOutput();
     //  */
+      if( (openVertB[i]==true) && ((millis()-openVertT[i]) > 500) ){
+        analogWrite(actuatorPin[i],0);
+        openVertB[i]=false;
+      }//end of the open loop timer check
+    
     }
     motorController.updateMotor();
-  }
-  else{
+  }//end of calibrated PID output
+  else{//not too sure what's safe to do here in the "don't move me" stage
     for(int i=0;i<5;i++){
       PIDcontrollerX[i].setSetPoint(PIDcontrollerX[i].getSensor());
       PIDcontrollerX[i].updateOutput();
@@ -437,12 +346,15 @@ void loop(){
 //      PIDcontrollerZ[i].updateOutput();
     //  */
       motorController.updateMotor();
+      ditherF();
+      
     }
   }
 /*++++++++++++++++++++output++++++++++++++++++++++++++++++++*/
+
+//PERIODIC BATTERY CHECKING
   if((millis()-BcheckTIME)>50000){
     checkBat();
 	BcheckTIME=millis();
   }
-
 }

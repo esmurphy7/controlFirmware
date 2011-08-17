@@ -15,8 +15,7 @@ void setup()
     delay(10);
   }
   
-  init_enable = Serial3.read();
-  num_slaves = Serial3.read();
+  Serial.read();
   
   interface.init(MASTER);
   delay(10);  
@@ -39,7 +38,11 @@ void setup()
 
 void loop(){
 
-//check for xbee command
+//check for CAN Bus message. this comes first mainly because of reinit
+
+  
+//check for xbee command. Done second because the buffer isn't going anywhere
+//CAN buffer can be overwridden
 //also take into consideration state. probably in giant switch itself
 
 //parse xbee command. pro
