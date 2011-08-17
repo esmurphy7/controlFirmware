@@ -12,13 +12,13 @@ const int sensorPinX[5] = {HORZ_POS_SENSOR_1,
                           HORZ_POS_SENSOR_4, 
                           HORZ_POS_SENSOR_5};
                           
-/*
-const int sensorPinX[5] = {VERT_POS_SENSOR_1, 
+///*
+const int sensorPinZ[5] = {VERT_POS_SENSOR_1, 
                           VERT_POS_SENSOR_2, 
                           VERT_POS_SENSOR_3, 
                           VERT_POS_SENSOR_4, 
                           VERT_POS_SENSOR_5};
-*/
+//*/
 //PID signal pins
 // /*
 const int actuatorPinX[5] = {HORZ_ACTUATOR_1, 
@@ -27,13 +27,13 @@ const int actuatorPinX[5] = {HORZ_ACTUATOR_1,
                             HORZ_ACTUATOR_4, 
                             HORZ_ACTUATOR_5};
 // */
-/*
-const int actuatorPinX[5] = {VERT_ACTUATOR_1, 
+// /*
+const int actuatorPinZ[5] = {VERT_ACTUATOR_1, 
                             VERT_ACTUATOR_2, 
                             VERT_ACTUATOR_3, 
                             VERT_ACTUATOR_4, 
                             VERT_ACTUATOR_5};
-*/
+//*/
 
 //Valve select pins because we don't have enough PWM
 // /*
@@ -43,13 +43,13 @@ const int valveSelectX[5] = {HORZ_ACTUATOR_CTRL_1,
                             HORZ_ACTUATOR_CTRL_4, 
                             HORZ_ACTUATOR_CTRL_5};
 // */
-/*
-const int valveSelectX[5] = {VERT_ACTUATOR_CTRL_1, 
+// /*
+const int valveSelectZ[5] = {VERT_ACTUATOR_CTRL_1, 
                             VERT_ACTUATOR_CTRL_2, 
                             VERT_ACTUATOR_CTRL_3, 
                             VERT_ACTUATOR_CTRL_4, 
                             VERT_ACTUATOR_CTRL_5};
-*/
+// */
 /*limit switches in series. will determine L/R through math*/
 // /*
 const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1, 
@@ -58,14 +58,14 @@ const int limit_switchX[5] = {HORZ_LIMIT_SWITCH_1,
                              HORZ_LIMIT_SWITCH_4, 
                              HORZ_LIMIT_SWITCH_5};
 // */  
-/*
-const int limit_switchX[5] = {VERT_LIMIT_SWITCH_1, 
+// /*
+const int limit_switchZ[5] = {VERT_LIMIT_SWITCH_1, 
                              VERT_LIMIT_SWITCH_2,
                              VERT_LIMIT_SWITCH_3, 
                              VERT_LIMIT_SWITCH_4, 
                              VERT_LIMIT_SWITCH_5};
 
-*/
+// */
 //Dither will be fed into all unselected valves
 const int ditherPin = DITHER;
 
@@ -100,6 +100,9 @@ int Ain[5];
 int Aout[5];
 
 int ditherFreq = 200;
+
+boolean openVertB[5]={false,false,false,false,false};
+unsigned int openVertT[5]={0,0,0,0,0};
 
 void setup() {
   
@@ -152,6 +155,11 @@ void updateSystem() {
 
     outputX[i]=PIDcontrollerX[i].updateOutput();
     motorController.updateAX(i,abs(outputX[i]));
+    
+    if( (openVertB[i]==true) && ((millis()-openVertT[i]) > 500) ){
+      analogWrite(actuatorPinZ[i],0);
+      openVertB[i]=false;
+    }//end of the open loop timer check
   }
   ditherF();
   motorController.updateMotor();
@@ -261,6 +269,68 @@ void loop() {
     if(tmp=='g') {cur_pid[4]+=10;}
     if(tmp=='b') {cur_pid[4]-=10;}
     
+    if(tmp=='A') {
+      openVertB[0]=true;
+      digitalWrite(valveSelectZ[0],HIGH);
+      analogWrite(actuatorPinZ[0],200);
+      openVertT[0]=millis();
+    }
+    if(tmp=='Z') {      
+      openVertB[0]=true;
+      digitalWrite(valveSelectZ[0],LOW);
+      analogWrite(actuatorPinZ[0],200);
+      openVertT[0]=millis();
+    }
+    if(tmp=='S') {
+      openVertB[1]=true;
+      digitalWrite(valveSelectZ[1],HIGH);
+      analogWrite(actuatorPinZ[1],200);
+      openVertT[1]=millis();
+    }
+    if(tmp=='X') {      
+      openVertB[1]=true;
+      digitalWrite(valveSelectZ[1],LOW);
+      analogWrite(actuatorPinZ[1],200);
+      openVertT[1]=millis();
+    }
+     if(tmp=='D') {
+      openVertB[2]=true;
+      digitalWrite(valveSelectZ[2],HIGH);
+      analogWrite(actuatorPinZ[2],200);
+      openVertT[2]=millis();
+    }
+    if(tmp=='C') {      
+      openVertB[2]=true;
+      digitalWrite(valveSelectZ[2],LOW);
+      analogWrite(actuatorPinZ[2],200);
+      openVertT[2]=millis();
+    }
+    if(tmp=='F') {
+      openVertB[3]=true;
+      digitalWrite(valveSelectZ[3],HIGH);
+      analogWrite(actuatorPinZ[3],200);
+      openVertT[3]=millis();
+    }
+    if(tmp=='V') {      
+      openVertB[3]=true;
+      digitalWrite(valveSelectZ[3],LOW);
+      analogWrite(actuatorPinZ[3],200);
+      openVertT[3]=millis();
+    }
+    if(tmp=='G') {
+      openVertB[4]=true;
+      digitalWrite(valveSelectZ[4],HIGH);
+      analogWrite(actuatorPinZ[4],200);
+      openVertT[4]=millis();
+    }
+    if(tmp=='B') {      
+      openVertB[4]=true;
+      digitalWrite(valveSelectZ[4],LOW);
+      analogWrite(actuatorPinZ[4],200);
+      openVertT[4]=millis();
+    }
+
+
     if(tmp=='w'){
       Serial.println(motorController.getMax());
     }
@@ -322,6 +392,10 @@ void loop() {
       }
       Serial.print("Motor Speed: ");
       Serial.println(motorController.getSpeed()); 
+    }
+    
+    if(tmp == 'O'){
+      //how to show true false vertical crap
     }
    /* if(tmp=='Q'){
       analogWrite(3,200);
@@ -533,5 +607,4 @@ void loop() {
     ticks = 0;
     lastmillis = millis();
   }
-    
 }
