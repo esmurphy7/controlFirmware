@@ -26,6 +26,7 @@ enum Command {
   CMD_SET_ANGLEZ=  0x77,
   CMD_GET_ANGLEX=  0x78,
   CMD_GET_ANGLEZ=  0x79,
+  CMD_REINIT	=  0x7A
 };
 
 enum State {
@@ -53,6 +54,8 @@ enum State {
   
   STATE_AIN		  = 0x78,
   STATE_AOUT	  = 0x79,
+  
+  STATE_INITING	  =	0x7A
 };
 
 #define PAD 0xff

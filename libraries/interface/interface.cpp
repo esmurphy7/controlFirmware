@@ -37,30 +37,30 @@ void Interface::init(int type) {
   else if(type == SLAVE){
   //arduino id assignment
   
-  while(Serial2.available()){
-    Serial2.read();
-  }
+	while(Serial2.available()){
+		Serial2.read();
+	}
   
-  while(! _id){  
+	while(! _id){  
     
-      if(Serial2.available()){
+		if(Serial2.available()){
       
-        _id = Serial2.read() + 0x01;
-        Serial.print("recieved id ");
-        Serial.println(_id,HEX);
-        byte _state = Serial2.read();
-        Serial.println(_state,HEX);
+			_id = Serial2.read() + 0x01;
+			Serial.print("recieved id ");
+			Serial.println(_id,HEX);
+			byte _state = Serial2.read();
+			Serial.println(_state,HEX);
       
-        if(_state != STATE_ALIVE){
-          _id=0x00;
-          Serial.println("ARGH");
-          continue;
-        }
+			if(_state != STATE_ALIVE){
+				_id=0x00;
+				Serial.println("ARGH");
+				continue;
+			}
         delay(50);
         sendDown();
         sendState(STATE_ALIVE,PAD,PAD,PAD,PAD,PAD,PAD);
-    }
-  }
+		}
+	}
   }
   Serial.println("i has finished init");
 }

@@ -30,7 +30,7 @@ class motorControl {
 		}
 		//update the motor output
 		void updateMotor(){
-			if(enableMotor){
+		//	if(enableMotor){
 				aSum = 0;
 				for(int i = 0; i < 5; i++){
 					aSum += actuatorX[i];
@@ -53,10 +53,10 @@ class motorControl {
 					motorScaled = hmotorMax;
 					//motorScaled = (255*2*aSum)/2550;
 				}
-			}
-			else{
+			//}
+		//	else{
 				motorScaled = 0;
-			}
+			//}
 
 			analogWrite(hmotorPin,abs(motorScaled));
 		}
