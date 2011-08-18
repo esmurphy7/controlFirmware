@@ -11,22 +11,22 @@
 /************************** Arduino Defines **********************************/
 
 // Arduino analog Pins
-#define ADC0   A0
-#define ADC1   A1
-#define ADC2   A2
-#define ADC3   A3
-#define ADC4   A4
-#define ADC5   A5
-#define ADC6   A6 
-#define ADC7   A7
-#define ADC8   A8
-#define ADC9   A9
-#define ADC10 A10
-#define ADC11 A11
-#define ADC12 A12
-#define ADC13 A13
-#define ADC14 A14
-#define ADC15 A15
+#define ADC0   0
+#define ADC1   1
+#define ADC2   2
+#define ADC3   3
+#define ADC4   4
+#define ADC5   5
+#define ADC6   6 
+#define ADC7   7
+#define ADC8   8
+#define ADC9   9
+#define ADC10 10
+#define ADC11 11
+#define ADC12 12
+#define ADC13 13
+#define ADC14 14
+#define ADC15 15
 
 
 // Arduino digital Pins

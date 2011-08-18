@@ -3,9 +3,7 @@ PID control library
 calculates the PID output
 and writes to output pin
 */
-//can probably pass through suspected edge values here and use limit switches to correct?
-
-#include "Wprogram.h"
+#include<WProgram.h>
 
 //class outputs PID control
 //out put constraint to between -255 and 255

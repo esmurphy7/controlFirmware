@@ -47,6 +47,26 @@ void loop(){
 
 //parse xbee command. pro
 
+//have to include states somewhere
+/*###################   state_going   ###################
+everything is fair game here. only restriction is that calibrate is true
+calibrate true tree works cause anying updating is overwritten
+maybe i should throw in a motor trigger condition just to be safe
+#########################################################*/
 
+/*###################   state_standby   ###################
+motor is off
+setpoints are being constantly set as current
+everything still going and ready to go
+#########################################################*/
 
+/*###################   state_stop    ###################
+basically arduino only state
+lights will probably be on still
+#########################################################*/
+
+/*###################   state_dying   ###################
+everything is turning off
+last action before arduino dies is sending state?
+#########################################################*/
 }

@@ -330,10 +330,9 @@ void loop(){
 //      PIDcontrollerZ[i].updateOutput();
     //  */
       if( (openVertB[i]==true) && ((millis()-openVertT[i]) > 500) ){
-        analogWrite(actuatorPin[i],0);
+        analogWrite(actuatorPinZ[i],0);
         openVertB[i]=false;
       }//end of the open loop timer check
-    
     }
     motorController.updateMotor();
   }//end of calibrated PID output
@@ -345,6 +344,11 @@ void loop(){
 //      PIDcontrollerZ[i].setSetPoint(PIDcontrollerZ[i].getSensor());
 //      PIDcontrollerZ[i].updateOutput();
     //  */
+        if(openVertB[i]==true){
+          analogWrite(actuatorPinZ[i],0);
+          openVertB[i]=false;
+        }//end of the open loop timer check
+
       motorController.updateMotor();
       ditherF();
       
