@@ -9,6 +9,7 @@ enum Command {
   CMD_SET_MOTOR =  0x63,//
   CMD_SEND_BAT  =  0x64,//
   CMD_SET_PID   =  0x65,//
+  //Once ALL PIDs work, going to need different pid setting commands
   CMD_SET_SENSR =  0x66,//
   CMD_BROADCAST =  0x67,//
   CMD_STOP      =  0x68,//
@@ -26,7 +27,9 @@ enum Command {
   CMD_SET_ANGLEZ=  0x77,
   CMD_GET_ANGLEX=  0x78,
   CMD_GET_ANGLEZ=  0x79,
-  CMD_REINIT	=  0x7A
+  CMD_REINIT	=  0x7A,
+  CMD_OPEN_HORIZ=  0x7B,
+  CMD_OPEN_VERT =  0x7C
 };
 
 enum State {
@@ -55,10 +58,13 @@ enum State {
   STATE_AIN		  = 0x78,
   STATE_AOUT	  = 0x79,
   
-  STATE_INITING	  =	0x7A
+  STATE_INITING	  =	0x7A,
+  
+  STATE_OPEN_HORIZ= 0x7B,
+  STATE_OPEN_VERT = 0x7C
 };
 
-#define PAD 0xff
+#define PAD 0xEE
 #define MASTER 1
 #define SLAVE  2
 

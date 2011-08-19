@@ -9,7 +9,10 @@ void setup()
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   SPI.begin();
-  
+
+//what exactly will the controller send to the master to make it trigger the initialization command
+//I don't want this to initialize until there is a controller present
+
   // Wait for initialization command from controller
   while (Serial3.available() < 2) {
     delay(10);
@@ -20,8 +23,9 @@ void setup()
   interface.init(MASTER);
   delay(10);  
   // Listen for slave broadcasts
+  unsigned in slaveTimer
   Frame slave_message;
-  while(init_enable) {
+  while(slaveTimer <2000) {
     slave_message = interface.getMessage();
     if(slave_message.id == 0x00) {
       continue;
