@@ -13,6 +13,8 @@ byte lastSlaveID = 0;
 #define MASTER_STATE_STANDBY 2
 #define MASTER_STATE_DYING 3
 
+#define MAX_CAN_DELAY 25
+
 byte master_state = MASTER_STATE_STOP;
 
 byte wait_for_slave_init() {
@@ -39,16 +41,23 @@ byte wait_for_slave_init() {
   return slave_message.id;
 }
 
-Frame block_until_slave_confirm() {
+Frame block_until_slave_confirm(int timeout) {
   Frame slave_message;
   unsigned long slaveTimer = millis();
-  while(millis() - slaveTimer < 2000) {
+  while(millis() - slaveTimer < timeout) {
     slave_message = interface.getMessage();
     if(slave_message.id != 0x00) {
       return slave_message;
     }
   }
   return slave_message;
+}
+
+void suicide() {
+  for(int i = 0; i < lastSlaveID; i++) {
+    interface.sendCommand(i+1,CMD_STOP,PAD,PAD,PAD,PAD,PAD,PAD);
+    block_until_slave_confirm(MAX_CAN_DELAY);
+  }
 }
 
 void setup()
@@ -124,10 +133,13 @@ switch(master_state) {
       }
       setPointList[0] = new_angle;
       lastUpdate = millis();
-      for(int i = 0; i < MAX_SLAVES; i++) {
+      for(int i = 0; i < lastSlaveID; i++) {
         interface.sendCommand(i+1,CMD_SET_ANGLEX,setPointList[i*5],setPointList[i*5+1],setPointList[i*5+2],setPointList[i*5+3],setPointList[i*5+4],PAD);
-        Frame confirm = block_until_slave_confirm();
+        Frame confirm = block_until_slave_confirm(MAX_CAN_DELAY);
         if(confirm.id == 0x00) {
+          master_state = MASTER_STATE_STOP;
+          suicide();
+          break;
           // Something bad happened (suicide sequence... do it)
         }
       }
@@ -136,6 +148,7 @@ switch(master_state) {
   case MASTER_STATE_STANDBY:
     break;
   case MASTER_STATE_STOP:
+    
     break;
   case MASTER_STATE_DYING:
     break;
