@@ -130,11 +130,11 @@ class PIDcontrol{
 	}
 	
 	void setAngle(int newAngle){
-		setPoint = map(newAngle,-25,25,Ain,Aout);
+		setPoint = map(newAngle,0,50,Ain,Aout);
 		}
 	
 	int getAngle(){
-		return map(setPoint,Ain,Aout,-25,25);
+		return map(setPoint,Ain,Aout,0,50);
 	}
 		
 	int getSetpoint(){
