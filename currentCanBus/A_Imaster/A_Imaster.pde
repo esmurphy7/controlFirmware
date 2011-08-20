@@ -58,11 +58,14 @@ calibrate true tree works cause anying updating is overwritten
 maybe i should throw in a motor trigger condition just to be safe
 #########################################################*/
 
-/*###################   state_standby   ###################
+/********************james says stop and standby are essentially the same thing
+###################   state_standby   ###################
 motor is off
 setpoints are being constantly set as current
 everything still going and ready to go
-#########################################################*/
+#########################################################
+*******************************************************************************
+*/
 
 /*###################   state_stop    ###################
 basically arduino only state

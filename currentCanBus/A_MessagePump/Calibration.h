@@ -79,4 +79,3 @@ void calibrate(){
     cur_pid[i] = (Aout[i] + Ain[i])/2 + 2;//little bit of curve
   }
 }
-
