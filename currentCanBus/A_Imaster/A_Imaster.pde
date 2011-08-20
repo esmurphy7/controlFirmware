@@ -1,3 +1,56 @@
+#include <SPI.h>
+#include "interface.h"
+#include "boashield_pins.h"
+#include "MCP2515.h"
+
+Interface interface(SS);
+
+#define MAX_SLAVES 5
+byte lastSlaveID = 0;
+
+#define MASTER_STATE_STOP 0
+#define MASTER_STATE_GOING 1
+#define MASTER_STATE_STANDBY 2
+#define MASTER_STATE_DYING 3
+
+byte master_state = MASTER_STATE_STOP;
+
+byte wait_for_slave_init() {
+  /*
+    wait_for_slave_init() 
+      waits two seconds for slaves to come online
+      arguments: none
+      returns: last id
+  */
+  // Listen for slave broadcasts
+  unsigned long slaveTimer = millis();
+  Frame slave_message;
+  while(millis() - slaveTimer < 2000) {
+    slave_message = interface.getMessage();
+    if(slave_message.id == 0x00) {
+      continue;
+    }
+    Serial.print("Recieved Slave broadcast from id ");
+    Serial.println(slave_message.id,HEX);
+    if(slave_message.id == MAX_SLAVES) {
+      break;
+    }
+  }
+  return slave_message.id;
+}
+
+Frame block_until_slave_confirm() {
+  Frame slave_message;
+  unsigned long slaveTimer = millis();
+  while(millis() - slaveTimer < 2000) {
+    slave_message = interface.getMessage();
+    if(slave_message.id != 0x00) {
+      return slave_message;
+    }
+  }
+  return slave_message;
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -21,35 +74,72 @@ void setup()
   Serial.read();
   
   interface.init(MASTER);
-  delay(10);  
-  // Listen for slave broadcasts
-  unsigned in slaveTimer
-  Frame slave_message;
-  while(slaveTimer <2000) {
-    slave_message = interface.getMessage();
-    if(slave_message.id == 0x00) {
-      continue;
-    }
-    Serial.print("Recieved Slave broadcast from id ");
-    Serial.println(slave_message.id,HEX);
-    if(slave_message.id == num_slaves) {
-      break;
-    }
-  }
+  delay(10);
+  lastSlaveID = wait_for_slave_init();
   delay(100);
   Serial.println("Finished Setup");
 }
 
-void loop(){
+//
+// Control data
+//
+long lastUpdate = 0;
+int setPointList[MAX_SLAVES*5] = {0};
+int new_angle = -1;
+int dt = 0xFFFF;
+
+
+void loop() {
 
 //check for CAN Bus message. this comes first mainly because of reinit
-
+Frame reinit = interface.getMessage();
+if(reinit.data[0] == CMD_REINIT) {
+  for(byte _id = 0; _id < lastSlaveID; _id++) {
+    interface.sendCommand(_id, CMD_REINIT, PAD,PAD,PAD,PAD,PAD,PAD);
+  }
+  interface.init(MASTER);
+  wait_for_slave_init();
+}
   
 //check for xbee command. Done second because the buffer isn't going anywhere
-//CAN buffer can be overwridden
+//CAN buffer can be overwritten
 //also take into consideration state. probably in giant switch itself
+if(Serial3.available() >= 4) {
+  byte command = Serial3.read();
+  new_angle = Serial3.read();
+  dt = Serial3.read();
+  Serial3.read();
+  
+  //parse xbee command. pro
+}
 
-//parse xbee command. pro
+
+
+
+switch(master_state) {
+  case MASTER_STATE_GOING:
+    if(millis() - lastUpdate > dt) {
+      for(int i = MAX_SLAVES*5-1; i > 0; i--) {
+        setPointList[i] = setPointList[i-1];
+      }
+      setPointList[0] = new_angle;
+      lastUpdate = millis();
+      for(int i = 0; i < MAX_SLAVES; i++) {
+        interface.sendCommand(i+1,CMD_SET_ANGLEX,setPointList[i*5],setPointList[i*5+1],setPointList[i*5+2],setPointList[i*5+3],setPointList[i*5+4],PAD);
+        Frame confirm = block_until_slave_confirm();
+        if(confirm.id == 0x00) {
+          // Something bad happened (suicide sequence... do it)
+        }
+      }
+    }
+    break;
+  case MASTER_STATE_STANDBY:
+    break;
+  case MASTER_STATE_STOP:
+    break;
+  case MASTER_STATE_DYING:
+    break;
+}
 
 //have to include states somewhere
 /*###################   state_going   ###################

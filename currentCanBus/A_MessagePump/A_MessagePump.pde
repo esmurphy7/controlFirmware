@@ -115,10 +115,10 @@ void ditherF(){
 //boolean flags and timers will do the trick
 //this also applies to the open loop case we want as backup
 boolean openVertB[5]={false,false,false,false,false};
-unsigned int openVertT[5]={0,0,0,0,0};
+unsigned long openVertT[5]={0,0,0,0,0};
 
 boolean openHorizB[5]={false,false,false,false,false};
-unsigned int openHorizT[5]={0,0,0,0,0};
+unsigned long openHorizT[5]={0,0,0,0,0};
 
 void loop(){
   int outputX[5];
