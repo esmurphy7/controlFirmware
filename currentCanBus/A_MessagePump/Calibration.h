@@ -45,7 +45,8 @@ void calibrate(){
     digitalWrite(valveSelectX[i],HIGH);
     analogWrite(actuatorPinX[i],255);
   }
-  delayForLimitSwitches();
+  delay(1000);
+  //delayForLimitSwitches();
   
   // Turn off all actuators and get thier sensor values
   for(int i=0; i<5; i++){  
@@ -63,7 +64,8 @@ void calibrate(){
     digitalWrite(valveSelectX[i],LOW);
     analogWrite(actuatorPinX[i],250);
   }
-  delayForLimitSwitches();
+  delay(1000);
+  //delayForLimitSwitches();
   
   for(int i=0; i<5; i++){  
     analogWrite(actuatorPinX[i],0);

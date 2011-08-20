@@ -41,12 +41,12 @@ byte wait_for_slave_init() {
   return slave_message.id;
 }
 
-Frame block_until_slave_confirm(int timeout) {
+Frame block_until_slave_confirm(byte slave, int timeout) {
   Frame slave_message;
   unsigned long slaveTimer = millis();
   while(millis() - slaveTimer < timeout) {
     slave_message = interface.getMessage();
-    if(slave_message.id != 0x00) {
+    if(slave_message.id == slave) {
       return slave_message;
     }
   }
@@ -54,9 +54,10 @@ Frame block_until_slave_confirm(int timeout) {
 }
 
 void suicide() {
+  master_state = MASTER_STATE_STOP;
   for(int i = 0; i < lastSlaveID; i++) {
     interface.sendCommand(i+1,CMD_STOP,PAD,PAD,PAD,PAD,PAD,PAD);
-    block_until_slave_confirm(MAX_CAN_DELAY);
+    block_until_slave_confirm(i+1, MAX_CAN_DELAY);
   }
 }
 
@@ -85,8 +86,24 @@ void setup()
   interface.init(MASTER);
   delay(10);
   lastSlaveID = wait_for_slave_init();
-  delay(100);
   Serial.println("Finished Setup");
+  
+  delay(1000);
+  for(byte _id = 0; _id < lastSlaveID; _id++) {
+    interface.sendCommand(_id, CMD_PID_CAL, PAD,PAD,PAD,PAD,PAD,PAD);
+    Frame confirm = block_until_slave_confirm(_id,MAX_CAN_DELAY);
+    if(confirm.id == 0x00) {
+      suicide();
+      break;
+    }
+  }
+  
+  // clear all Serail3 data
+  while(Serial3.available()) {
+    Serial3.read();
+  }
+  // start the joystick
+  Serial3.write(CMD_START);
 }
 
 //
@@ -114,14 +131,34 @@ if(reinit.data[0] == CMD_REINIT) {
 //CAN buffer can be overwritten
 //also take into consideration state. probably in giant switch itself
 Command cmd = CMD_NONE;
-if(Serial3.available() >= 4) {
+if(Serial3.available() >= 3) {
   cmd = (Command)Serial3.read();
   new_angle = Serial3.read();
   dt = Serial3.read();
-  Serial3.read();
   
   //parse xbee command. pro
 }
+
+switch(cmd) {
+  case CMD_START:
+    break;
+  case CMD_STOP:
+    break;
+  case CMD_SET_ANGLEX:
+    break;
+  case CMD_SET_ANGLEZ:
+    break;
+  // May get out of sync with the joystick
+  // Clear all Serial3 data
+  // Should be back in sync
+  default:
+    while(Serial3.available()) {
+      Serial3.read();
+    }
+    break;
+}
+
+
 
 switch(master_state) {
   case MASTER_STATE_GOING:
@@ -136,7 +173,7 @@ switch(master_state) {
       lastUpdate = millis();
       for(int i = 0; i < lastSlaveID; i++) {
         interface.sendCommand(i+1,CMD_SET_ANGLEX,setPointList[i*5],setPointList[i*5+1],setPointList[i*5+2],setPointList[i*5+3],setPointList[i*5+4],PAD);
-        Frame confirm = block_until_slave_confirm(MAX_CAN_DELAY);
+        Frame confirm = block_until_slave_confirm(i,MAX_CAN_DELAY);
         // confirmation fram will have id 0x00 if the slave did not respond by MAX_CAN_DLELAY
         if(confirm.id == 0x00) {
           master_state = MASTER_STATE_STOP;
@@ -152,7 +189,7 @@ switch(master_state) {
     if(cmd == CMD_START) {
       for(int i = 0; i < lastSlaveID; i++) {
         interface.sendCommand(i+1,CMD_START,PAD,PAD,PAD,PAD,PAD,PAD);
-        Frame confirm = block_until_slave_confirm(MAX_CAN_DELAY);
+        Frame confirm = block_until_slave_confirm(i,MAX_CAN_DELAY);
         if(confirm.id == 0x00) {
           master_state = MASTER_STATE_STOP;
           suicide();

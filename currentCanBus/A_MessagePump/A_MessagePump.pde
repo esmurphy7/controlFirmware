@@ -18,7 +18,7 @@ Interface interface(CS_PIN);
 
 #include "PIDcontrolBOA.h"
 #include <motorControl.h>
-#include "batteryInfo.h"
+#include "BatteryInfo.h"
 #include "PinInit.h"
 
 /*X is for horizontal
@@ -98,6 +98,7 @@ void setup()
   }
   checkBat();
   BcheckTIME = millis();
+  Serial.println("Entering Loop");
 }//setup end
 
 //still not entirely sure how this will affect the valve output

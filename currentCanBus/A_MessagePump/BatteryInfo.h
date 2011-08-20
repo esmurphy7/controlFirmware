@@ -11,7 +11,7 @@ int checkBat(){
   if(batREAL < batDIE){
     //whatever we do to trigger kill switches
     //digitalWrite(one of the kill switches,HIGH);
-  interface.sendState(STATE_DEAD,batREAL,batDIE,PAD,PAD,PAD,PAD);
+    interface.sendState(STATE_DEAD,batREAL,batDIE,PAD,PAD,PAD,PAD);
   }
   return batREAL;
 }
