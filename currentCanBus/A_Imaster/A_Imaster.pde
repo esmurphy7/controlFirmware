@@ -95,7 +95,7 @@ void setup()
 long lastUpdate = 0;
 int setPointList[MAX_SLAVES*5] = {0};
 int new_angle = -1;
-int dt = 0xFFFF;
+unsigned int dt = 0;
 
 
 void loop() {
@@ -113,8 +113,9 @@ if(reinit.data[0] == CMD_REINIT) {
 //check for xbee command. Done second because the buffer isn't going anywhere
 //CAN buffer can be overwritten
 //also take into consideration state. probably in giant switch itself
+Command cmd = CMD_NONE;
 if(Serial3.available() >= 4) {
-  byte command = Serial3.read();
+  cmd = (Command)Serial3.read();
   new_angle = Serial3.read();
   dt = Serial3.read();
   Serial3.read();
@@ -122,11 +123,11 @@ if(Serial3.available() >= 4) {
   //parse xbee command. pro
 }
 
-
-
-
 switch(master_state) {
   case MASTER_STATE_GOING:
+    if(!dt) {
+      break;
+    }
     if(millis() - lastUpdate > dt) {
       for(int i = MAX_SLAVES*5-1; i > 0; i--) {
         setPointList[i] = setPointList[i-1];
@@ -136,11 +137,11 @@ switch(master_state) {
       for(int i = 0; i < lastSlaveID; i++) {
         interface.sendCommand(i+1,CMD_SET_ANGLEX,setPointList[i*5],setPointList[i*5+1],setPointList[i*5+2],setPointList[i*5+3],setPointList[i*5+4],PAD);
         Frame confirm = block_until_slave_confirm(MAX_CAN_DELAY);
+        // confirmation fram will have id 0x00 if the slave did not respond by MAX_CAN_DLELAY
         if(confirm.id == 0x00) {
           master_state = MASTER_STATE_STOP;
           suicide();
           break;
-          // Something bad happened (suicide sequence... do it)
         }
       }
     }
@@ -148,7 +149,18 @@ switch(master_state) {
   case MASTER_STATE_STANDBY:
     break;
   case MASTER_STATE_STOP:
-    
+    if(cmd == CMD_START) {
+      for(int i = 0; i < lastSlaveID; i++) {
+        interface.sendCommand(i+1,CMD_START,PAD,PAD,PAD,PAD,PAD,PAD);
+        Frame confirm = block_until_slave_confirm(MAX_CAN_DELAY);
+        if(confirm.id == 0x00) {
+          master_state = MASTER_STATE_STOP;
+          suicide();
+        }
+      }
+      // if everything was successfull set the new state
+      master_state = MASTER_STATE_GOING;
+    }
     break;
   case MASTER_STATE_DYING:
     break;
