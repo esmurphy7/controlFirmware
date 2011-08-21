@@ -12,10 +12,10 @@ Interface interface(CS_PIN);
 //PID integration
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 //pin numbers CHECK FOR ACTUAL PINS
-const int sensorPinX[] = {1, 2, 3, 4, 5};
-const int sensorPinZ[] = {6, 7, 8, 9, 10};
-const int actuatorPinXL[] = {2, 3, 4, 7, 8};
-const int actuatorPinXR[] = {9, 10, 11, 12, 13};
+int sensorPinX[] = {1, 2, 3, 4, 5};
+int sensorPinZ[] = {6, 7, 8, 9, 10};
+int actuatorPinXL[] = {2, 3, 4, 7, 8};
+int actuatorPinXR[] = {9, 10, 11, 12, 13};
 /*
 const int actuatorPinZU[] = {21, 22, 23, 24, 25};
 const int actuatorPinZD[] = {26, 27, 28, 29, 30};

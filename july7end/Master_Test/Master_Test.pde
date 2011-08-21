@@ -7,8 +7,8 @@
 #define CS_PIN 53
 
 Interface interface(CS_PIN);
-byte init_enable = 0x00;
-byte num_slaves = 0x00;
+byte init_enable = 0x01;
+byte num_slaves = 0x01;
 
 void setup()
 {
@@ -17,21 +17,30 @@ void setup()
   Serial2.begin(115200);
   Serial3.begin(115200);
   
+  while(Serial.available()) {
+    delay(10);
+  }
+  Serial.read();
+  
+  delay(1000);
+  
   SPI.setClockDivider(SPI_CLOCK_DIV2);
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   SPI.begin();
   
   // Wait for initialization command from controller
-  while (Serial3.available() < 2) {
+  while (Serial.available() < 2) {
     delay(10);
   }
-  
-  init_enable = Serial3.read();
-  num_slaves = Serial3.read();
+  Serial.read();
+  Serial.read();
+  init:
+  //init_enable = Serial3.read();
+  //num_slaves = Serial3.read();
   
   interface.init(MASTER);
-  delay(10);  
+  delay(10);
   // Listen for slave broadcasts
   Frame slave_message;
   while(init_enable) {
@@ -101,31 +110,31 @@ void loop()
         Serial.println();*/
     }
     // Forward message to controller
-    Serial3.print(slaveSpeak.id);
-    Serial3.print(slaveSpeak.data[0]);
-    Serial3.print(slaveSpeak.data[1]);
-    Serial3.print(slaveSpeak.data[2]);
-    Serial3.print(slaveSpeak.data[3]);
-    Serial3.print(slaveSpeak.data[4]);
-    Serial3.print(slaveSpeak.data[5]);
-    Serial3.print(slaveSpeak.data[6]);
-    Serial3.print(slaveSpeak.data[7]);
+    Serial.print(0x01);
+    Serial.print(slaveSpeak.data[0]);
+    Serial.print(slaveSpeak.data[1]);
+    Serial.print(slaveSpeak.data[2]);
+    Serial.print(slaveSpeak.data[3]);
+    Serial.print(slaveSpeak.data[4]);
+    Serial.print(slaveSpeak.data[5]);
+    Serial.print(slaveSpeak.data[6]);
+    Serial.print(slaveSpeak.data[7]);
   }
   
   // Pump XBee messages
   // Recieved 5 bytes per slave plus one command byte
-  if(Serial3.available() >= num_slaves*5 + 1) {
+  if(Serial.available() >= num_slaves*5 + 1) {
     byte slave_command = Serial.read();
-    Serial3.println("=====");
-    Serial3.println(slave_command,HEX);
-    Serial3.println("=====");
+    Serial.println("=====");
+    Serial.println(slave_command,HEX);
+    Serial.println("=====");
     for(byte i = 1; i <= num_slaves; i++) {
       // Forward the command with 5 single byte args
-      interface.sendCommand(i,(Command)slave_command,Serial3.read(),
-                                                     Serial3.read(),
-                                                     Serial3.read(),
-                                                     Serial3.read(),
-                                                     Serial3.read(),
+      interface.sendCommand(i,(Command)slave_command,Serial.read(),
+                                                     Serial.read(),
+                                                     Serial.read(),
+                                                     Serial.read(),
+                                                     Serial.read(),
                                                      PAD);
       delay(5);
     }

@@ -81,6 +81,8 @@ int MCP2515::Init(int CAN_Bus_Speed, byte Freq, byte SJW) {
 		if(Interrupt()) {
 		  // determine which interrupt flags have been set
 		  interruptFlags = Read(CANINTF);
+		  //Serial.print("CANINTF ");
+		  //Serial.println(interruptFlags,BIN);
 		  if(!(interruptFlags & MERRF)) {
 		    // to get here we must have received something without errors
 		    Mode(MODE_NORMAL);
@@ -94,7 +96,7 @@ int MCP2515::Init(int CAN_Bus_Speed, byte Freq, byte SJW) {
 }
 
 bool MCP2515::_init(int CAN_Bus_Speed, byte Freq, byte SJW, bool autoBaud) {
-
+	Serial.println("MCP2515 _init");
   // Reset MCP2515 which puts it in configuration mode
   Reset();
 
@@ -142,9 +144,12 @@ bool MCP2515::_init(int CAN_Bus_Speed, byte Freq, byte SJW, bool autoBaud) {
   }
   // Enable all interupts
   //Write(CANINTE,255);
-
+  	//Serial.print("CANINTF ");
+	//Serial.println(Read(CANINTF),BIN);
   // Test that we can read back from the MCP2515 what we wrote to it
   byte rtn = Read(CNF1);
+  //Serial.print("CANINTF ");
+	//Serial.println(Read(CANINTF),BIN);
   return (rtn==data);
 }
 

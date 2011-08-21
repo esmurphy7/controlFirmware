@@ -29,7 +29,9 @@ enum Command {
   CMD_GET_ANGLEZ=  0x79,
   CMD_REINIT	=  0x7A,
   CMD_OPEN_HORIZ=  0x7B,
-  CMD_OPEN_VERT =  0x7C
+  CMD_OPEN_VERT =  0x7C,
+  CMD_GET_OUTPUT = 0x7D,
+  CMD_GET_SETPOINT = 0x7E
 };
 
 enum State {

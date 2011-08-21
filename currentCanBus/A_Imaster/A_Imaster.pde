@@ -89,11 +89,29 @@ void callibrate_all_slaves() {
   Serial.println(" Entered Callibrate All");
   for(byte _id = 1; _id <= lastSlaveID; _id++) {
     interface.sendCommand(_id, CMD_PID_CAL, PAD,PAD,PAD,PAD,PAD,PAD);
-    //Frame confirm = block_until_slave_confirm(_id,5000);
-    //if(confirm.id == 0x00) {
-    //  suicide();
-    //  break;
-    //}
+    Frame confirm = block_until_slave_confirm(_id,6000);
+    interface.sendCommand(_id, CMD_SET_SENSR, PAD,PAD,PAD,PAD,PAD,PAD);
+    Frame confirm2 = block_until_slave_confirm(_id,6000); // Ain
+    Frame confirm3 = block_until_slave_confirm(_id,6000); // Aout
+           // A in
+          Serial.print(millis());Serial.print(" ");
+          Serial.print(confirm2.id,HEX);Serial.print(" ");
+          Serial.print(confirm2.data[0],HEX);Serial.print(" ");
+          Serial.print(confirm2.data[1],DEC);Serial.print(" ");
+          Serial.print(confirm2.data[2],DEC);Serial.print(" ");
+          Serial.print(confirm2.data[3],DEC);Serial.print(" ");
+          Serial.print(confirm2.data[4],DEC);Serial.print(" ");
+          Serial.println(confirm2.data[5],DEC);
+          
+          // A out
+          Serial.print(millis());Serial.print(" ");
+          Serial.print(confirm3.id,HEX);Serial.print(" ");
+          Serial.print(confirm3.data[0],HEX);Serial.print(" ");
+          Serial.print(confirm3.data[1],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[2],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[3],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[4],DEC);Serial.print(" ");
+          Serial.println(confirm3.data[5],DEC);
     Serial.print(_id,HEX);
     Serial.println(" Was sent callibration");
   }
@@ -143,6 +161,9 @@ int new_angle = -1;
 unsigned int dt = 0;
 boolean sine_wave = false;
 float sine_point = 0.0;
+Command setPointMethod;
+float amplitude = 20.0;
+float sine_inc = 0.8;
 
 
 void loop() {
@@ -194,21 +215,38 @@ if(Serial.available() ) {
     case 'c':
       callibrate_all_slaves();
       break;
-    case 's':
+    case 'q':
+      setPointMethod = CMD_SET_ANGLEX;
       new_angle = 45;
-      dt = 1000;
+      dt = 1;
       cmd = CMD_START;
       break;
-    case 'm':
+    case 'w':
+      setPointMethod = CMD_SET_ANGLEX;
       new_angle = 5;
-      dt = 1000;
+      dt = 1;
+      cmd = CMD_START;
+      break;
+    case 'e':
+      setPointMethod = CMD_SET_HORIZ;
+      new_angle = 255;
+      dt = 1;
+      cmd = CMD_START;
+      break;
+    case 'r':
+      setPointMethod = CMD_SET_HORIZ;
+      new_angle = 0;
+      dt = 1;
       cmd = CMD_START;
       break;
     case 'M':
       new_angle = 0;
-      dt = 300;
+      dt = 450;
       cmd = CMD_START;
       sine_wave = true;
+      setPointMethod = CMD_SET_ANGLEX;
+      amplitude = 15.0;
+      sine_inc = 0.8;
       break;
     case 'S':
       cmd = CMD_STOP;
@@ -286,17 +324,17 @@ switch(master_state) {
         Serial.print(setPointList[(i-1)*5+3]);Serial.print(" ");
         Serial.print(setPointList[(i-1)*5+4]);Serial.print(" ");
         Serial.println();
-        interface.sendCommand(i,CMD_SET_ANGLEX,setPointList[(i-1)*5],setPointList[(i-1)*5+1],setPointList[(i-1)*5+2],setPointList[(i-1)*5+3],setPointList[(i-1)*5+4],PAD);
+        interface.sendCommand(i,setPointMethod,setPointList[(i-1)*5],setPointList[(i-1)*5+1],setPointList[(i-1)*5+2],setPointList[(i-1)*5+3],setPointList[(i-1)*5+4],PAD);
         Frame confirm = block_until_slave_confirm(i,MAX_CAN_DELAY);
         interface.sendCommand(i,CMD_GET_SETPOINT,PAD,PAD,PAD,PAD,PAD,PAD);
         Frame confirm2 = block_until_slave_confirm(i,MAX_CAN_DELAY);
-        interface.sendCommand(i,CMD_GET_OUTPUT,PAD,PAD,PAD,PAD,PAD,PAD);
+        interface.sendCommand(i,CMD_PRINT_H,PAD,PAD,PAD,PAD,PAD,PAD);
         Frame confirm3 = block_until_slave_confirm(i,MAX_CAN_DELAY);
         
         if(sine_wave) {
           // New point
-          new_angle = 20.0*sin(sine_point)+20;
-          sine_point += 0.5;
+          new_angle = amplitude*sin(sine_point)+25;
+          sine_point += sine_inc;
         }
         
         // confirmation fram will have id 0x00 if the slave did not respond by MAX_CAN_DLELAY
@@ -310,9 +348,7 @@ switch(master_state) {
         }
         else {
           // Sensor Data
-          Serial.print(millis());Serial.print(" ");
-          Serial.print(confirm.id,HEX);Serial.print(" ");
-          Serial.print(confirm.data[0],HEX);Serial.print(" ");
+          Serial.print(millis());Serial.println(" Sensor Data (angle)");
           Serial.print(confirm.data[1],DEC);Serial.print(" ");
           Serial.print(confirm.data[2],DEC);Serial.print(" ");
           Serial.print(confirm.data[3],DEC);Serial.print(" ");
@@ -320,24 +356,20 @@ switch(master_state) {
           Serial.println(confirm.data[5],DEC);
           
           // Set point data
-          Serial.print(millis());Serial.print(" ");
-          Serial.print(confirm2.id,HEX);Serial.print(" ");
-          Serial.print(confirm2.data[0],HEX);Serial.print(" ");
+          Serial.print(millis());Serial.println(" Setpoint Data");
           Serial.print(confirm2.data[1],DEC);Serial.print(" ");
           Serial.print(confirm2.data[2],DEC);Serial.print(" ");
           Serial.print(confirm2.data[3],DEC);Serial.print(" ");
           Serial.print(confirm2.data[4],DEC);Serial.print(" ");
           Serial.println(confirm2.data[5],DEC);
           
-          // Output data
-          Serial.print(millis());Serial.print(" ");
-          Serial.print(confirm3.id,HEX);Serial.print(" ");
-          Serial.print(confirm3.data[0],HEX);Serial.print(" ");
-          Serial.print(confirm3.data[1],HEX);Serial.print(" ");
-          Serial.print(confirm3.data[2],HEX);Serial.print(" ");
-          Serial.print(confirm3.data[3],HEX);Serial.print(" ");
-          Serial.print(confirm3.data[4],HEX);Serial.print(" ");
-          Serial.println(confirm3.data[5],HEX);
+          // Sensor data
+          Serial.print(millis());Serial.println(" Sensor Data (raw)");
+          Serial.print(confirm3.data[1],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[2],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[3],DEC);Serial.print(" ");
+          Serial.print(confirm3.data[4],DEC);Serial.print(" ");
+          Serial.println(confirm3.data[5],DEC);
         }
       }
     }

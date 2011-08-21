@@ -17,7 +17,6 @@ void Interface::init(int type) {
   // In this case 1Mbps with a 16MHz oscillator
   // (Note:  This is the oscillator attached to the MCP2515, not the Arduino oscillaltor)
   int baudRate=CAN.Init(1000,16);
-  Serial.println(CAN.Mode(MODE_NORMAL),HEX);
   if(baudRate>0) {
     Serial.println("MCP2515 Init OK ...");
     Serial.print("Baud Rate (kbps): ");
@@ -25,8 +24,6 @@ void Interface::init(int type) {
   } else {
     Serial.println("MCP2515 Init Failed ...");
   }
-  Serial.println(CAN.Read(CANSTAT),HEX);
-  Serial.println("Ready ...");
   
   if(type==MASTER){
     delay(2000);
@@ -131,19 +128,26 @@ Frame Interface::getMessage() {
   Frame message;
   message.id = 0x00;
   message.data[0] = 0x00;
-  byte int_byte = CAN.Read(CANINTF);
-  if(int_byte) {
-//    Serial.println("Interupted");
+  byte interruptFlags = CAN.Read(CANINTF);
+  boolean newMessage = false;
+  //Serial.print("CANINTF ");
+  //Serial.println(interruptFlags,BIN);
+  if(interruptFlags) {
+    //Serial.print("Interupted ");
     // determine which interrupt flags have been set
-    byte interruptFlags = CAN.Read(CANINTF);
+    //interruptFlags = CAN.Read(CANINTF);
 
     if(interruptFlags & RX0IF) {
 	// read from RX buffer 0
 	message = CAN.ReadBuffer(RXB0);
+	newMessage = true;
+	Serial.println("Buffer 0");
     }
     else if(interruptFlags & RX1IF) {
 	// read from RX buffer 1
 	message = CAN.ReadBuffer(RXB1);
+	newMessage = true;
+	Serial.println("Buffer 1");
 	// (this is poor code as clearly if two messages are received then the second will overwrite the first)
     }
     if(interruptFlags & TX0IF) {
@@ -157,6 +161,7 @@ Frame Interface::getMessage() {
     }
     if(interruptFlags & ERRIF) {
 	// error handling code
+	Serial.println("Canbus error");
     }
     if(interruptFlags & MERRF) {
 	// error handling code
@@ -168,13 +173,16 @@ Frame Interface::getMessage() {
     Serial.print(_id,HEX);
     Serial.println();*/
   }
-  if( _id == 0x00){//master cares about all
-	return message;
+  if(newMessage) {
+	  if( _id == 0x00){//master cares about all
+	  	Serial.println("Message returned");
+		return message;
+		}
+	  // Cast message.id to byte here since it isn't actually returned as a byte
+	  if((byte)message.id == _id) {
+		return message;
+	  }
 	}
-  // Cast message.id to byte here since it isn't actually returned as a byte
-  if((byte)message.id == _id) {
-    return message;
-  }
   else {
     Frame none;
     none.id = 0x00;
