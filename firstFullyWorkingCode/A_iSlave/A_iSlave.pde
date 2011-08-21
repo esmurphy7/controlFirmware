@@ -7,10 +7,12 @@
 //Open Loop cases beginning to be added August 18th
 //ideally what Ian want's to have done is a solid CLOSED LOOP, OPEN LOOP, OFF, DYING states of operatoin
 //little awkward just as we head to burning man but oh well
+//this is the 20 hour mark for ian on his marathon coding before packup
 #include "boashield_pins.h"
+#include "PinInit.h"
 #include <SPI.h>
-#include "interface.h"
 #include "MCP2515.h"
+#include "interface.h"
 
 #define CS_PIN 53
 
@@ -19,7 +21,6 @@ Interface interface(CS_PIN);
 #include "PIDcontrolBOA.h"
 #include <motorControl.h>
 #include "BatteryInfo.h"
-#include "PinInit.h"
 
 /*X is for horizontal
   Z is for vertical*/
@@ -53,53 +54,6 @@ boolean OpenLoopMode = false;
 boolean ClosedLoopMode = false;
 Frame command;
 
-void setup()
-{
-  Serial.begin(115200);
-  Serial1.begin(115200);
-  Serial2.begin(115200);
-  Serial3.begin(115200);
-  
-  SPI.setClockDivider(SPI_CLOCK_DIV2);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setBitOrder(MSBFIRST);
-  SPI.begin();
-  
-  int type = SLAVE;
-  //the solution to our probable power on initialization
-  interface.sendState(STATE_INITING,PAD,PAD,PAD,PAD,PAD,PAD);
-  
-  interface.init(type);
-  delay(10);
-  
-  pinMode(motorPin, OUTPUT);
-  
-  //make sure actuators are off and set pin modes
-  
-  pinMode(ditherPin, OUTPUT);
-//  digitalWrite(ditherPin,DITHERPWM);
-
-  for(int i=0;i<5;i++){
-    pinMode(actuatorPinX[i], OUTPUT);
-    analogWrite(actuatorPinX[i], 0);
-    
-    pinMode(valveSelectX[i], OUTPUT);
-   
-    pinMode(actuatorPinZ[i], OUTPUT);
-    analogWrite(actuatorPinZ[i], 0);
-    
-    pinMode(valveSelectZ[i], OUTPUT);
-  }
-  
-  //make set point current value(so it dosen't move)
-  for(int i=0;i<5;i++){
-    PIDcontrollerX[i].setSetPoint(analogRead(sensorPinX[i]));
-    PIDcontrollerZ[i].setSetPoint(analogRead(sensorPinZ[i]));
-  }
-  checkBat();
-  BcheckTIME = millis();
-  Serial.println("Entering Loop");
-}//setup end
 
 //still not entirely sure how this will affect the valve output
 void ditherF(){
@@ -121,9 +75,65 @@ unsigned long openVertT[5]={0,0,0,0,0};
 boolean openHorizB[5]={false,false,false,false,false};
 unsigned long openHorizT[5]={0,0,0,0,0};
 
+void setup()
+{
+  Serial.begin(115200);
+  Serial1.begin(115200);
+  Serial2.begin(115200);
+  Serial3.begin(115200);
+  
+  SPI.setClockDivider(SPI_CLOCK_DIV2);
+  SPI.setDataMode(SPI_MODE0);
+  SPI.setBitOrder(MSBFIRST);
+  SPI.begin();
+  
+  int type = SLAVE;
+  //the solution to our probable power on initialization  
+  interface.CANinit();
+  interface.sendState(STATE_INITING,PAD,PAD,PAD,PAD,PAD,PAD);
+  interface.init(type);
+  delay(10);
+  
+  pinMode(motorPin, OUTPUT);
+  
+  //make sure actuators are off and set pin modes
+  
+  pinMode(ditherPin, OUTPUT);
+//  digitalWrite(ditherPin,DITHERPWM);
+  Serial.println(millis());
+  for(int i=0;i<5;i++){
+    pinMode(actuatorPinX[i], OUTPUT);
+    analogWrite(actuatorPinX[i], 0);
+    
+    pinMode(valveSelectX[i], OUTPUT);
+   
+    pinMode(actuatorPinZ[i], OUTPUT);
+    analogWrite(actuatorPinZ[i], 0);
+    
+    pinMode(valveSelectZ[i], OUTPUT);
+  }
+  Serial.println(millis());
+  //make set point current value(so it dosen't move)
+  for(int i=0;i<5;i++){
+    PIDcontrollerX[i].setSetPoint(analogRead(sensorPinX[i]));
+    PIDcontrollerZ[i].setSetPoint(analogRead(sensorPinZ[i]));
+  }
+  Serial.println(millis());
+  checkBat();
+  BcheckTIME = millis();
+  Serial.println("Entering Loop");
+}//setup end
+
 void loop(){
   int outputX[5];
   command = interface.getMessage();
+  if(command.data[0] != CMD_NONE){
+    for(int i=0;i<7;i++){
+      Serial.print(command.data[i],HEX);
+      Serial.print(" ");
+    }
+    Serial.println("");
+  }
   switch(command.data[0]){
     
     case CMD_NONE:
@@ -133,11 +143,17 @@ void loop(){
     //gives the PID controller a value between 0 and 255
   //this relates to the sensor readings  
     case CMD_SET_HORIZ:
-        Serial.println("CMD_SET_HORIZ");
+      Serial.println("CMD_SET_HORIZ");
+      Serial.print("horizontal start ");
+      Serial.println(millis());
       for (int i=1;i<=5;i++){
         PIDcontrollerX[i-1].setSetPoint(0|command.data[i]);
       }
+      Serial.print("horizontal done ");
+      Serial.print(millis());
       interface.sendState(STATE_HORIZ,PIDcontrollerX[0].getSensor(),PIDcontrollerX[1].getSensor(),PIDcontrollerX[2].getSensor(),PIDcontrollerX[3].getSensor(),PIDcontrollerX[4].getSensor(),PAD);
+      Serial.print(" ");
+      Serial.println(millis());
 /*      Serial.print(PIDcontrollerX[0].getSensor(),DEC);
       Serial.print(" ");
       Serial.print(PIDcontrollerX[1].getSensor(),DEC);
@@ -244,12 +260,14 @@ void loop(){
     //will return the current angle the joint is suppose to be making
   //still under the impression that max angle is +/- 25 degrees   
     case CMD_GET_ANGLEX:
+      Serial.println("CMD GET ANGLEX");
       interface.sendState(STATE_ANGLEX,PIDcontrollerX[0].getAngle(),PIDcontrollerX[1].getAngle(),PIDcontrollerX[2].getAngle(),PIDcontrollerX[3].getAngle(),PIDcontrollerX[4].getAngle(),PAD);
       break;
     
     //will eventually do the and thing as angleX
   //currently only shows if vertical actuator should be on or not
     case CMD_GET_ANGLEZ:
+    Serial.println("CMD GET ANGLEZ");
        //interface.sendState(STATE_ANGLEX,PIDcontrollerZ[0].getAngle(),PIDcontrollerZ[1].getAngle(),PIDcontrollerZ[2].getAngle(),PIDcontrollerZ[3].getAngle(),PIDcontrollerZ[4].getAngle(),PAD);
       interface.sendState(STATE_ANGLEZ,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);       break;
       break;
@@ -265,6 +283,7 @@ void loop(){
     
     //status command that prints the current max motor value and current speed
     case CMD_PRINT_MOT:
+      Serial.println("CMD PRINT MOTOR");
       interface.sendState(STATE_MOTOR,motorController.getMax(),motorController.getSpeed(),PAD,PAD,PAD,PAD);
       break;
     
@@ -276,6 +295,7 @@ void loop(){
     
     //sets the battery die level from the default to something new  
     case CMD_SET_DIE:// battery kill level
+      Serial.println("CMD SET DIE");
       batDIE = command.data[1];
       break;
     
@@ -295,6 +315,7 @@ void loop(){
     
     //sends us the current PID values for the section or individual PID controller  
     case CMD_GET_PID:
+      Serial.println("CMD GET PID");
     //same problem as PID SET
       if(command.data[1] > 4) {	  
 	    for(int i=0;i<3;i++){
@@ -310,13 +331,16 @@ void loop(){
   //this musts be run. gives us Ain and Aout values  
   //Ian has set it so that open has to be false before calibrated can be turned on
     case CMD_PID_CAL:
+      Serial.println("PID CAL");
       if(OpenLoopMode==false){
+        Serial.println(millis());
         calibrate();
+        Serial.println(millis());
         pidCalibrated = true;
-        interface.sendState(STATE_PID_CAL,PAD,PAD,PAD,PAD,PAD,PAD);
+        interface.sendState(STATE_PID_CAL,true,PAD,PAD,PAD,PAD,PAD);
       }
       else{
-        interface.sendState(STATE_PID,STATE_NONE,PAD,PAD,PAD,PAD,PAD);
+        interface.sendState(STATE_PID_CAL,false,PAD,PAD,PAD,PAD,PAD);
       }
       break;
     
@@ -354,9 +378,11 @@ void loop(){
       motorController.setON();
       if(command.data[1]==0x11){
         OpenLoopMode = true;
+        ClosedLoopMode = false;
       }
-      if(command.data[2]==0x22){
+      if(command.data[1]==0x22){
         ClosedLoopMode = true;
+        OpenLoopMode = false;
       }
       //there is no else case cause nothing will happen otherwise
       interface.sendState(STATE_GOING,ClosedLoopMode,OpenLoopMode,PAD,PAD,PAD,PAD);      
@@ -369,6 +395,7 @@ void loop(){
       break;*/
       
     case CMD_DIE:
+      Serial.println("CMD DIE");
       motorController.off();
       //ack die and power down
       break;
@@ -377,22 +404,30 @@ void loop(){
 
     //not sure what to do with this one anymore. lots more status information than before  
     case CMD_DATA_DUMP://master command. not slave. really need here?
+      Serial.println("CMD USELESS DUMP");
       //send back what needs to be sent
       break;
     
     //because powering everything on and off manually won't always be an option
     case CMD_REINIT:
+      Serial.println("CMD REINITIALIZATION");
     //this will happen if a new module turns on or resets
+      Serial.println(millis());
       for(int i=0; i<5; i++){
         PIDcontrollerX[i].setSetPoint(PIDcontrollerX[i].getSensor());
         PIDcontrollerX[i].updateOutput();
       }
       motorController.off();
       motorController.updateMotor();
+      Serial.print("starting another initialize command");
+      Serial.println(millis());
       interface.init(SLAVE);
+      Serial.print("ending another initialize command");
+      Serial.println(millis());
       break;
       
     case CMD_OPEN_HORIZ:
+      Serial.println("CMD OPEN LOOP HORIZONTAL");
       for(int i = 1; i<=5; i++){
         //turning off for sure case
         if(command.data[i]==0){
@@ -415,10 +450,12 @@ void loop(){
           motorController.updateAX(i,200);
         }
       }
+      interface.sendState(STATE_OPEN_HORIZ,openHorizB[0],openHorizB[1],openHorizB[2],openHorizB[3],openHorizB[4],PAD);
       break;
 
   //THIS is the permanent open loop case which is currently everywhere
     case CMD_OPEN_VERT:
+      Serial.println("CMD OPEN LOOP VERT");
       for(int i = 1; i<=5; i++){
         //turning off for sure case
         if(command.data[i]==0){
@@ -445,14 +482,30 @@ void loop(){
       }
       interface.sendState(STATE_OPEN_VERT,openVertB[0],openVertB[1],openVertB[2],openVertB[3],openVertB[4],PAD);
       break;
-  }//end of switch
+      
+      case CMD_OUTPUT:
+        Serial.println("cmd output");
+        Serial.print(PIDcontrollerX[0].getSensor());;Serial.print(" ");
+        Serial.print(PIDcontrollerX[0].getSetpoint());;Serial.print(" ");
+        Serial.print(PIDcontrollerX[0].getPID(0));;Serial.print(" ");
+        Serial.print(PIDcontrollerX[0].updateOutput());Serial.print(" ");
+        Serial.println();
+        interface.sendState(STATE_OUTPUT,outputX[0],outputX[1],outputX[2],outputX[3],outputX[4],PAD);
+        break;
+      case CMD_GET_SETPOINT:
+        Serial.println("cmd get setpoint");
+        interface.sendState(STATE_GET_SETPOINT,PIDcontrollerX[0].getSetpoint(),PIDcontrollerX[1].getSetpoint(),PIDcontrollerX[2].getSetpoint(),PIDcontrollerX[3].getSetpoint(),PIDcontrollerX[4].getSetpoint(),PAD);
+        break;
+}//end of switch
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /*+++++++++++++++++++++++++++++++++++++++output+++++++++++++++++++++++++++++++++++++++*/
 /**********************************closed loop stuff***********************************/
-  if(pidCalibrated == true && ClosedLoopMode == true){
+  if(/*pidCalibrated == true &&*/ ClosedLoopMode == true){    
     //use PID to make actuator adjustments
-    for(int i=0;i<5;i++){
+    for(int i=1;i<5;i++){
       outputX[i]=PIDcontrollerX[i].updateOutput();
+     // Serial.print(outputX[i],DEC);
+    //  Serial.print(" ");
       motorController.updateAX(i,outputX[i]);
      // /*
 //      PIDcontrollerZ[i].updateOutput();
