@@ -11,7 +11,8 @@ Interface::Interface(int cs): CAN(cs, 0) {
   arg[4] = 0x00;
   arg[5] = 0x00;
 }
-void Interface::CANinit(){
+
+void Interface::init(int type) {
   // Initialise MCP2515 CAN controller at the specified speed and clock frequency
   // In this case 1Mbps with a 16MHz oscillator
   // (Note:  This is the oscillator attached to the MCP2515, not the Arduino oscillaltor)
@@ -26,11 +27,7 @@ void Interface::CANinit(){
   }
   Serial.println(CAN.Read(CANSTAT),HEX);
   Serial.println("Ready ...");
-}
-
-void Interface::init(int type) {
-	_id = 0;
-
+  
   if(type==MASTER){
     delay(2000);
     Serial.println("Starting ID initialization");
@@ -40,37 +37,30 @@ void Interface::init(int type) {
   else if(type == SLAVE){
   //arduino id assignment
   
-	if(! _id){
-		byte readbuffer[2] = {0,0};
-		while(!Serial1.available()){
-			delay(5);
-		}
-		
-		while(Serial1.available()){
-			readbuffer[1] = Serial1.read();
-			Serial.println(readbuffer[1]);
-			if(readbuffer[1] == STATE_ALIVE) {
-				break;
-			}
-			else {
-				readbuffer[0] = readbuffer[1];
-			}
-		}
+  while(Serial2.available()){
+    Serial2.read();
+  }
+  
+  while(! _id){  
+    
+      if(Serial2.available()){
       
-			_id = readbuffer[0] + 0x01;
-			Serial.print("recieved id ");
-			Serial.println(_id,HEX);
-			byte _state = readbuffer[1];
-			Serial.println(_state,HEX);
+        _id = Serial2.read() + 0x01;
+        Serial.print("recieved id ");
+        Serial.println(_id,HEX);
+        byte _state = Serial2.read();
+        Serial.println(_state,HEX);
       
-			if(_state != STATE_ALIVE){
-				_id=0x00;
-				Serial.println("ARGH");
-			}
+        if(_state != STATE_ALIVE){
+          _id=0x00;
+          Serial.println("ARGH");
+          continue;
+        }
         delay(50);
         sendDown();
-        sendState(STATE_ALIVE,PAD,PAD,PAD,PAD,PAD,PAD);	
-	}
+        sendState(STATE_ALIVE,PAD,PAD,PAD,PAD,PAD,PAD);
+    }
+  }
   }
   Serial.println("i has finished init");
 }
@@ -122,13 +112,13 @@ void Interface::sendState(State state, char arg1, char arg2, char arg3,
 }
 
 void Interface::sendUp() {
-  Serial1.write(_id);
-  Serial1.write(STATE_ALIVE);
+  Serial2.write(_id);
+  Serial2.write(STATE_ALIVE);
 }
 
 void Interface::sendDown() {
-  Serial2.write(_id);
-  Serial2.write(STATE_ALIVE);
+  Serial1.write(_id);
+  Serial1.write(STATE_ALIVE);
 }
 
 void Interface::broadcast() {

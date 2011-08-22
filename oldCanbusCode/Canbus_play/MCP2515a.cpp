@@ -20,11 +20,11 @@ MCP2515::MCP2515(byte CS_Pin, byte INT_Pin) {
   pinMode(CS_Pin, OUTPUT);
   digitalWrite(CS_Pin,HIGH);
 
-  //pinMode(INT_Pin,INPUT);
-  //digitalWrite(INT_Pin,HIGH);
+  pinMode(INT_Pin,INPUT);
+  digitalWrite(INT_Pin,HIGH);
 
   _CS = CS_Pin;
-  //_INT = INT_Pin;
+  _INT = INT_Pin;
 }
 
 /*

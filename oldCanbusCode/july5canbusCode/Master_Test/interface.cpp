@@ -11,7 +11,8 @@ Interface::Interface(int cs): CAN(cs, 0) {
   arg[4] = 0x00;
   arg[5] = 0x00;
 }
-void Interface::CANinit(){
+
+void Interface::init() {
   // Initialise MCP2515 CAN controller at the specified speed and clock frequency
   // In this case 1Mbps with a 16MHz oscillator
   // (Note:  This is the oscillator attached to the MCP2515, not the Arduino oscillaltor)
@@ -26,53 +27,10 @@ void Interface::CANinit(){
   }
   Serial.println(CAN.Read(CANSTAT),HEX);
   Serial.println("Ready ...");
-}
-
-void Interface::init(int type) {
-	_id = 0;
-
-  if(type==MASTER){
-    delay(2000);
-    Serial.println("Starting ID initialization");
-    sendDown();
-  }
   
-  else if(type == SLAVE){
-  //arduino id assignment
-  
-	if(! _id){
-		byte readbuffer[2] = {0,0};
-		while(!Serial1.available()){
-			delay(5);
-		}
-		
-		while(Serial1.available()){
-			readbuffer[1] = Serial1.read();
-			Serial.println(readbuffer[1]);
-			if(readbuffer[1] == STATE_ALIVE) {
-				break;
-			}
-			else {
-				readbuffer[0] = readbuffer[1];
-			}
-		}
-      
-			_id = readbuffer[0] + 0x01;
-			Serial.print("recieved id ");
-			Serial.println(_id,HEX);
-			byte _state = readbuffer[1];
-			Serial.println(_state,HEX);
-      
-			if(_state != STATE_ALIVE){
-				_id=0x00;
-				Serial.println("ARGH");
-			}
-        delay(50);
-        sendDown();
-        sendState(STATE_ALIVE,PAD,PAD,PAD,PAD,PAD,PAD);	
-	}
-  }
-  Serial.println("i has finished init");
+  delay(2000);
+  Serial.println("Starting ID initialization");
+  sendDown();
 }
 
 char Interface::getID() {
@@ -122,13 +80,13 @@ void Interface::sendState(State state, char arg1, char arg2, char arg3,
 }
 
 void Interface::sendUp() {
-  Serial1.write(_id);
-  Serial1.write(STATE_ALIVE);
+  Serial2.write(_id);
+  Serial2.write(STATE_ALIVE);
 }
 
 void Interface::sendDown() {
-  Serial2.write(_id);
-  Serial2.write(STATE_ALIVE);
+  Serial1.write(_id);
+  Serial1.write(STATE_ALIVE);
 }
 
 void Interface::broadcast() {
@@ -139,11 +97,11 @@ void Interface::broadcast() {
 
 Frame Interface::getMessage() {
   Frame message;
-  message.id = 0x00;
+  message.id = 0;
   message.data[0] = 0x00;
   byte int_byte = CAN.Read(CANINTF);
   if(int_byte) {
-//    Serial.println("Interupted");
+    //Serial.println("Interupted");
     // determine which interrupt flags have been set
     byte interruptFlags = CAN.Read(CANINTF);
 
@@ -151,7 +109,7 @@ Frame Interface::getMessage() {
 	// read from RX buffer 0
 	message = CAN.ReadBuffer(RXB0);
     }
-    else if(interruptFlags & RX1IF) {
+    if(interruptFlags & RX1IF) {
 	// read from RX buffer 1
 	message = CAN.ReadBuffer(RXB1);
 	// (this is poor code as clearly if two messages are received then the second will overwrite the first)
@@ -173,24 +131,6 @@ Frame Interface::getMessage() {
 	// if TXBnCTRL.TXERR set then transmission error
 	// if message is lost TXBnCTRL.MLOA will be set
     }
- /*   Serial.print(message.id,HEX);
-    Serial.print(" ");
-    Serial.print(_id,HEX);
-    Serial.println();*/
   }
-  if( _id == 0x00){//master cares about all
-	return message;
-	}
-  // Cast message.id to byte here since it isn't actually returned as a byte
-  if((byte)message.id == _id) {
-    return message;
-  }
-  else {
-    Frame none;
-    none.id = 0x00;
-    none.data[0] = CMD_NONE;
-    return none;
-  }
+  return message;// Check ID here... if message.id == self.id return message else return 0
 }
-
-

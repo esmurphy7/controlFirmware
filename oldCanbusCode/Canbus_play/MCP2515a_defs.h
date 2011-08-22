@@ -42,7 +42,7 @@ typedef struct
 // CANSTAT
 #define MODE_CONFIG		0x80
 #define MODE_LISTEN		0x60
-#define MODE_LOOPBACK	0x40
+#define MODE_LOOPBACK	        0x40
 #define MODE_SLEEP		0x20
 #define MODE_NORMAL		0x00
 // CANINTF

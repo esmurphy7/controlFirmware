@@ -3,7 +3,9 @@ PID control library
 calculates the PID output
 and writes to output pin
 */
-#include<WProgram.h>
+//can probably pass through suspected edge values here and use limit switches to correct?
+
+#include "Wprogram.h"
 
 //class outputs PID control
 //out put constraint to between -255 and 255
@@ -99,21 +101,6 @@ class PIDcontrol{
 	}  
 	*/  
 
-	int getPID(int num){
-		if(num == 0){return kp;}
-		else if(num == 1){return ki;}
-		else if(num == 2){return kd;}
-		else{return NULL;}
-	}
-	
-	int getAIN(){
-		return Ain;
-	}
-	
-	int getAOUT(){
-		return Aout;
-	}
-	
 	void calibrated(int newAin, int newAout){
 		Ain = newAin;
 		Aout = newAout;
@@ -124,30 +111,10 @@ class PIDcontrol{
 			even = false;
 		}
 	}
-	
 	void setSetPoint(int newSetPoint){
 		setPoint = newSetPoint;
 	}
-	
-	void setAngle(int newAngle){
-		if(even){
-			setPoint = map(newAngle,0,50,Ain,Aout);
-		}
-		else{
-			setPoint = map(newAngle,0,50,Aout,Ain);
-		}
-	}
-	
-	int getAngle(){
-		getSensor();
-		if(even){
-			return map(sensorReading,Ain,Aout,0,50);
-		}
-		else{
-			return map(sensorReading,Aout,Ain,0,50);
-		}
-	}
-		
+
 	int getSetpoint(){
 		return setPoint;
 	}
@@ -177,10 +144,6 @@ class PIDcontrol{
 			error = 0;
 			integral = 0;
 			prevSensorReading = -1;
-			//Serial.println("error is 0");
-		} 
-		else {
-			//Serial.println(error);
 		}
 		//Serial.print("error: ");
 		//Serial.println(error);
@@ -207,14 +170,12 @@ class PIDcontrol{
 		//calculate output
 		//adjust fomula to change sensativity to constaints
 		output = kp*error - kd*derivative + ki*integral/256;
-		//SSerial.println(output);
 		output = constrain(output, -255, 255);
 		//}
-		
 
 		int realOutput = output;
 		realOutput = constrain(realOutput, -255, 255);
-		//Serial.println(realOutput);
+
 		//here is where we need to set up some way to determine left and right. everything else  works fine
 
 		// We map the output to 120 to 255 here because the
