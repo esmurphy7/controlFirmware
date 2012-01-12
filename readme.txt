@@ -8,3 +8,6 @@ People involved with software:
 Michelle La Haye
 Markus Hager
 Ian Brown
+James Simard
+Julian Fong
+Eric Wilson
