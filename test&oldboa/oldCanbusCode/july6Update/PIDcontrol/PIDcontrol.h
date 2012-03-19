@@ -30,11 +30,6 @@ private:
   int output;
   unsigned long prevTime;
   int prevSensorReading;
-  
-//limit switches included in this library
-  int limit_switchL;
-  int limit_switchR;
-  
 public:
 
   void debugging(){
@@ -57,13 +52,10 @@ public:
 
 
   //constructor
-  PIDcontrol(int newSensorPin,int newActuatorPinFwd,int newActuatorPinRev, int newlimit_switchL, int newlimit_switchR){
+  PIDcontrol(int newSensorPin,int newActuatorPinFwd,int newActuatorPinRev){
     sensorPin = newSensorPin;
     actuatorPinFwd = newActuatorPinFwd;
     actuatorPinRev = newActuatorPinRev;
-//limit switches being assigned
-	limit_switchL =  newlimit_switchL;
-	limit_switchR = newlimit_switchR;
     
     kp = 0;
     kd = 0;
@@ -92,48 +84,37 @@ public:
   }
   
   int updateOutput(){
-	
-	if(digitalRead(limit_switchL) == HIGH){
-		setPoint = analogRead(sensorPin)+20;
-		Serial.print("limit left tripped");
-	}
-	else if(digitalRead(limit_switchR) == HIGH){
-		setPoint = analogRead(sensorPin)-20;
-		
-	}
-	else{//normal operation
+    sensorReading = analogRead(sensorPin);
     //map sensor readings to 0-255 range
-		sensorReading = analogRead(sensorPin);
-		sensorReading = map(sensorReading, 0, 1023, 0, 255);
+    sensorReading = map(sensorReading, 0, 1023, 0, 255);
     
-		error = sensorReading - setPoint;
+    error = sensorReading - setPoint;
     
     //prevSensorReading initialized to -1
     //-1 if no sensor readins previously
-		if(prevSensorReading != -1){
-			derivative = (sensorReading - prevSensorReading) / (millis() - prevTime);
-		}
-		else{
-			derivative = 0;
-		}
-    
-		if(prevSensorReading != sensorReading){
-			prevSensorReading = sensorReading;
-			prevTime = millis();
-		}
-		derivative = constrain(derivative,-1024,1024);
-    
-		//integral constraint for anti-windup
-		integral += error;
-		integral = constrain(integral, -1024, 1024);
-    
-		//calculate output
-		//adjust fomula to change sensativity to constaints
-		output = kp*error - kd*derivative + ki*integral/256;
-		output = constrain(output, -235, 235);
+    if(prevSensorReading != -1){
+      derivative = (sensorReading - prevSensorReading) / (millis() - prevTime);
     }
-	
-    //add dithering regardless of trigger or not
+    else{
+      derivative = 0;
+    }
+    
+    if(prevSensorReading != sensorReading){
+      prevSensorReading = sensorReading;
+      prevTime = millis();
+    }
+	derivative = constrain(derivative,-1024,1024);
+    
+    //integral constraint for anti-windup
+    integral += error;
+    integral = constrain(integral, -1024, 1024);
+    
+    //calculate output
+    //adjust fomula to change sensativity to constaints
+    output = kp*error - kd*derivative + ki*integral/256;
+    output = constrain(output, -235, 235);
+    
+    //add dithering
     output = output + 20*int(sin(float(millis()/2)));
     output = constrain(output, -255, 255);
     

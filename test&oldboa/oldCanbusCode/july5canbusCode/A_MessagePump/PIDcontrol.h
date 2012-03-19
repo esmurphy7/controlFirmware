@@ -86,7 +86,7 @@ public:
   int updateOutput(){
     sensorReading = analogRead(sensorPin);
     //map sensor readings to 0-255 range
-    sensorReading = map(sensorReading, 0, 1023, 0, 255);
+    sensorReading = map(sensorReading, 60, 120, 0, 255);
     
     error = sensorReading - setPoint;
     
@@ -103,7 +103,6 @@ public:
       prevSensorReading = sensorReading;
       prevTime = millis();
     }
-	derivative = constrain(derivative,-1024,1024);
     
     //integral constraint for anti-windup
     integral += error;
@@ -111,7 +110,7 @@ public:
     
     //calculate output
     //adjust fomula to change sensativity to constaints
-    output = kp*error - kd*derivative + ki*integral/256;
+    output = kp*error - kd*derivative*1024 + ki*integral/256;
     output = constrain(output, -235, 235);
     
     //add dithering
