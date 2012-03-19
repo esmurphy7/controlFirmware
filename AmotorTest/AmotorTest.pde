@@ -1,4 +1,5 @@
 
+
 // Arduino analog Pins
 #define ADC0   0
 #define ADC1   1
@@ -302,6 +303,8 @@ void loop(){
         digitalWrite(31-segSelect,HIGH);
         Serial.print("l dir");
         Serial.print("\n");
+        delay(200);
+        StopMov();
       }
       if(motor == true){
         motorSpeed+=10;
@@ -318,6 +321,8 @@ void loop(){
         digitalWrite(31-segSelect,LOW);
         Serial.print("k dir");
         Serial.print("\n");
+        delay(200);
+        StopMov();
       }
       if(motor == true){
         motorSpeed-=10;
@@ -334,6 +339,8 @@ void loop(){
         digitalWrite(26-segSelect,LOW);
         Serial.print("i dir");
         Serial.print("\n");
+        delay(200);
+        StopMov();
       } 
     }
     if(byteIn == 'o'){
@@ -343,6 +350,8 @@ void loop(){
         digitalWrite(26-segSelect,HIGH);
         Serial.print("o dir");
         Serial.print("\n");
+        delay(200);
+        StopMov();
       } 
     }
     if(byteIn == 's'){
