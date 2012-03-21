@@ -27,6 +27,7 @@ timing based, full left/right actuated
  to incoperate sensor feed back and PID
  */
 
+#include "EEPROM.h"
 #include "boashield_pins.h"
 #include "PIDcontrol.h"
 
@@ -111,6 +112,14 @@ char endModuleNumber;
 #define TAIL_SERIAL Serial2
 
 void setup(){
+  
+  //load calibration from EEPROM
+  for(int i=0;i<5;i++){ 
+    highRange[i] = EEPROM.read(i*5+0) + (EEPROM.read(i*5+1) << 8);
+    lowRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
+    PIDcontroller[i].setEven(EEPROM.read(i*5+4));
+  }
+  
   //turn of motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
@@ -414,7 +423,7 @@ void move(){
 void calibrate(){
   //calibrade low and high range on snake
 
-    //move to side when ctrl is HIGH 
+  //move to side when ctrl is HIGH 
   analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
   for(int i=0;i<5;i++){
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
@@ -451,7 +460,7 @@ void calibrate(){
     lowRange[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
 
-  //adjust high and low range and account for alternating actuators
+  //Adjust high and low range and account for alternating actuators
   for(int i=0;i<5;i++){
     if(highRange[i]>lowRange[i]){
       PIDcontroller[i].setEven(true);
@@ -464,6 +473,16 @@ void calibrate(){
       PIDcontroller[i].setEven(false);
       horzAngleArray[i] = '0';
     }
+  }
+  
+  //save calibration to EEPROM
+  //10-bit values must be split into two bytes for storage.
+  for(int i=0;i<5;i++){ 
+    EEPROM.write(i*5+0,lowByte(highRange[i]));
+    EEPROM.write(i*5+1,highByte(highRange[i]));
+    EEPROM.write(i*5+2,lowByte(lowRange[i]));
+    EEPROM.write(i*5+3,highByte(lowRange[i]));
+    EEPROM.write(i*5+4,PIDcontroller[i].getEven());
   }
 
   strighten();

@@ -6,7 +6,7 @@ and writes to output pin
 #ifndef PIDcontrol_h
 #define PIDcontrol_h
 
-#include "WProgram.h"
+#include <Arduino.h>
 
 //class outputs PID control
 //output constraint to between -255 and 255

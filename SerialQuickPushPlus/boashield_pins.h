@@ -199,13 +199,6 @@
 #define RX_DOWNSTREAM  RX2
 #define TX_DOWNSTREAM  TX2
 
-// CanBus
-#define SS    ARD53
-#define SCK   ARD52
-#define MOSI  ARD51
-#define MISO  ARD50
-
-
 // LEDs
 #define LED_1  ARD32
 #define LED_2  ARD33
