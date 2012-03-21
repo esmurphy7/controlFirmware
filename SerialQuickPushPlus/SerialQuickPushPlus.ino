@@ -7,24 +7,20 @@ timing based, full left/right actuated
  through Serial 2
 
  created July 9, 2011 Julian Fong
- (begining of the 
- second day of Vacnover 125
- celebrations)
+   (begining of the  second day of Vancouver 125 celebrations)
  modified July 10, 2011 Julian Fong
- (begining of the 
- third day of Vacnover 125
- celebrations)
+   (begining of the third day of Vancouver 125 celebrations)
  modified July 10, 2011 Julian Fong
- used at end of Vacnover 125
- celebrations
- modified August 29
- made at burning man
- does not wait for ready, angles move as
- fast as they  are pushed in
- -digging into sand, need vertical control
- 
+   (used at end of Vancouver 125 celebrations)
  modified August 13, 2011 Julian Fong
- to incoperate sensor feed back and PID
+   - to incoperate sensor feed back and PID  
+ modified August 29
+   (Made at burning man)
+   - does not wait for ready, angles move as fast as they  are pushed in
+   - digging into sand, need vertical control
+ modified March 20, 2012 Kevin Lowe
+   - Save calibration to EEROM
+ 
  */
 
 #include "EEPROM.h"
