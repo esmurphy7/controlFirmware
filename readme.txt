@@ -12,9 +12,6 @@ James Simard
 Julian Fong
 Eric Wilson
 
-notes about repository:
-protoboa is the location of testing and prototype software
-directories starting with A indicate arduino code
-directories starting with P indicate processing code (for the most part)
+
 
 
