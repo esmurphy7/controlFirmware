@@ -116,6 +116,30 @@ void setup(){
     PIDcontroller[i].setEven(EEPROM.read(i*5+4));
   }
   
+  // initialize serial port in order to print out current calibration data
+  Serial2.begin(115200);
+  Serial3.begin(115200);
+  Serial1.begin(115200);
+  Serial.begin(115200);
+  
+  //printing out calibration
+  Serial.println("");
+  for(int i=0;i<5;i++){
+    Serial.print(highRange[i]);
+    Serial.print(' ');
+  }
+  Serial.println("HIGH ");
+  for(int i=0;i<5;i++){
+    Serial.print(lowRange[i]);
+    Serial.print(' ');
+  }
+  Serial.println("LOW ");
+  for(int i=0;i<5;i++){
+    Serial.print(PIDcontroller[i].getEven(),BIN);
+    Serial.print("    ");
+  }
+  Serial.println("EVEN");
+  
   //turn of motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
@@ -126,6 +150,7 @@ void setup(){
     pinMode(VERT_ACTUATOR[i],OUTPUT);
     analogWrite(VERT_ACTUATOR[i],0);
   }
+  
   //initilize output pins
   for(int i=0;i<5;i++){
     pinMode(HORZ_ACTUATOR_CTRL[i],OUTPUT);
@@ -139,12 +164,6 @@ void setup(){
   for(int i=0;i<5;i++){
     PIDcontroller[i].setConstants(50,0,0);
   }
-
-  Serial2.begin(115200);
-  Serial3.begin(115200);
-  Serial1.begin(115200);
-  Serial.begin(115200);
-  
   
   delay(1000);
 }
