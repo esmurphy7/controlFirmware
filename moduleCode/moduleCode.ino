@@ -106,6 +106,7 @@ char endModuleNumber;
 //down == 2
 #define HEAD_SERIAL Serial1
 #define TAIL_SERIAL Serial2
+#define USB_COM_PORT Serial
 
 
 /**************************************
@@ -189,11 +190,26 @@ void loop(){
 
   char message;
 
+  // check for command from USB serial to enter manual control
+  // NOTE: this is a quick hack for NightQuest so that we can adjust actuators quickly if they get out of wack
+  //       this only puts one module in manual control, never operate titanoboa like this!!!
+  //       in future manual control mode should be selected from the joystick and all modules enter manual control
+  //       mode and return to normal operation together
+  if (USB_COM_PORT.available()>0)
+  {
+    USB_COM_PORT.print("checking for command on USB\n");
+    if (USB_COM_PORT.read() == 'M')
+    {
+      //confirm this wasn't random noise
+      if (USB_COM_PORT.read() == 'M')
+      {
+        manualControl();
+      }
+    }
+  }
+
   if(HEAD_SERIAL.available()>0){
-    //*
-    Serial.print("\nrecieved ");
-    Serial.write(HEAD_SERIAL.peek());
-    //*/
+
     switch(HEAD_SERIAL.read()){
     case 's':
       //setpionts to come
@@ -610,6 +626,7 @@ void manualControl()
   int segSelect = 0;
   boolean motor = false;
   int actuationDelay = 200;
+  char delaySetting = 'm';
   
   Serial.print("\nManual Control mode entered\n");
   Serial.print("commands: 1-5 to select vertebrae\n");
@@ -663,20 +680,20 @@ void manualControl()
           switch (delaySetting)
           {
             case 's':
-              actuationDelay = 100;
-              Serial.print("Actuation delay set to smallest time (100)\n");
+              actuationDelay = 150;
+              Serial.print("Actuation delay set to smallest time (150ms)\n");
               break;
             case 'm':
               actuationDelay = 200;
-              Serial.print("Actuation delay set to medium time (200)\n");
+              Serial.print("Actuation delay set to medium time (200ms)\n");
               break;
             case 'l':
-              actuationDelay = 400;
-              Serial.print("Actuation delay set to largest time (400)\n");
+              actuationDelay = 300;
+              Serial.print("Actuation delay set to largest time (300ms)\n");
               break;
             default:
               actuationDelay = 200;
-              Serial.print("Invalid entry, actuation delay set to medium time (200)\n");
+              Serial.print("Invalid entry, actuation delay set to medium time (200ms)\n");
               break;
           }
           break;
