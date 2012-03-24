@@ -110,10 +110,12 @@ char endModuleNumber;
 void setup(){
   
   //load calibration from EEPROM
+  myModuleNumber = EEPROM.read(0);
+  endModuleNumber = EEPROM.write(1);  
   for(int i=0;i<5;i++){ 
-    highRange[i] = EEPROM.read(i*5+0) + (EEPROM.read(i*5+1) << 8);
-    lowRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
-    PIDcontroller[i].setEven(EEPROM.read(i*5+4));
+    highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
+    lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
+    PIDcontroller[i].setEven(EEPROM.read(i*5+6));
   }
   
   // initialize serial port in order to print out current calibration data
@@ -492,12 +494,14 @@ void calibrate(){
   
   //save calibration to EEPROM
   //10-bit values must be split into two bytes for storage.
+  EEPROM.write(0,myModuleNumber);
+  EEPROM.write(1,endModuleNumber);
   for(int i=0;i<5;i++){ 
-    EEPROM.write(i*5+0,lowByte(highRange[i]));
-    EEPROM.write(i*5+1,highByte(highRange[i]));
-    EEPROM.write(i*5+2,lowByte(lowRange[i]));
-    EEPROM.write(i*5+3,highByte(lowRange[i]));
-    EEPROM.write(i*5+4,PIDcontroller[i].getEven());
+    EEPROM.write(i*5+2,lowByte(highRange[i]));
+    EEPROM.write(i*5+3,highByte(highRange[i]));
+    EEPROM.write(i*5+4,lowByte(lowRange[i]));
+    EEPROM.write(i*5+5,highByte(lowRange[i]));
+    EEPROM.write(i*5+6,PIDcontroller[i].getEven());
   }
 
   strighten();
