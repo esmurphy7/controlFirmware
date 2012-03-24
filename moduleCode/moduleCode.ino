@@ -107,6 +107,11 @@ char endModuleNumber;
 #define HEAD_SERIAL Serial1
 #define TAIL_SERIAL Serial2
 
+
+/**************************************
+* Function name: setup()
+* Description: 
+**************************************/
 void setup(){
   
   //load calibration from EEPROM
@@ -173,6 +178,11 @@ char headAngle[] = {
 char tailAngle[] = {
   '3','3'  };
 
+
+/**************************************
+* Function name: loop()
+* Description: Main loop
+**************************************/
 void loop(){
   headAngle[0] = '3';
   headAngle[1] = '3';
@@ -257,7 +267,7 @@ void loop(){
 
     case 'l':
       TAIL_SERIAL.print("l");
-      strighten();
+      straighten();
       ready();
       break;
     }
@@ -315,12 +325,19 @@ void loop(){
    */
 }
 
+
+/**************************************
+* Function name: ready()
+**************************************/
 void ready(){
   HEAD_SERIAL.write('r');
   HEAD_SERIAL.write(myModuleNumber);
 }
 
 
+/**************************************
+* Function name: propergate()
+**************************************/
 void propergate(){
   tailAngle[0] = horzAngleArray[4];
   tailAngle[1] = vertAngleArray[4];
@@ -363,6 +380,9 @@ void propergate(){
 }
 
 
+/**************************************
+* Function name: move()
+**************************************/
 //time to try moving actuator before giving up
 const int MAX_WAIT_TIME = 3000;
 //safty range to not move 
@@ -372,7 +392,7 @@ int count=0;
 
 void move(){
   //to see if any in segment moved
-  //so we can turn of motor when it's reached setpoint
+  //so we can turn off motor when it's reached setpoint
   boolean moved = false;
 
   int goal;
@@ -435,8 +455,11 @@ void move(){
 }
 
 
+/**************************************
+* Function name: calibrate()
+* Description: calibrate low and high range on snake
+**************************************/
 void calibrate(){
-  //calibrade low and high range on snake
 
   //move to side when ctrl is HIGH 
   analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
@@ -500,7 +523,7 @@ void calibrate(){
     EEPROM.write(i*5+4,PIDcontroller[i].getEven());
   }
 
-  strighten();
+  straighten();
 
   //*
   //printing out calibration
@@ -523,8 +546,12 @@ void calibrate(){
   //*/
 }
 
+
+/**************************************
+* Function name: straighten()
+**************************************/
 //uses the same constants used by move()
-void strighten(){
+void straighten(){
   //move till horzAngleArray is matched
   boolean inPosition = false;
 
@@ -552,7 +579,7 @@ void strighten(){
     }
   }
 
-  //turn of motor
+  //turn off motor
   analogWrite(MOTOR_CONTROL, 0);
   //turn off all actuators
   //undefine angles
