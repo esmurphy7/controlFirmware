@@ -270,6 +270,11 @@ void loop(){
       straighten();
       ready();
       break;
+      
+    case 'A':
+      // manual actuator control
+      manualControl();
+      break;
     }
 
     //flush everything and get ready for next loop
@@ -537,6 +542,11 @@ void calibrate(){
     Serial.print(lowRange[i]);
     Serial.print(' ');
   }
+  Serial.println("RANGE ");
+  for(int i=0;i<5;i++){
+    Serial.print(highRange[i] - lowRange[i]);
+    Serial.print("    ");
+  }
   Serial.println("LOW ");
   for(int i=0;i<5;i++){
     Serial.print(PIDcontroller[i].getEven(),BIN);
@@ -590,6 +600,188 @@ void straighten(){
 }
 
 
+/**************************************
+* Function name: manualControl()
+**************************************/
+void manualControl()
+{
+  boolean manual = true;
+  char byteIn = 'z';
+  int segSelect = 0;
+  boolean motor = false;
+  int actuationDelay = 200;
+  
+  Serial.print("\nManual Control mode entered\n");
+  Serial.print("commands: 1-5 to select vertebrae\n");
+  Serial.print("          k/l - horizontal actuation\n");
+  Serial.print("          i/o - vertical actuation\n");
+  Serial.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+  Serial.print("          s - stop motor\n");
+  Serial.print("          q - quit\n");
+  
+  while(manual == true)
+  {
+    if(Serial.available() > 0){
+      byteIn = Serial.read();
+      
+      switch(byteIn)
+      {
+        case '1':
+          segSelect = 0;
+          StopMov();
+          Serial.print("Seg1\n");
+          motor = false;
+          break;
+        case '2':
+          segSelect = 1;
+          StopMov();
+          Serial.print("Seg2\n");
+          motor = false;
+          break;
+        case '3':
+          segSelect = 2;
+          StopMov();
+          Serial.print("Seg3\n");
+          motor = false;
+          break;
+        case '4':
+          segSelect = 3;
+          StopMov();
+          Serial.print("Seg4\n");
+          motor = false;
+          break;
+        case '5':
+          segSelect = 4;
+          StopMov();
+          Serial.print("Seg5\n");
+          motor = false;
+          break;
+        
+        case 'd':
+          StopMov();
+          delaySetting = Serial.read();
+          switch (delaySetting)
+          {
+            case 's':
+              actuationDelay = 100;
+              Serial.print("Actuation delay set to smallest time (100)\n");
+              break;
+            case 'm':
+              actuationDelay = 200;
+              Serial.print("Actuation delay set to medium time (200)\n");
+              break;
+            case 'l':
+              actuationDelay = 400;
+              Serial.print("Actuation delay set to largest time (400)\n");
+              break;
+            default:
+              actuationDelay = 200;
+              Serial.print("Invalid entry, actuation delay set to medium time (200)\n");
+              break;
+          }
+          break;
+          
+        case 'l':
+          if(motor == false){
+            StopMov();
+            analogWrite(5, MOTOR_SPEED);
+            analogWrite(HORZ_ACTUATOR[segSelect], 255);
+            digitalWrite(31-segSelect, HIGH);
+            Serial.print("l dir\n");
+            delay(actuationDelay);
+            StopMov();
+          }
+          break;
+         
+        case 'k':
+          if(motor == false){
+            StopMov();
+            analogWrite(5, MOTOR_SPEED);
+            analogWrite(HORZ_ACTUATOR[segSelect], 255);
+            digitalWrite(31-segSelect,LOW);
+            Serial.print("k dir\n");
+            delay(actuationDelay);
+            StopMov();
+          }
+          break;
+        
+        case 'i':
+          if(motor == false){
+            StopMov();
+            analogWrite(5, MOTOR_SPEED);
+            analogWrite(VERT_ACTUATOR[segSelect], 255);
+            digitalWrite(26-segSelect, LOW);
+            Serial.print("i dir\n");
+            delay(actuationDelay);
+            StopMov();
+          }
+          break; 
+
+        case 'o':
+          if(motor == false){
+            analogWrite(5, MOTOR_SPEED);
+            analogWrite(VERT_ACTUATOR[segSelect], 255);
+            digitalWrite(26-segSelect, HIGH);
+            Serial.print("o dir\n");
+            delay(actuationDelay);
+            StopMov();
+          }
+          break;
+        
+        case 's':
+          StopMov();
+          Serial.print("STOPPED\n");
+          break;
+        
+        case 'q':
+          manual = false;
+          break;
+      }//end switch
+    }//end if serial
+    
+    byteIn = 'z';
+  }
+  Serial.print("\nManual Control mode exited");
+}
+
+/**************************************
+* Function name: StopMov()
+* Description: stop movment
+**************************************/
+void StopMov(){
+  
+  /*for (int i=0; i<5; i++)
+  {
+    analogWrite(HORZ_ACTUATOR[i], 0);
+    analogWrite(VERT_ACTUATOR[i], 0);
+  }*/
+  analogWrite(2,0);
+  analogWrite(3,0);
+  analogWrite(4,0);
+  analogWrite(5,0);
+  analogWrite(6,0);
+  analogWrite(7,0);
+  analogWrite(8,0);
+  analogWrite(9,0);
+  analogWrite(10,0);
+  analogWrite(11,0);
+  analogWrite(12,0);
+  analogWrite(13,0);
+
+  digitalWrite(31,LOW);
+  digitalWrite(30,LOW);
+  digitalWrite(29,LOW);
+  digitalWrite(28,LOW);
+  digitalWrite(27,LOW);
+
+  digitalWrite(26,LOW);
+  digitalWrite(25,LOW);
+  digitalWrite(24,LOW);
+  digitalWrite(23,LOW);
+  digitalWrite(22,LOW);
+
+  return;
+}
 
 
 
