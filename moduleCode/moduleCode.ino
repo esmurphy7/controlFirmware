@@ -168,27 +168,27 @@ void setup(){
   Serial.print("HIGH: ");
   for(int i=0;i<5;i++){
     Serial.print(highRange[i]);
-    Serial.print(' ');
+    Serial.print('\t');
   }
-  Serial.println("");
+  Serial.println('');
   Serial.print("LOW: ");
   for(int i=0;i<5;i++){
     Serial.print(lowRange[i]);
-    Serial.print(' ');
+    Serial.print('\t');
   }
-  Serial.println("");
+  Serial.println('');
   Serial.print("EVEN?: "); 
   for(int i=0;i<5;i++){
     Serial.print(PIDcontroller[i].getEven() ? 'T' : 'F');
-    Serial.print(' ');
+    Serial.print('\t');
   }
-  Serial.println("");
+  Serial.println('');
   Serial.print("ANGLE_ARRAY: ");  
   for(int i=0;i<5;i++){
     Serial.print(horzAngleArray[i]);
-    Serial.print(' ');
+    Serial.print('\t');
   }
-  Serial.println("\n");  
+  Serial.println('\n');  
   delay(1000);
 }
 
