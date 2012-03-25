@@ -117,7 +117,7 @@ void setup(){
   
   //load calibration from EEPROM
   myModuleNumber = EEPROM.read(0);
-  endModuleNumber = EEPROM.write(1);  
+  endModuleNumber = EEPROM.read(1);  
   for(int i=0;i<5;i++){ 
     highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
     lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
