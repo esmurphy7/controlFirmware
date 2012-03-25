@@ -115,49 +115,13 @@ char endModuleNumber;
 **************************************/
 void setup(){
   
-  //load calibration from EEPROM
-  myModuleNumber = EEPROM.read(0);
-  endModuleNumber = EEPROM.read(1);  
-  for(int i=0;i<5;i++){ 
-    highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
-    lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
-    PIDcontroller[i].setEven(EEPROM.read(i*5+6));
-  }
-  
-  // initialize serial port in order to print out current calibration data
-  Serial2.begin(115200);
+  //initialize serial ports
   Serial3.begin(115200);
-  Serial1.begin(115200);
-  Serial.begin(115200);
-  
-  //print out a hello message
-  Serial.print("Hi I'm Titanoboa\n");
-  Serial.print("this is module #");
-  Serial.println(myModuleNumber);
-  //printing out calibration
-  Serial.println("");
-  for(int i=0;i<5;i++){
-    Serial.print(highRange[i]);
-    Serial.print(' ');
-  }
-  Serial.println("HIGH ");
-  for(int i=0;i<5;i++){
-    Serial.print(lowRange[i]);
-    Serial.print(' ');
-  }
-  Serial.println("RANGE ");
-  for(int i=0;i<5;i++){
-    Serial.print(highRange[i] - lowRange[i]);
-    Serial.print(" ");
-  }
-  Serial.println("LOW ");
-  for(int i=0;i<5;i++){
-    Serial.print(PIDcontroller[i].getEven(),BIN);
-    Serial.print("    ");
-  }
-  Serial.println("EVEN");
-  
-  //turn of motor pin
+  Serial2.begin(115200); // Tail Serial
+  Serial1.begin(115200); // Head Serial
+  Serial.begin(115200);  // USB/Debug Serial
+
+  //turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
   //turn off actuator valves
@@ -168,12 +132,12 @@ void setup(){
     analogWrite(VERT_ACTUATOR[i],0);
   }
   
-  //initilize output pins
+  //initilize actuator output pins
   for(int i=0;i<5;i++){
     pinMode(HORZ_ACTUATOR_CTRL[i],OUTPUT);
     pinMode(VERT_ACTUATOR_CTRL[i],OUTPUT);
   }
-  //inilize sensor
+  //inialize sensor input pins
   for(int i=0;i<5;i++){
     pinMode(HORZ_POS_SENSOR[i],INPUT);
   }
@@ -181,7 +145,59 @@ void setup(){
   for(int i=0;i<5;i++){
     PIDcontroller[i].setConstants(50,0,0);
   }
+
+  //load calibration from EEPROM
+  myModuleNumber = EEPROM.read(0);
+  endModuleNumber = EEPROM.read(1);  
+  for(int i=0;i<5;i++){ 
+    highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
+    lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
+    PIDcontroller[i].setEven(EEPROM.read(i*5+6));
+  }
   
+  //set goals based on current angles
+  for(int i=0;i<5;i++){
+    int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
+    
+    if(currentAngle < 100)
+      horzAngleArray[i]=='0';
+    if(currentAngle >= 100 && currentAngle <= 154)
+      horzAngleArray[i]=='2';
+    if(currentAngle > 154)
+      horzAngleArray[i]=='1';
+  } 
+
+  //print out a hello message
+  Serial.print("Hi I'm Titanoboa\n");
+
+  //printing out calibration and goals
+  Serial.println("> Loaded Calibration");
+  Serial.print("MODULE #: ");
+  Serial.println(myModuleNumber, DEC);
+  Serial.print("HIGH: ");
+  for(int i=0;i<5;i++){
+    Serial.print(highRange[i]);
+    Serial.print('\t');
+  }
+  Serial.println('');
+  Serial.print("LOW: ");
+  for(int i=0;i<5;i++){
+    Serial.print(lowRange[i]);
+    Serial.print('\t');
+  }
+  Serial.println('');
+  Serial.print("EVEN?: "); 
+  for(int i=0;i<5;i++){
+    Serial.print(PIDcontroller[i].getEven() ? 'T' : 'F');
+    Serial.print('\t');
+  }
+  Serial.println('');
+  Serial.print("ANGLE_ARRAY: ");  
+  for(int i=0;i<5;i++){
+    Serial.print(horzAngleArray[i]);
+    Serial.print('\t');
+  }
+  Serial.println('\n');  
   delay(1000);
 }
 
