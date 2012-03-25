@@ -36,7 +36,7 @@ void loop(){
     limitsON++; 
   } 
   angle = angle/limitsON;
-  throttle = map(throttle,0,255,1500,500);
+  throttle = map(throttle,0,255,1000,250);
 
   if(digitalRead(37)==HIGH){
     if((angle < 270 && angle > 90) && angle != -1){
