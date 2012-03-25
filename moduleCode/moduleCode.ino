@@ -130,6 +130,10 @@ void setup(){
   Serial1.begin(115200);
   Serial.begin(115200);
   
+  //print out a hello message
+  Serial.print("Hi I'm Titanoboa\n");
+  Serial.print("this is module #");
+  Serial.println(myModuleNumber);
   //printing out calibration
   Serial.println("");
   for(int i=0;i<5;i++){
@@ -140,6 +144,11 @@ void setup(){
   for(int i=0;i<5;i++){
     Serial.print(lowRange[i]);
     Serial.print(' ');
+  }
+  Serial.println("RANGE ");
+  for(int i=0;i<5;i++){
+    Serial.print(highRange[i] - lowRange[i]);
+    Serial.print(" ");
   }
   Serial.println("LOW ");
   for(int i=0;i<5;i++){
@@ -549,8 +558,7 @@ void calibrate(){
   }
 
   straighten();
-
-  //*
+   
   //printing out calibration
   Serial.println("");
   for(int i=0;i<5;i++){
@@ -565,7 +573,7 @@ void calibrate(){
   Serial.println("RANGE ");
   for(int i=0;i<5;i++){
     Serial.print(highRange[i] - lowRange[i]);
-    Serial.print("    ");
+    Serial.print(" ");
   }
   Serial.println("LOW ");
   for(int i=0;i<5;i++){
@@ -573,7 +581,6 @@ void calibrate(){
     Serial.print("    ");
   }
   Serial.println("EVEN");
-  //*/
 }
 
 
@@ -647,6 +654,10 @@ void manualControl()
       
       switch(byteIn)
       {
+        case 'c':
+          Serial.print("Running calibration...\n");
+          calibrate();
+          break;
         case '1':
           segSelect = 0;
           StopMov();
