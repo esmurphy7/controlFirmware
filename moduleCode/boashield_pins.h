@@ -10,6 +10,11 @@
 
 /************************** Arduino Defines **********************************/
 
+#ifndef _BOA_SHIELD_PINS_H_
+#define _BOA_SHIELD_PINS_H_
+
+#include <Arduino.h>
+
 // Arduino analog Pins
 #define ADC0   A0
 #define ADC1   A1
@@ -210,6 +215,43 @@
 #define LED_8  ARD39
 
 
+// Actuator arrays for easy looping
+const int HORZ_POS_SENSOR[] = {
+  HORZ_POS_SENSOR_1,
+  HORZ_POS_SENSOR_2,
+  HORZ_POS_SENSOR_3,
+  HORZ_POS_SENSOR_4,
+  HORZ_POS_SENSOR_5
+};
+const int HORZ_ACTUATOR_CTRL[] = {
+  HORZ_ACTUATOR_CTRL_1,
+  HORZ_ACTUATOR_CTRL_2,
+  HORZ_ACTUATOR_CTRL_3,
+  HORZ_ACTUATOR_CTRL_4,
+  HORZ_ACTUATOR_CTRL_5
+};
+const int HORZ_ACTUATOR[] = {
+  HORZ_ACTUATOR_1,
+  HORZ_ACTUATOR_2,
+  HORZ_ACTUATOR_3,
+  HORZ_ACTUATOR_4,
+  HORZ_ACTUATOR_5
+};
 
+const int VERT_ACTUATOR_CTRL[] = {
+  VERT_ACTUATOR_CTRL_1,
+  VERT_ACTUATOR_CTRL_2,
+  VERT_ACTUATOR_CTRL_3,
+  VERT_ACTUATOR_CTRL_4,
+  VERT_ACTUATOR_CTRL_5
+};
+const int VERT_ACTUATOR[] = {
+  VERT_ACTUATOR_1,
+  VERT_ACTUATOR_2,
+  VERT_ACTUATOR_3,
+  VERT_ACTUATOR_4,
+  VERT_ACTUATOR_5
+};
 
+#endif _BOA_SHIELD_PINS_H_
 
