@@ -1,35 +1,52 @@
 /*
-timing based, full left/right actuated
- send 0 or 1 to signify direction to Serial 3
- direction is put into the front angle and
- the current angles are propergated down the module
- the end angle propergated out to the next module
- through Serial 2
 
- created July 9, 2011 Julian Fong
-   (begining of the  second day of Vancouver 125 celebrations)
- modified July 10, 2011 Julian Fong
-   (begining of the third day of Vancouver 125 celebrations)
- modified July 10, 2011 Julian Fong
-   (used at end of Vancouver 125 celebrations)
- modified August 13, 2011 Julian Fong
-   - to incoperate sensor feed back and PID  
- modified August 29
-   (Made at burning man)
-   - does not wait for ready, angles move as fast as they  are pushed in
-   - digging into sand, need vertical control
- modified March 20, 2012 Kevin Lowe
-   - Save calibration to EEROM
- 
- */
+  moduleCode.h - Controls 1 Titanaboa module of 5 vertebrae  
+  
+  Created: July 9, 2011 
+  Part of the titanaboa.ca project
+  
+  Decription: This code runs on an Arduino MEGA with a BoaShield to
+  the control 5 vertical and 5 horizontal actuators of a 
+  5 vertebrae module. Titanaboa moves by pushing a sequence of
+  angles from head to tail at an interval initiated by an external 
+  controller.
+  
+  Vertebrae angles are controlled by a hydrualic system in a PID
+  loop with angular position sensors. Communication between the 
+  modules is done over a serial daisy chain.  
+
+*/
 
 #include "EEPROM.h"
 #include "boashield_pins.h"
 #include "PIDcontrol.h"
 
-//direction of mux
-boolean even = false;
+boolean even = false;                   // Unused, will be set in EEPROM after calibration
+const int MOTOR_SPEED = 130;            // Analog output for pump speed when turned on
 
+char horzAngleArray[] = {               // Current horizontal and vertical position of 
+  '3','3','3','3','3'};                 // the actuators.
+char vertAngleArray[] = {               // 0 = Bent Left, 1 = Bent Right  <-- TODO:confirm
+  '3','3','3','3','3'};                 // 2 = Straight,  3 = Undefined
+
+unsigned long horzTimerArray[] = {      // Timer arrays used to timeout when waiting for 
+  0,0,0,0,0};                           // an actuator to reach its set point
+unsigned long vertTimerArray[] = {
+  0,0,0,0,0};  
+
+int highRange[] = {                     // Calibration values. The values of the position
+  1023,1023,1023,1023,1023};            // sensors at the hard limits of actuation. Assume
+int lowRange[] = {                      // a linear sensor characteristic between these
+  0,0,0,0,0};                           // two points.
+                                        
+char myModuleNumber;                    // My position in the module chain (1,2,3...)
+char endModuleNumber;                   // ? TODO:Not sure why we would need this
+
+#define HEAD_SERIAL Serial1             // Serial to the upstream module
+#define TAIL_SERIAL Serial2             // Serial to the downstream module
+#define USB_COM_PORT Serial             // Serial for debugging
+
+// PID Controllers for the horizontal actuators
 PIDcontrol PIDcontroller[] = {
   PIDcontrol(HORZ_POS_SENSOR[0], HORZ_ACTUATOR_CTRL[0], HORZ_ACTUATOR[0], even),
   PIDcontrol(HORZ_POS_SENSOR[1], HORZ_ACTUATOR_CTRL[1], HORZ_ACTUATOR[1], !even),
@@ -38,87 +55,69 @@ PIDcontrol PIDcontroller[] = {
   PIDcontrol(HORZ_POS_SENSOR[4], HORZ_ACTUATOR_CTRL[4], HORZ_ACTUATOR[4], even),
 };
 
-//motorSpeed
-const int MOTOR_SPEED = 130;
 
-// current angles of joints
-//0 & 1 relay angle 2:strundefined for initlal start
-char horzAngleArray[] = {
-  '3','3','3','3','3'};
-char vertAngleArray[] = {
-  '3','3','3','3','3'};
+/****************************************************************************
+ setup(): Initializes serial ports, pins and loads EEPROM calibration
+**************************************************************************/
+void setup()
+{
+  // Initialize serial ports
+  TAIL_SERIAL.begin(115200); 
+  HEAD_SERIAL.begin(115200); 
+  USB_COM_PORT.begin(115200);
 
-unsigned long horzTimerArray[] = {
-  0,0,0,0,0};
+  // Print out a hello message
+  Serial.println("Hi I'm Titanoboa");
 
-unsigned long vertTimerArray[] = {
-  0,0,0,0,0};
-
-//limits on sensor at end of range
-int highRange[] = {
-  1023,1023,1023,1023,1023};
-int lowRange[] = {
-  0,0,0,0,0};
-
-//place in the chain of the snake
-char myModuleNumber;
-char endModuleNumber;
-
-//upstearm == 1
-//down == 2
-#define HEAD_SERIAL Serial1
-#define TAIL_SERIAL Serial2
-#define USB_COM_PORT Serial
-
-
-/**************************************
-* Function name: setup()
-* Description: 
-**************************************/
-void setup(){
-  
-  //initialize serial ports
-  Serial3.begin(115200);
-  Serial2.begin(115200); // Tail Serial
-  Serial1.begin(115200); // Head Serial
-  Serial.begin(115200);  // USB/Debug Serial
-
-  //turn off motor pin
+  // Turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
-  //turn off actuator valves
-  for(int i=0;i<5;i++){
+  
+  // Initialize solenoid valve control ouputs
+  for(int i=0;i<5;i++)
+  {
     pinMode(HORZ_ACTUATOR[i],OUTPUT);
     analogWrite(HORZ_ACTUATOR[i],0);
     pinMode(VERT_ACTUATOR[i],OUTPUT);
     analogWrite(VERT_ACTUATOR[i],0);
   }
   
-  //initilize actuator output pins
-  for(int i=0;i<5;i++){
+  // Initialize solenoid valve selection ouputs
+  // Each valve has two solenoids: 1 for extending
+  // 1 for retracting. This signal selects which one 
+  // we are controlling.
+  for(int i=0;i<5;i++)
+  {
     pinMode(HORZ_ACTUATOR_CTRL[i],OUTPUT);
     pinMode(VERT_ACTUATOR_CTRL[i],OUTPUT);
   }
-  //inialize sensor input pins
-  for(int i=0;i<5;i++){
+  
+  // Initialize position sensor inputs.
+  for(int i=0;i<5;i++)
+  {
     pinMode(HORZ_POS_SENSOR[i],INPUT);
   }
 
-  for(int i=0;i<5;i++){
+  // Set the constants of the PID controllers
+  for(int i=0;i<5;i++)
+  {
     PIDcontroller[i].setConstants(50,0,0);
   }
 
-  //load calibration from EEPROM
+  // Load previous calibration from EEPROM
   myModuleNumber = EEPROM.read(0);
   endModuleNumber = EEPROM.read(1);  
-  for(int i=0;i<5;i++){ 
+  for(int i=0;i<5;i++)
+  { 
     highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
     lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
     PIDcontroller[i].setEven(EEPROM.read(i*5+6));
   }
   
-  //set goals based on current angles
-  for(int i=0;i<5;i++){
+  // Initialize the angle array based on the current
+  // position of the pistons.
+  for(int i=0;i<5;i++)
+  {
     int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
     
     if(currentAngle < 100)
@@ -129,11 +128,8 @@ void setup(){
       horzAngleArray[i]=='1';
   } 
 
-  //print out a hello message
-  Serial.print("Hi I'm Titanoboa\n");
-
-  //printing out calibration and goals
-  Serial.println("> Loaded Calibration");
+  // Print out the loaded cabibration and angle array.
+  Serial.println("> Loaded Calibration and Initialized Angle Array");
   Serial.print("MODULE #: ");
   Serial.println(myModuleNumber, DEC);
   Serial.print("HIGH: ");
@@ -141,20 +137,17 @@ void setup(){
     Serial.print(highRange[i]);
     Serial.print('\t');
   }
-  Serial.println(' ');
-  Serial.print("LOW: ");
+  Serial.print("\nLOW: ");
   for(int i=0;i<5;i++){
     Serial.print(lowRange[i]);
     Serial.print('\t');
   }
-  Serial.println(' ');
-  Serial.print("EVEN?: "); 
+  Serial.print("\nEVEN?: "); 
   for(int i=0;i<5;i++){
     Serial.print(PIDcontroller[i].getEven() ? 'T' : 'F');
     Serial.print('\t');
   }
-  Serial.println(' ');
-  Serial.print("ANGLE_ARRAY: ");  
+  Serial.print("\nANGLE_ARRAY: ");  
   for(int i=0;i<5;i++){
     Serial.print(horzAngleArray[i]);
     Serial.print('\t');
@@ -163,17 +156,17 @@ void setup(){
   delay(1000);
 }
 
-char headAngle[] = {
-  '3','3'  };
-char tailAngle[] = {
-  '3','3'  };
-
-
-/**************************************
-* Function name: loop()
-* Description: Main loop
-**************************************/
-void loop(){
+/***********************************************************************************
+  loop(): Checks for serial messages and runs the PID controllers in an endless loop.
+ ***********************************************************************************/
+ 
+char headAngle[] = {                    // Angles recieved from the upsteam module
+  '3','3'  };                           // module are temporarily stored here. 
+char tailAngle[] = {                    // ? TODO:not sure why we need angles from the 
+  '3','3'  };                           // downstream module
+ 
+void loop()
+{
   headAngle[0] = '3';
   headAngle[1] = '3';
 
@@ -197,27 +190,31 @@ void loop(){
     }
   }
 
-  if(HEAD_SERIAL.available()>0){
+  if (HEAD_SERIAL.available() > 0)
+  {
 
-    switch(HEAD_SERIAL.read()){
+    switch (HEAD_SERIAL.read())
+    {
     case 's':
       //setpionts to come
-      while(HEAD_SERIAL.available()<2){
+      while(HEAD_SERIAL.available() < 2)
+      {
         delay(1);
       }
       headAngle[0] = HEAD_SERIAL.read();
       headAngle[1] = HEAD_SERIAL.read();
-
       break;
 
     case 'v':
       Serial.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
       break;
+     
     case 'c':
       //calabration
       //my module number and end module number to come
       //brain is 0, first moving segment is 1 etc
-      while(HEAD_SERIAL.available()<2){
+      while(HEAD_SERIAL.available()<2)
+      {
         delay(1);
       }
 
@@ -242,24 +239,30 @@ void loop(){
 
     case 'h':
       //for moving head, turns on and off motor
-      while(HEAD_SERIAL.available()<1){
+      while(HEAD_SERIAL.available()<1)
+      {
         delay(1);
       }
 
       message = HEAD_SERIAL.read();
-      if(message == '5'){
+      if(message == '5')
+      {
         digitalWrite(HORZ_ACTUATOR_CTRL[0],LOW);
       }
-      else if(message == '6'){
+      else if(message == '6')
+      {
         digitalWrite(HORZ_ACTUATOR_CTRL[0],HIGH);
       }
       
-      if(message == '5' || message == '6'){
-        for(int i=0;i<=255;i++){
+      if(message == '5' || message == '6')
+      {
+        for(int i=0;i<=255;i++)
+        {
           analogWrite(HORZ_ACTUATOR[0],i);
           delay(2);
         }
-        for(int i=255;i>=0;i--){
+        for(int i=255;i>=0;i--)
+        {
           analogWrite(HORZ_ACTUATOR[0],i);
           delay(2);
         }
@@ -286,11 +289,13 @@ void loop(){
     HEAD_SERIAL.flush();
   }
 
-  if(TAIL_SERIAL.available()>0){
-    switch(TAIL_SERIAL.read()){
+  if(TAIL_SERIAL.available()>0)
+  {
+    switch(TAIL_SERIAL.read())
+    {
     case 'r':
-      //setpionts to come
-      while(TAIL_SERIAL.available()<1){
+      while(TAIL_SERIAL.available()<1)
+      {
         delay(1);
       }
       HEAD_SERIAL.write('r');
@@ -311,7 +316,8 @@ void loop(){
     headAngle[0] != '2' &&
     headAngle[1] != '0' &&
     headAngle[1] != '1' &&
-    headAngle[1] != '2'){
+    headAngle[1] != '2')
+  {
     return;
   }
 
@@ -336,89 +342,100 @@ void loop(){
 }
 
 
-/**************************************
-* Function name: ready()
-**************************************/
-void ready(){
+/***********************************************************************************
+  ready(): TODO: Why do we need this?
+ ***********************************************************************************/
+void ready()
+{
   HEAD_SERIAL.write('r');
   HEAD_SERIAL.write(myModuleNumber);
 }
 
-
-/**************************************
-* Function name: propergate()
-**************************************/
-void propergate(){
+/************************************************************************************
+  propergate(): Properly moves angles downstream and out towards the following module
+ ***********************************************************************************/
+void propergate()
+{
   tailAngle[0] = horzAngleArray[4];
   tailAngle[1] = vertAngleArray[4];
 
-  for(int i=4;i>0;i--){
-    if(horzAngleArray[i] != horzAngleArray[i-1]){
+  for(int i=4;i>0;i--)
+  {
+    if(horzAngleArray[i] != horzAngleArray[i-1])
+    {
       horzTimerArray[i] = millis();
     }
     horzAngleArray[i] = horzAngleArray[i-1];
 
-    if(vertAngleArray[i] != vertAngleArray[i-1]){
+    if(vertAngleArray[i] != vertAngleArray[i-1])
+    {
       vertTimerArray[i] = millis();
     }
     vertAngleArray[i] = vertAngleArray[i-1];
   }
 
-  if(horzAngleArray[0] != headAngle[0]){
+  if(horzAngleArray[0] != headAngle[0])
+  {
     horzTimerArray[0] = millis();
   }
   horzAngleArray[0] = headAngle[0];
 
-  if(vertAngleArray[0] != headAngle[1]){
+  if(vertAngleArray[0] != headAngle[1])
+  {
     vertTimerArray[0] = millis();
   }
   vertAngleArray[0] = headAngle[1];
 
   //*
   Serial.write('\n');
-  for(int i=0;i<5;i++){
+  for(int i=0;i<5;i++)
+  {
     Serial.print(horzAngleArray[i]);
   }
   Serial.println(' horz');
 
   Serial.write('\n');
-  for(int i=0;i<5;i++){
+  for(int i=0;i<5;i++)
+  {
     Serial.print(vertAngleArray[i]);
   }
   Serial.println(' vert');
   //*/
 }
 
+/************************************************************************************
+  move(): Modulates the values to achieve position set points (Runs the PID)
+ ***********************************************************************************/
 
-/**************************************
-* Function name: move()
-**************************************/
-//time to try moving actuator before giving up
-const int MAX_WAIT_TIME = 3000;
-//safty range to not move 
-const int DEAD_ZONE = 10;
+const int MAX_WAIT_TIME = 3000;  // Time to try moving actuator before giving up
+const int DEAD_ZONE = 10;        // Safty range to not move 
+int count = 0;
 
-int count=0;
-
-void move(){
+void move()
+{
   //to see if any in segment moved
   //so we can turn off motor when it's reached setpoint
   boolean moved = false;
 
   int goal;
 
-  for(int i=0;i<5;i++){
+  for (int i=0; i < 5; i++)
+  {
     //horizontal
-    if(horzAngleArray[i]=='0'){
+    if (horzAngleArray[i]=='0')
+    {
       goal = 10;
     }
-    else if(horzAngleArray[i]=='1'){
+    else if (horzAngleArray[i]=='1')
+    {
       goal = 245;
     }
-    else if(horzAngleArray[i]=='2'){
+    else if (horzAngleArray[i]=='2')
+    {
       goal = 127;
     }
-    else{
+    else
+    {
       analogWrite(HORZ_ACTUATOR[i],0);
       continue;
     }
@@ -427,94 +444,109 @@ void move(){
 
     int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
 
-    if((abs(currentAngle-goal)>DEAD_ZONE) &&
-      (millis()-horzTimerArray[i]) < MAX_WAIT_TIME){
+    if ((abs(currentAngle-goal)>DEAD_ZONE) &&
+       (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
+    {
       analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
       PIDcontroller[i].updateOutput();
       moved = true;
     }
-    else{
+    else
+    {
       analogWrite(HORZ_ACTUATOR[i],0);
     }
 
     //vertical
-    if((millis()-vertTimerArray[i]) < MAX_WAIT_TIME){
+    if((millis()-vertTimerArray[i]) < MAX_WAIT_TIME)
+    {
       analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
-      if(vertAngleArray[i] == '0'){
+      if(vertAngleArray[i] == '0')
+      {
         digitalWrite(VERT_ACTUATOR_CTRL[i],LOW);
         analogWrite(VERT_ACTUATOR[i],255);
         moved = true;
       }
-      else if(vertAngleArray[i] == '1'){
+      else if(vertAngleArray[i] == '1')
+      {
         digitalWrite(VERT_ACTUATOR_CTRL[i],HIGH);
         analogWrite(VERT_ACTUATOR[i],255);
         moved = true;
       }
-      else if(vertAngleArray[i] == '2'){
+      else if(vertAngleArray[i] == '2')
+      {
         //do nothing
       }
     }
-    else{
+    else
+    {
       analogWrite(VERT_ACTUATOR[i],0);
     }
-
   }
-  if(moved == false){
+  if(moved == false)
+  {
     analogWrite(MOTOR_CONTROL, 0);
   }
 }
 
+/****************************************************************************************
+  calibrate(): Records sensor values at the hard limits of each vertebrae. Saves to EEPROM.
+ *************************************************************************************/
+void calibrate()
+{
 
-/**************************************
-* Function name: calibrate()
-* Description: calibrate low and high range on snake
-**************************************/
-void calibrate(){
-
-  //move to side when ctrl is HIGH 
+  // HIGH: Move to side when the solenoid selection signal is HIGH
   analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
-  for(int i=0;i<5;i++){
+  for (int i = 0; i < 5; i++)
+  {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(3000);
-  //stop
+  // HIGH: Stop
   analogWrite(MOTOR_CONTROL,0);
-  for(int i=0;i<5;i++){
+  for (int i=0;i<5;i++)
+  {
     analogWrite(HORZ_ACTUATOR[i],0);
   }
   delay(1000);
-  //set Range
-  for(int i=0;i<5;i++){
+  // HIGH: Record Values
+  for(int i=0;i<5;i++)
+  {
     highRange[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
 
 
-  //move to side when ctrl is LOW
+  // LOW: Move to side when the selection signal is LOW
   analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
-  for(int i=0;i<5;i++){
+  for(int i=0;i<5;i++)
+  {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], LOW);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(3000);
-  //stop
+  // LOW: Stop
   analogWrite(MOTOR_CONTROL,0);
-  for(int i=0;i<5;i++){
+  for(int i=0;i<5;i++)
+  {
     analogWrite(HORZ_ACTUATOR[i],0);
   }
   delay(1000);
-  //set Range
-  for(int i=0;i<5;i++){
+  // LOW: Record Values
+  for(int i=0;i<5;i++)
+  {
     lowRange[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
 
-  //Adjust high and low range and account for alternating actuators
-  for(int i=0;i<5;i++){
-    if(highRange[i]>lowRange[i]){
+  // Adjust high and low range and account for alternating actuators
+  for(int i=0;i<5;i++)
+  {
+    if(highRange[i]>lowRange[i])
+    {
       PIDcontroller[i].setEven(true);
       horzAngleArray[i] = '1';
     }
-    else{
+    else
+    {
       int temp = highRange[i];
       highRange[i] = lowRange[i];
       lowRange[i] = temp;
@@ -523,8 +555,8 @@ void calibrate(){
     }
   }
   
-  //save calibration to EEPROM
-  //10-bit values must be split into two bytes for storage.
+  // Save calibration to EEPROM
+  // 10-bit values must be split into two bytes for storage.
   EEPROM.write(0,myModuleNumber);
   EEPROM.write(1,endModuleNumber);
   for(int i=0;i<5;i++){ 
@@ -537,7 +569,7 @@ void calibrate(){
 
   straighten();
    
-  //printing out calibration
+  // Print out calibration
   Serial.println("");
   for(int i=0;i<5;i++){
     Serial.print(highRange[i]);
@@ -562,20 +594,21 @@ void calibrate(){
 }
 
 
-/**************************************
-* Function name: straighten()
-**************************************/
-//uses the same constants used by move()
-void straighten(){
-  //move till horzAngleArray is matched
+/**************************************************************************************
+  straighten(): Makes Titanaboa straight as an arrow.
+ *************************************************************************************/
+void straighten()
+{
+  // Move till horzAngleArray is matched
   boolean inPosition = false;
 
   int goal = 127;
-  for(int i=0;i<5;i++){
+  for(int i=0;i<5;i++)
+  {
     PIDcontroller[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
   }
 
-  //time limit so if stuck, goes to next
+  // Time limit so if stuck, goes to next
   unsigned long startTime = millis();
   while(inPosition == false && (millis()-startTime) < MAX_WAIT_TIME){
     inPosition = true;
@@ -605,9 +638,9 @@ void straighten(){
 }
 
 
-/**************************************
-* Function name: manualControl()
-**************************************/
+/**************************************************************************************
+  manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
+ *************************************************************************************/
 void manualControl()
 {
   boolean manual = true;
@@ -692,7 +725,8 @@ void manualControl()
           break;
           
         case 'l':
-          if(motor == false){
+          if(motor == false)
+          {
             StopMov();
             analogWrite(5, MOTOR_SPEED);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
@@ -704,7 +738,8 @@ void manualControl()
           break;
          
         case 'k':
-          if(motor == false){
+          if(motor == false)
+          {
             StopMov();
             analogWrite(5, MOTOR_SPEED);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
@@ -716,7 +751,8 @@ void manualControl()
           break;
         
         case 'i':
-          if(motor == false){
+          if(motor == false)
+          {
             StopMov();
             analogWrite(5, MOTOR_SPEED);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
@@ -728,7 +764,8 @@ void manualControl()
           break; 
 
         case 'o':
-          if(motor == false){
+          if(motor == false)
+          {
             analogWrite(5, MOTOR_SPEED);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, HIGH);
@@ -754,11 +791,11 @@ void manualControl()
   Serial.print("\nManual Control mode exited");
 }
 
-/**************************************
-* Function name: StopMov()
-* Description: stop movment
-**************************************/
-void StopMov(){
+/**************************************************************************************
+  StopMov(): In manual mode, stops movement of all actuators.
+ *************************************************************************************/
+void StopMov()
+{
   
   /*for (int i=0; i<5; i++)
   {
@@ -792,7 +829,6 @@ void StopMov(){
 
   return;
 }
-
 
 
 
