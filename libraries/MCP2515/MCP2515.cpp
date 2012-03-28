@@ -11,7 +11,8 @@
   http://en.wikipedia.org/wiki/CAN_bus
 */
 
-#include "WProgram.h"
+//#include "WProgram.h"
+#include "Arduino.h"
 #include "SPI.h"
 #include "MCP2515.h"
 #include "MCP2515_defs.h"

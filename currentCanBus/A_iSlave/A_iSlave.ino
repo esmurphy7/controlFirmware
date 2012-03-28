@@ -8,9 +8,10 @@
 //ideally what Ian want's to have done is a solid CLOSED LOOP, OPEN LOOP, OFF, DYING states of operatoin
 //little awkward just as we head to burning man but oh well
 //this is the 20 hour mark for ian on his marathon coding before packup
+//with an update for Arduino 1.0 and not sure if will work properly
+#include <SPI.h>
 #include "boashield_pins.h"
 #include "PinInit.h"
-#include <SPI.h>
 #include "MCP2515.h"
 #include "interface.h"
 
@@ -569,6 +570,7 @@ void loop(){
 /*+++++++++++++++++++++++++++++++++++++++output+++++++++++++++++++++++++++++++++++++++*/
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 //PERIODIC BATTERY CHECKING
+//If battery is checked from time to time, message collission will have to be set in CAN Bus initialization and code handling in library files
   if((millis()-BcheckTIME)>50000){
     checkBat();
 	BcheckTIME=millis();

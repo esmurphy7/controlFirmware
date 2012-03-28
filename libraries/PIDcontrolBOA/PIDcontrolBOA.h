@@ -3,7 +3,8 @@ PID control library
 calculates the PID output
 and writes to output pin
 */
-#include<WProgram.h>
+//#include<WProgram.h>
+#include "Arduino.h"
 
 //class outputs PID control
 //out put constraint to between -255 and 255

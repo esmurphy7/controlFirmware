@@ -14,7 +14,8 @@
 #ifndef MCP2515_h
 #define MCP2515_h
 
-#include "WProgram.h"
+//#include "WProgram.h"
+#include "Arduino.h"
 #include "MCP2515_defs.h"
 
 class MCP2515
