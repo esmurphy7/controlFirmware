@@ -1,3 +1,21 @@
+/*
+
+  headCode.ino - Controls head of Titanoboa
+  
+  Created: July 9, 2011 
+  Part of the titanaboa.ca project
+  
+  Decription: This code runs on an Arduino MEGA to control the 
+  head actuators and by communicating to the main module BoaBox 
+  Arduinos to propagat a sequence of angles from head to tail at 
+  an interval initiated by an external controller.  Communicates
+  with an external controller over Xbee.
+
+*/
+
+/*************************************************************************
+ setup(): Initializes serial ports, pins
+**************************************************************************/
 void setup(){
   Serial.begin(115200);
   Serial1.begin(115200);
@@ -12,6 +30,11 @@ void setup(){
 //normally Serial 3
 #define INPUT_SERIAL Serial3
 
+
+/*************************************************************************
+ loop(): main loop, checks for messages from the joystick and relays them
+         to the first module
+**************************************************************************/
 void loop(){
   char message;
   int actuator;
