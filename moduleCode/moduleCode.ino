@@ -501,7 +501,7 @@ void calibrate()
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
-  delay(3000);
+  delay(4000);
   // HIGH: Stop
   analogWrite(MOTOR_CONTROL,0);
   for (int i=0;i<5;i++)
@@ -523,7 +523,7 @@ void calibrate()
     digitalWrite(HORZ_ACTUATOR_CTRL[i], LOW);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
-  delay(3000);
+  delay(4000);
   // LOW: Stop
   analogWrite(MOTOR_CONTROL,0);
   for(int i=0;i<5;i++)
