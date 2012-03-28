@@ -35,20 +35,26 @@ void setup(){
  loop(): main loop, checks for messages from the joystick and relays them
          to the first module
 **************************************************************************/
-void loop(){
+void loop()
+{
   char message;
   int actuator;
-  if(Serial2.available()){
+
+  if(Serial2.available())
+  {
     INPUT_SERIAL.write(Serial2.read());
   }
 
-  if(INPUT_SERIAL.available()){
+  if(INPUT_SERIAL.available())
+  {
     message = INPUT_SERIAL.read();
     Serial.write(message);
     Serial2.write(message);
 
-    if(message == 'h'){
-      while(INPUT_SERIAL.available()<1){
+    if(message == 'h')
+    {
+      while(INPUT_SERIAL.available()<1)
+      {
         delay(1);
       }
       Serial2.write(message);
@@ -56,28 +62,36 @@ void loop(){
       message = INPUT_SERIAL.read();
       Serial.write(message);
       
-      if(message == '0'){
+      if(message == '0')
+      {
         actuator = 4;
       }
-      else if(message == '1'){
+      else if(message == '1')
+      {
         actuator = 5;
       }
-      else if(message == '2'){
+      else if(message == '2')
+      {
         actuator = 6;
       }
-      else if(message == '3'){
+      else if(message == '3')
+      {
         actuator = 7;
       }
-      else{
+      else
+      {
         actuator = -1;
       }
       
-      if(actuator != -1){
-        for(int i=0;i<=255;i++){
+      if(actuator != -1)
+      {
+        for(int i=0;i<=255;i++)
+        {
           analogWrite(actuator,i);
           delay(4);
         }
-        for(int i=255;i>=0;i--){
+        for(int i=255;i>=0;i--)
+        {
           analogWrite(actuator,i);
           delay(4);
         }
