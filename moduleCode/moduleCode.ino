@@ -1,6 +1,6 @@
 /*
 
-  moduleCode.h - Controls 1 Titanaboa module of 5 vertebrae  
+  moduleCode.ino - Controls 1 Titanaboa module of 5 vertebrae  
   
   Created: July 9, 2011 
   Part of the titanaboa.ca project
@@ -18,7 +18,7 @@
 */
 
 #include "EEPROM.h"
-#include "boashield_pins.h"
+#include "titanoboa_pins.h"
 #include "PIDcontrol.h"
 
 boolean even = false;                   // Unused, will be set in EEPROM after calibration
