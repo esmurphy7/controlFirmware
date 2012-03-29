@@ -13,22 +13,27 @@
 
 */
 
+#include "titanoboa_pins.h"
+
+#define INPUT_SERIAL Serial2            // Xbee
+#define TAIL_SERIAL Serial3             // Serial to the downstream module
+#define USB_COM_PORT Serial             // Serial for debugging
+
+
 /*************************************************************************
  setup(): Initializes serial ports, pins
 **************************************************************************/
 void setup(){
-  Serial.begin(115200);
+  USB_COM_PORT.begin(115200);
   Serial1.begin(115200);
-  Serial2.begin(115200);
-  Serial3.begin(115200);
+  TAIL_SERIAL.begin(115200);
+  INPUT_SERIAL.begin(115200);
 
   for(int i=4;i<=7;i++){
     pinMode(i,OUTPUT);
     analogWrite(i,0);
   }
 }
-//normally Serial 3
-#define INPUT_SERIAL Serial3
 
 
 /*************************************************************************
@@ -40,16 +45,16 @@ void loop()
   char message;
   int actuator;
 
-  if(Serial2.available())
+  if(INPUT_SERIAL.available())
   {
-    INPUT_SERIAL.write(Serial2.read());
+     TAIL_SERIAL.write(INPUT_SERIAL.read());
   }
 
   if(INPUT_SERIAL.available())
   {
     message = INPUT_SERIAL.read();
-    Serial.write(message);
-    Serial2.write(message);
+    USB_COM_PORT.write(message);
+    TAIL_SERIAL.write(message);
 
     if(message == 'h')
     {
@@ -57,10 +62,10 @@ void loop()
       {
         delay(1);
       }
-      Serial2.write(message);
+      TAIL_SERIAL.write(message);
 
       message = INPUT_SERIAL.read();
-      Serial.write(message);
+      USB_COM_PORT.write(message);
       
       if(message == '0')
       {
