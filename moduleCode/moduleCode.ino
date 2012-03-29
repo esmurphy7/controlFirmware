@@ -18,7 +18,7 @@
 */
 
 #include "EEPROM.h"
-#include "boashield_pins.h"
+#include "titanoboa_pins.h"
 #include "PIDcontrol.h"
 
 boolean even = false;                   // Unused, will be set in EEPROM after calibration
