@@ -272,6 +272,13 @@ void loop()
       delay(1000);
       analogWrite(MOTOR_CONTROL,0);
       break;
+      
+    case 'g':
+      //manual control of head actuators, need to turn motor on and off
+      analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+      delay(200);  //for now just run for 200ms
+      analogWrite(MOTOR_CONTROL, 0);
+      break;
 
     case 'l':
       TAIL_SERIAL.print("l");
@@ -279,7 +286,7 @@ void loop()
       ready();
       break;
       
-    case 'A':
+    case 'M':
       // manual actuator control
       manualControl();
       break;
