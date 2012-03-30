@@ -50,6 +50,23 @@ void loop()
 {
   char message;
   int actuator;
+  
+  // check for command from USB serial to enter manual control
+  // NOTE: this is a quick hack so that we can adjust actuators quickly if they get out of wack
+  //       this only puts one module in manual control, never operate titanoboa like this!!!
+  //       in future manual control mode should be selected from the joystick and all modules enter 
+  //       manual control mode and return to normal operation together
+  if (USB_COM_PORT.available()>0)
+  {
+    if (USB_COM_PORT.read() == 'M')
+    {
+      //confirm this wasn't random noise
+      if (USB_COM_PORT.read() == 'M')
+      {
+        manualControl();
+      }
+    }
+  }
 
   if(INPUT_SERIAL.available())
   {
@@ -113,3 +130,125 @@ void loop()
 }
 
 
+/**************************************************************************************
+  manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
+ *************************************************************************************/
+void manualControl()
+{
+  boolean manual = true;
+  char byteIn = 'z';
+  int actuatorSel = 0;
+  int actuationDelay = 200;
+  char delaySetting = 'm';
+  
+  Serial.print("\nManual Control mode entered\n");
+  Serial.print("commands: j or he to select jaw or head actuator\n");
+  Serial.print("          k/l - actuation\n");
+  Serial.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+  Serial.print("          s - stop motor\n");
+  Serial.print("          q - quit\n");
+  
+  while(manual == true)
+  {
+    if(Serial.available() > 0){
+      byteIn = Serial.read();
+      
+      switch(byteIn)
+      {
+        case 'j':
+          actuatorSel = 0;
+          StopMov();
+          Serial.print("Jaw actuator selected\n");
+          break;
+        case 'h':
+          actuatorSel = 1;
+          StopMov();
+          Serial.print("Head actuator selected\n");
+          break;
+        
+        case 'd':
+          StopMov();
+          delaySetting = Serial.read();
+          switch (delaySetting)
+          {
+            case 's':
+              actuationDelay = 150;
+              Serial.print("Actuation delay set to smallest time (150ms)\n");
+              break;
+            case 'm':
+              actuationDelay = 200;
+              Serial.print("Actuation delay set to medium time (200ms)\n");
+              break;
+            case 'l':
+              actuationDelay = 300;
+              Serial.print("Actuation delay set to largest time (300ms)\n");
+              break;
+            default:
+              actuationDelay = 200;
+              Serial.print("Invalid entry, actuation delay set to medium time (200ms)\n");
+              break;
+          }
+          break;
+          
+        case 'l':
+          StopMov();
+          //instruct downsteam moduel to turn on motor, will run for 200ms
+          TAIL_SERIAL.write('g');
+          USB_COM_PORT.print("l dir\n");
+          if (actuatorSel == 0)
+          {
+            analogWrite(JAW_CLOSE, 255);
+          }
+          else if (actuatorSel == 1)
+          {
+            analogWrite(HEAD_LOWER, 255);
+          }
+          delay(400);
+          StopMov();
+          break;
+         
+        case 'k':
+          StopMov();
+          //instruct downsteam moduel to turn on motor, will run for 200ms
+          TAIL_SERIAL.write('g');
+          USB_COM_PORT.print("k dir\n");
+          if (actuatorSel == 0)
+          {
+            analogWrite(JAW_OPEN, 255);
+          }
+          else if (actuatorSel == 1)
+          {
+            analogWrite(HEAD_RAISE, 255);
+          }
+          delay(400);
+          StopMov();
+          break;
+        
+        case 's':
+          StopMov();
+          Serial.print("STOPPED\n");
+          break;
+        
+        case 'q':
+          manual = false;
+          break;
+      }//end switch
+    }//end if serial
+    
+    byteIn = 'z';
+  }
+  Serial.print("\nManual Control mode exited");
+}
+
+/**************************************************************************************
+  StopMov(): In manual mode, stops movement of all actuators.
+ *************************************************************************************/
+void StopMov()
+{
+  analogWrite(JAW_OPEN, 0);
+  analogWrite(JAW_CLOSE, 0);
+  analogWrite(HEAD_RAISE, 0);
+  analogWrite(HEAD_LOWER, 0);
+
+  return;
+}
