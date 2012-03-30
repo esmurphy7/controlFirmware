@@ -13,11 +13,17 @@
 
 */
 
-#include "titanoboa_pins.h"
+//#include "titanoboa_pins.h"
 
 #define INPUT_SERIAL Serial2            // Xbee
 #define TAIL_SERIAL Serial3             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
+
+//Actuator pins, these may be incorrect, but will be adjusted after testing
+#define JAW_OPEN    4
+#define JAW_CLOSE   5
+#define HEAD_RAISE  6
+#define HEAD_LOWER  7
 
 
 /*************************************************************************
@@ -58,7 +64,7 @@ void loop()
 
     if(message == 'h')
     {
-      while(INPUT_SERIAL.available()<1)
+      while(INPUT_SERIAL.available() < 1)
       {
         delay(1);
       }
@@ -69,19 +75,19 @@ void loop()
       
       if(message == '0')
       {
-        actuator = 4;
+        actuator = JAW_OPEN;
       }
       else if(message == '1')
       {
-        actuator = 5;
+        actuator = JAW_CLOSE;
       }
       else if(message == '2')
       {
-        actuator = 6;
+        actuator = HEAD_RAISE;
       }
       else if(message == '3')
       {
-        actuator = 7;
+        actuator = HEAD_LOWER;
       }
       else
       {
@@ -90,14 +96,14 @@ void loop()
       
       if(actuator != -1)
       {
-        for(int i=0;i<=255;i++)
+        for(int i=0; i<=255; i++)
         {
-          analogWrite(actuator,i);
+          analogWrite(actuator, i);
           delay(4);
         }
-        for(int i=255;i>=0;i--)
+        for(int i=255; i>=0; i--)
         {
-          analogWrite(actuator,i);
+          analogWrite(actuator, i);
           delay(4);
         }
       }
