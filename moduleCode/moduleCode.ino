@@ -67,7 +67,7 @@ void setup()
   USB_COM_PORT.begin(115200);
 
   // Print out a hello message
-  Serial.println("Hi I'm Titanoboa");
+  USB_COM_PORT.println("Hi I'm Titanoboa");
 
   // Turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
@@ -129,30 +129,30 @@ void setup()
   } 
 
   // Print out the loaded cabibration and angle array.
-  Serial.println("> Loaded Calibration and Initialized Angle Array");
-  Serial.print("MODULE #: ");
-  Serial.println(myModuleNumber, DEC);
-  Serial.print("HIGH: ");
+  USB_COM_PORT.println("> Loaded Calibration and Initialized Angle Array");
+  USB_COM_PORT.print("MODULE #: ");
+  USB_COM_PORT.println(myModuleNumber, DEC);
+  USB_COM_PORT.print("HIGH: ");
   for(int i=0;i<5;i++){
-    Serial.print(highRange[i]);
-    Serial.print('\t');
+    USB_COM_PORT.print(highRange[i]);
+    USB_COM_PORT.print('\t');
   }
-  Serial.print("\nLOW: ");
+  USB_COM_PORT.print("\nLOW: ");
   for(int i=0;i<5;i++){
-    Serial.print(lowRange[i]);
-    Serial.print('\t');
+    USB_COM_PORT.print(lowRange[i]);
+    USB_COM_PORT.print('\t');
   }
-  Serial.print("\nEVEN?: "); 
+  USB_COM_PORT.print("\nEVEN?: "); 
   for(int i=0;i<5;i++){
-    Serial.print(PIDcontroller[i].getEven() ? 'T' : 'F');
-    Serial.print('\t');
+    USB_COM_PORT.print(PIDcontroller[i].getEven() ? 'T' : 'F');
+    USB_COM_PORT.print('\t');
   }
-  Serial.print("\nANGLE_ARRAY: ");  
+  USB_COM_PORT.print("\nANGLE_ARRAY: ");  
   for(int i=0;i<5;i++){
-    Serial.print(horzAngleArray[i]);
-    Serial.print('\t');
+    USB_COM_PORT.print(horzAngleArray[i]);
+    USB_COM_PORT.print('\t');
   }
-  Serial.println('\n');  
+  USB_COM_PORT.println('\n');  
   delay(1000);
 }
 
@@ -206,7 +206,7 @@ void loop()
       break;
 
     case 'v':
-      Serial.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
+      USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
       break;
      
     case 'c':
@@ -275,9 +275,11 @@ void loop()
       
     case 'g':
       //manual control of head actuators, need to turn motor on and off
+      USB_COM_PORT.print("turning motor on\n");
       analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
       delay(200);  //for now just run for 200ms
       analogWrite(MOTOR_CONTROL, 0);
+      USB_COM_PORT.print("turning motor off\n");
       break;
 
     case 'l':
@@ -394,19 +396,18 @@ void propergate()
   vertAngleArray[0] = headAngle[1];
 
   //*
-  Serial.write('\n');
+  USB_COM_PORT.print('\n');
   for(int i=0;i<5;i++)
   {
-    Serial.print(horzAngleArray[i]);
+    USB_COM_PORT.print(horzAngleArray[i]);
   }
-  Serial.println(' horz');
+  USB_COM_PORT.println(' horz\n');
 
-  Serial.write('\n');
   for(int i=0;i<5;i++)
   {
-    Serial.print(vertAngleArray[i]);
+    USB_COM_PORT.print(vertAngleArray[i]);
   }
-  Serial.println(' vert');
+  USB_COM_PORT.println(' vert');
   //*/
 }
 
@@ -577,27 +578,27 @@ void calibrate()
   straighten();
    
   // Print out calibration
-  Serial.println("");
+  USB_COM_PORT.println("");
   for(int i=0;i<5;i++){
-    Serial.print(highRange[i]);
-    Serial.print(' ');
+    USB_COM_PORT.print(highRange[i]);
+    USB_COM_PORT.print(' ');
   }
-  Serial.println("HIGH ");
+  USB_COM_PORT.println("HIGH ");
   for(int i=0;i<5;i++){
-    Serial.print(lowRange[i]);
-    Serial.print(' ');
+    USB_COM_PORT.print(lowRange[i]);
+    USB_COM_PORT.print(' ');
   }
-  Serial.println("RANGE ");
+  USB_COM_PORT.println("RANGE ");
   for(int i=0;i<5;i++){
-    Serial.print(highRange[i] - lowRange[i]);
-    Serial.print(" ");
+    USB_COM_PORT.print(highRange[i] - lowRange[i]);
+    USB_COM_PORT.print(" ");
   }
-  Serial.println("LOW ");
+  USB_COM_PORT.println("LOW ");
   for(int i=0;i<5;i++){
-    Serial.print(PIDcontroller[i].getEven(),BIN);
-    Serial.print("    ");
+    USB_COM_PORT.print(PIDcontroller[i].getEven(),BIN);
+    USB_COM_PORT.print("    ");
   }
-  Serial.println("EVEN");
+  USB_COM_PORT.println("EVEN");
 }
 
 
@@ -657,76 +658,76 @@ void manualControl()
   int actuationDelay = 200;
   char delaySetting = 'm';
   
-  Serial.print("\nManual Control mode entered\n");
-  Serial.print("commands: 1-5 to select vertebrae\n");
-  Serial.print("          k/l - horizontal actuation\n");
-  Serial.print("          i/o - vertical actuation\n");
-  Serial.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
-  Serial.print("          s - stop motor\n");
-  Serial.print("          q - quit\n");
+  USB_COM_PORT.print("\nManual Control mode entered\n");
+  USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
+  USB_COM_PORT.print("          k/l - horizontal actuation\n");
+  USB_COM_PORT.print("          i/o - vertical actuation\n");
+  USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+  USB_COM_PORT.print("          s - stop motor\n");
+  USB_COM_PORT.print("          q - quit\n");
   
   while(manual == true)
   {
     if(Serial.available() > 0){
-      byteIn = Serial.read();
+      byteIn = USB_COM_PORT.read();
       
       switch(byteIn)
       {
         case 'c':
-          Serial.print("Running calibration...\n");
+          USB_COM_PORT.print("Running calibration...\n");
           calibrate();
           break;
         case '1':
           segSelect = 0;
           StopMov();
-          Serial.print("Seg1\n");
+          USB_COM_PORT.print("Seg1\n");
           motor = false;
           break;
         case '2':
           segSelect = 1;
           StopMov();
-          Serial.print("Seg2\n");
+          USB_COM_PORT.print("Seg2\n");
           motor = false;
           break;
         case '3':
           segSelect = 2;
           StopMov();
-          Serial.print("Seg3\n");
+          USB_COM_PORT.print("Seg3\n");
           motor = false;
           break;
         case '4':
           segSelect = 3;
           StopMov();
-          Serial.print("Seg4\n");
+          USB_COM_PORT.print("Seg4\n");
           motor = false;
           break;
         case '5':
           segSelect = 4;
           StopMov();
-          Serial.print("Seg5\n");
+          USB_COM_PORT.print("Seg5\n");
           motor = false;
           break;
         
         case 'd':
           StopMov();
-          delaySetting = Serial.read();
+          delaySetting = USB_COM_PORT.read();
           switch (delaySetting)
           {
             case 's':
               actuationDelay = 150;
-              Serial.print("Actuation delay set to smallest time (150ms)\n");
+              USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
               break;
             case 'm':
               actuationDelay = 200;
-              Serial.print("Actuation delay set to medium time (200ms)\n");
+              USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
               break;
             case 'l':
               actuationDelay = 300;
-              Serial.print("Actuation delay set to largest time (300ms)\n");
+              USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
               break;
             default:
               actuationDelay = 200;
-              Serial.print("Invalid entry, actuation delay set to medium time (200ms)\n");
+              USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
               break;
           }
           break;
@@ -738,7 +739,7 @@ void manualControl()
             analogWrite(5, MOTOR_SPEED);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect, HIGH);
-            Serial.print("l dir\n");
+            USB_COM_PORT.print("l dir\n");
             delay(actuationDelay);
             StopMov();
           }
@@ -751,7 +752,7 @@ void manualControl()
             analogWrite(5, MOTOR_SPEED);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect,LOW);
-            Serial.print("k dir\n");
+            USB_COM_PORT.print("k dir\n");
             delay(actuationDelay);
             StopMov();
           }
@@ -764,7 +765,7 @@ void manualControl()
             analogWrite(5, MOTOR_SPEED);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, LOW);
-            Serial.print("i dir\n");
+            USB_COM_PORT.print("i dir\n");
             delay(actuationDelay);
             StopMov();
           }
@@ -776,7 +777,7 @@ void manualControl()
             analogWrite(5, MOTOR_SPEED);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, HIGH);
-            Serial.print("o dir\n");
+            USB_COM_PORT.print("o dir\n");
             delay(actuationDelay);
             StopMov();
           }
@@ -784,7 +785,7 @@ void manualControl()
         
         case 's':
           StopMov();
-          Serial.print("STOPPED\n");
+          USB_COM_PORT.print("STOPPED\n");
           break;
         
         case 'q':
@@ -795,7 +796,7 @@ void manualControl()
     
     byteIn = 'z';
   }
-  Serial.print("\nManual Control mode exited");
+  USB_COM_PORT.print("\nManual Control mode exited");
 }
 
 /**************************************************************************************
