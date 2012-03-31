@@ -190,6 +190,7 @@ void loop()
     }
   }
 
+  // check for messages from upstream port
   if (HEAD_SERIAL.available() > 0)
   {
 
@@ -206,6 +207,7 @@ void loop()
       break;
 
     case 'v':
+      // display current voltage level
       USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
       break;
      
@@ -330,25 +332,18 @@ void loop()
     return;
   }
 
-  //read new angle and propergate it down
-  propergate();
+  //read new angle and propagate it down
+  propagate();
 
   TAIL_SERIAL.write('s');
   //send the next angle down
   TAIL_SERIAL.write(tailAngle[0]);
   TAIL_SERIAL.write(tailAngle[1]);
 
-
   //ready to go one
   ready();
 
-  /*
-  //flush everything and get ready for next loop
-   Serial2.flush();
-   Serial3.flush();
-   Serial.flush();
-   */
-}
+}//end loop()
 
 
 /***********************************************************************************
@@ -360,10 +355,11 @@ void ready()
   HEAD_SERIAL.write(myModuleNumber);
 }
 
+
 /************************************************************************************
-  propergate(): Properly moves angles downstream and out towards the following module
+  propagate(): Properly moves angles downstream and out towards the following module
  ***********************************************************************************/
-void propergate()
+void propagate()
 {
   tailAngle[0] = horzAngleArray[4];
   tailAngle[1] = vertAngleArray[4];
@@ -395,7 +391,6 @@ void propergate()
   }
   vertAngleArray[0] = headAngle[1];
 
-  //*
   USB_COM_PORT.print('\n');
   for(int i=0;i<5;i++)
   {
@@ -408,8 +403,9 @@ void propergate()
     USB_COM_PORT.print(vertAngleArray[i]);
   }
   USB_COM_PORT.println(' vert');
-  //*/
-}
+
+}//end propagate()
+
 
 /************************************************************************************
   move(): Modulates the values to achieve position set points (Runs the PID)
