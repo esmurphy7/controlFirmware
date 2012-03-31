@@ -15,13 +15,13 @@
 
 //#include "titanoboa_pins.h"
 
-#define INPUT_SERIAL Serial2            // Xbee
-#define TAIL_SERIAL Serial3             // Serial to the downstream module
+#define INPUT_SERIAL Serial3            // Xbee
+#define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
 //Actuator pins, these may be incorrect, but will be adjusted after testing
-#define JAW_OPEN    4
-#define JAW_CLOSE   5
+#define JAW_CLOSE   4
+#define JAW_OPEN    5
 #define HEAD_RAISE  6
 #define HEAD_LOWER  7
 
@@ -39,6 +39,8 @@ void setup(){
     pinMode(i,OUTPUT);
     analogWrite(i,0);
   }
+  
+  USB_COM_PORT.print("\nSetup complete\n");
 }
 
 
@@ -58,6 +60,7 @@ void loop()
   //       manual control mode and return to normal operation together
   if (USB_COM_PORT.available()>0)
   {
+    USB_COM_PORT.print("checking for command on USB\n");
     if (USB_COM_PORT.read() == 'M')
     {
       //confirm this wasn't random noise
@@ -70,13 +73,19 @@ void loop()
 
   if(INPUT_SERIAL.available())
   {
-     TAIL_SERIAL.write(INPUT_SERIAL.read());
+    USB_COM_PORT.print("received message from xbee: ");
+    message = INPUT_SERIAL.read();
+    USB_COM_PORT.write(message);
+    USB_COM_PORT.write("\n");
+    TAIL_SERIAL.write(message);
   }
 
   if(INPUT_SERIAL.available())
   {
+    USB_COM_PORT.print("received message from xbee: ");
     message = INPUT_SERIAL.read();
     USB_COM_PORT.write(message);
+    USB_COM_PORT.write("\n");
     TAIL_SERIAL.write(message);
 
     if(message == 'h')
@@ -87,8 +96,10 @@ void loop()
       }
       TAIL_SERIAL.write(message);
 
+      USB_COM_PORT.print("received message from xbee: ");
       message = INPUT_SERIAL.read();
       USB_COM_PORT.write(message);
+      USB_COM_PORT.write("\n");
       
       if(message == '0')
       {
@@ -141,51 +152,51 @@ void manualControl()
   int actuationDelay = 200;
   char delaySetting = 'm';
   
-  Serial.print("\nManual Control mode entered\n");
-  Serial.print("commands: j or he to select jaw or head actuator\n");
-  Serial.print("          k/l - actuation\n");
-  Serial.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
-  Serial.print("          s - stop motor\n");
-  Serial.print("          q - quit\n");
+  USB_COM_PORT.print("\nManual Control mode entered\n");
+  USB_COM_PORT.print("commands: j or h to select jaw or head actuator\n");
+  USB_COM_PORT.print("          k/l - actuation\n");
+  USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+  USB_COM_PORT.print("          s - stop motor\n");
+  USB_COM_PORT.print("          q - quit\n");
   
   while(manual == true)
   {
     if(Serial.available() > 0){
-      byteIn = Serial.read();
+      byteIn = USB_COM_PORT.read();
       
       switch(byteIn)
       {
         case 'j':
           actuatorSel = 0;
           StopMov();
-          Serial.print("Jaw actuator selected\n");
+          USB_COM_PORT.print("Jaw actuator selected\n");
           break;
         case 'h':
           actuatorSel = 1;
           StopMov();
-          Serial.print("Head actuator selected\n");
+          USB_COM_PORT.print("Head actuator selected\n");
           break;
         
         case 'd':
           StopMov();
-          delaySetting = Serial.read();
+          delaySetting = USB_COM_PORT.read();
           switch (delaySetting)
           {
             case 's':
               actuationDelay = 150;
-              Serial.print("Actuation delay set to smallest time (150ms)\n");
+              USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
               break;
             case 'm':
               actuationDelay = 200;
-              Serial.print("Actuation delay set to medium time (200ms)\n");
+              USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
               break;
             case 'l':
               actuationDelay = 300;
-              Serial.print("Actuation delay set to largest time (300ms)\n");
+              USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
               break;
             default:
               actuationDelay = 200;
-              Serial.print("Invalid entry, actuation delay set to medium time (200ms)\n");
+              USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
               break;
           }
           break;
@@ -209,7 +220,8 @@ void manualControl()
          
         case 'k':
           StopMov();
-          //instruct downsteam moduel to turn on motor, will run for 200ms
+          //instruct downsteam module to turn on motor, will run for 200ms
+          USB_COM_PORT.print("sending motor on\n");
           TAIL_SERIAL.write('g');
           USB_COM_PORT.print("k dir\n");
           if (actuatorSel == 0)
@@ -222,11 +234,12 @@ void manualControl()
           }
           delay(400);
           StopMov();
+          USB_COM_PORT.print("done, motor can turn off\n");
           break;
         
         case 's':
           StopMov();
-          Serial.print("STOPPED\n");
+          USB_COM_PORT.print("STOPPED\n");
           break;
         
         case 'q':
@@ -237,7 +250,7 @@ void manualControl()
     
     byteIn = 'z';
   }
-  Serial.print("\nManual Control mode exited");
+  USB_COM_PORT.print("\nManual Control mode exited\n");
 }
 
 /**************************************************************************************
