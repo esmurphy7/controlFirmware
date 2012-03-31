@@ -29,13 +29,15 @@
 /*************************************************************************
  setup(): Initializes serial ports, pins
 **************************************************************************/
-void setup(){
+void setup()
+{
   USB_COM_PORT.begin(115200);
   Serial1.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
 
-  for(int i=4;i<=7;i++){
+  for(int i=4;i<=7;i++)
+  {
     pinMode(i,OUTPUT);
     analogWrite(i,0);
   }
@@ -161,7 +163,8 @@ void manualControl()
   
   while(manual == true)
   {
-    if(Serial.available() > 0){
+    if(Serial.available() > 0)
+    {
       byteIn = USB_COM_PORT.read();
       
       switch(byteIn)
@@ -203,7 +206,7 @@ void manualControl()
           
         case 'l':
           StopMov();
-          //instruct downsteam moduel to turn on motor, will run for 200ms
+          //instruct downsteam module to turn on motor, will run for 200ms
           TAIL_SERIAL.write('g');
           USB_COM_PORT.print("l dir\n");
           if (actuatorSel == 0)
