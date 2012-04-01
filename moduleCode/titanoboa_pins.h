@@ -215,7 +215,7 @@
 #define LED_8  ARD39
 
 
-// Actuator arrays for easy looping
+// Position sensor pin arrays for easy looping
 const int HORZ_POS_SENSOR[] = {
   HORZ_POS_SENSOR_1,
   HORZ_POS_SENSOR_2,
@@ -223,6 +223,16 @@ const int HORZ_POS_SENSOR[] = {
   HORZ_POS_SENSOR_4,
   HORZ_POS_SENSOR_5
 };
+
+const int VERT_POS_SENSOR[] = {
+  VERT_POS_SENSOR_1,
+  VERT_POS_SENSOR_2,
+  VERT_POS_SENSOR_3,
+  VERT_POS_SENSOR_4,
+  VERT_POS_SENSOR_5
+};
+
+// Actuator pin arrays for easy looping
 const int HORZ_ACTUATOR_CTRL[] = {
   HORZ_ACTUATOR_CTRL_1,
   HORZ_ACTUATOR_CTRL_2,
