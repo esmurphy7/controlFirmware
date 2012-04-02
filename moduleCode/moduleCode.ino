@@ -21,8 +21,18 @@
 #include "titanoboa_pins.h"
 #include "PIDcontrol.h"
 
-boolean even = false;                   // Unused, will be set in EEPROM after calibration
+
+// Defines and constants
+#define HEAD_SERIAL Serial1             // Serial to the upstream module
+#define TAIL_SERIAL Serial2             // Serial to the downstream module
+#define USB_COM_PORT Serial             // Serial for debugging
+
 const int MOTOR_SPEED = 130;            // Analog output for pump speed when turned on
+const int VERT_DEAD_ZONE = 20;          // Vertical safety range
+
+
+// Static variables
+boolean even = false;                   // Unused, will be set in EEPROM after calibration
 
 char horzAngleArray[] = {               // Current horizontal and vertical position of 
   '3','3','3','3','3'};                 // the actuators.
@@ -42,9 +52,6 @@ int lowRange[] = {                      // a linear sensor characteristic betwee
 char myModuleNumber;                    // My position in the module chain (1,2,3...)
 char endModuleNumber;                   // ? TODO:Not sure why we would need this
 
-#define HEAD_SERIAL Serial1             // Serial to the upstream module
-#define TAIL_SERIAL Serial2             // Serial to the downstream module
-#define USB_COM_PORT Serial             // Serial for debugging
 
 // PID Controllers for the horizontal actuators
 PIDcontrol PIDcontroller[] = {
