@@ -232,33 +232,10 @@ void loop()
       break;
      
     case 'c':
-      //calabration
-      //my module number and end module number to come
-      //brain is 0, first moving segment is 1 etc
-      while(HEAD_SERIAL.available()<2)
-      {
-        delay(1);
-      }
-
-      //tell next module to also calibrate
-      TAIL_SERIAL.write('c');
-      myModuleNumber = HEAD_SERIAL.read();
-      endModuleNumber = HEAD_SERIAL.read();
-
-      even = (myModuleNumber%2)==0;
-
-      TAIL_SERIAL.write(myModuleNumber+1);
-      TAIL_SERIAL.write(endModuleNumber);
-
-      //calibrate and reset everything
+      //calibration
       calibrate();
-      HEAD_SERIAL.flush();
-      TAIL_SERIAL.flush();
-
-      delay(100);
-      ready();
       break;
-
+      
     case 'h':
       //for moving head, turns on and off motor
       while(HEAD_SERIAL.available()<1)
