@@ -87,9 +87,6 @@ void setup()
   HEAD_SERIAL.begin(115200); 
   USB_COM_PORT.begin(115200);
 
-  // Print out a hello message
-  USB_COM_PORT.println("Hi I'm Titanoboa");
-
   // Turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
@@ -152,7 +149,7 @@ void setup()
   } 
 
   // Print out the loaded cabibration and angle array.
-  USB_COM_PORT.print("MODULE #: ");
+  USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
   USB_COM_PORT.println("> Loaded Calibration and Initialized Horizontal Angle Array");
   USB_COM_PORT.print("HIGH: ");
