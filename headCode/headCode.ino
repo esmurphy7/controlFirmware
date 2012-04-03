@@ -26,6 +26,9 @@
 #define HEAD_LOWER  7
 
 
+const char myModuleNumber = 0;
+
+
 /*************************************************************************
  setup(): Initializes serial ports, pins
 **************************************************************************/
@@ -35,14 +38,16 @@ void setup()
   Serial1.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
+  
+  // Print out the loaded cabibration and angle array.
+  USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
+  USB_COM_PORT.println(myModuleNumber, DEC);
 
   for(int i=4;i<=7;i++)
   {
     pinMode(i,OUTPUT);
     analogWrite(i,0);
   }
-  
-  USB_COM_PORT.print("\nSetup complete\n");
 }
 
 
