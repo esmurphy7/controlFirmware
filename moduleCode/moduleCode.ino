@@ -141,12 +141,12 @@ void setup()
     int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
     
     if(currentAngle < 100)
-      horzAngleArray[i]=='0';
+      horzAngleArray[i] = '0';
     if(currentAngle >= 100 && currentAngle <= 154)
-      horzAngleArray[i]=='2';
+      horzAngleArray[i] = '2';
     if(currentAngle > 154)
-      horzAngleArray[i]=='1';
-  } 
+      horzAngleArray[i] = '1';
+  }
 
   // Print out the loaded cabibration and angle array.
   USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
