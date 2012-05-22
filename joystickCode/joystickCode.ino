@@ -21,25 +21,20 @@
 void setup()
 {
   XBEE_SERIAL.begin(115200);
-  pinMode(2,OUTPUT);
-  analogWrite(2,0);
-  
+
   // Internal pull up on the calibrate button
-  digitalWrite(28,HIGH);
+  digitalWrite(CALIBRATE_BUTTON, HIGH);
 }
 
 void loop()
-{ 
-  // Position of throttle potentiometer determines the delay between 
-  // angle propegations
-  int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,0,255);
-  analogWrite(2,throttle);
-  throttle = map(throttle,0,255,1000,250);
-  
+{  
   // Only send commands when joystick button is pressed
   if(digitalRead(JOYSTICK_BUTTON) == HIGH)
   {
-
+    // Position of throttle potentiometer determines the delay between 
+    // angle propegations
+    int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,1000,250);
+      
     if(digitalRead(CALIBRATE_BUTTON) == LOW)
     {
       XBEE_SERIAL.write("c12");
