@@ -1,61 +1,64 @@
-int limitsON =0;
-int angle = 0;
-int throttle =0;
+/*
 
-void setup(){
-  Serial3.begin(115200);
+  joystickCode.ino - Sends wireless commands to Titanoboa
+  
+  Created: August 2011 
+  Part of the titanaboa.ca project
+  
+  Description: This file needs commenting and a description.
 
+*/
+
+#define XBEE_SERIAL Serial3
+#define JOYSTICK_LEFT_PIN 41
+#define JOYSTICK_RIGHT_PIN 45
+#define JOYSTICK_UP_PIN 39     // TODO: Confirm pin number
+#define JOYSTICK_DOWN_PIN 43   // TODO: Confirm pin number
+#define JOYSTICK_BUTTON 37
+#define CALIBRATE_BUTTON 28
+#define THROTTLE_ANALOG_PIN 3
+
+void setup()
+{
+  XBEE_SERIAL.begin(115200);
   pinMode(2,OUTPUT);
   analogWrite(2,0);
+  
+  // Internal pull up on the calibrate button
   digitalWrite(28,HIGH);
 }
 
-void loop(){
-  limitsON=0;
-  angle=0;
-  throttle = map(analogRead(3),0,670,0,255);
+void loop()
+{ 
+  // Position of throttle potentiometer determines the delay between 
+  // angle propegations
+  int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,0,255);
   analogWrite(2,throttle);
-
-  if(digitalRead(39) == HIGH){
-    angle=270;
-    limitsON++; 
-  }
-  if(digitalRead(41) == HIGH){
-    angle=180;
-    limitsON++; 
-  } 
-  if(digitalRead(43) == HIGH){
-    angle=90;
-    limitsON++;
-    if(limitsON ==1 && angle ==0){
-      angle+=360;
-    }
-  } 
-  if(digitalRead(45) == HIGH){
-    angle=0;
-    limitsON++; 
-  } 
-  angle = angle/limitsON;
   throttle = map(throttle,0,255,1000,250);
+  
+  // Only send commands when joystick button is pressed
+  if(digitalRead(JOYSTICK_BUTTON) == HIGH)
+  {
 
-  if(digitalRead(37)==HIGH){
-    if((angle < 270 && angle > 90) && angle != -1){
-      Serial3.write("s0");
-      delay(throttle);
-    }
-    if((angle < 90 || angle > 270)&& angle != -1){
-      Serial3.write("s1");
-      delay(throttle);
-    }
-
-    if(digitalRead(28) == LOW){
-      Serial3.write("c12");
+    if(digitalRead(CALIBRATE_BUTTON) == LOW)
+    {
+      XBEE_SERIAL.write("c12");
       delay(3000);
     }
+   
+    if(digitalRead(JOYSTICK_LEFT_PIN) == HIGH)
+    {
+      XBEE_SERIAL.write("s0");
+      delay(throttle);
+    } 
+  
+    if(digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
+    {
+      XBEE_SERIAL.write("s1");
+      delay(throttle);
+    }
   }
-  angle = -1;
 }
-
 
 
 
