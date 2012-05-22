@@ -19,15 +19,13 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
-//Actuator pins, these may be incorrect, but will be adjusted after testing
+// Actuator pins, these may be incorrect, but will be adjusted after testing
 #define JAW_CLOSE   4
 #define JAW_OPEN    5
 #define HEAD_RAISE  6
 #define HEAD_LOWER  7
 
-
 const char myModuleNumber = 0;
-
 
 /*************************************************************************
  setup(): Initializes serial ports, pins
@@ -76,15 +74,6 @@ void loop()
         manualControl();
       }
     }
-  }
-
-  if(INPUT_SERIAL.available())
-  {
-    USB_COM_PORT.print("received message from xbee: ");
-    message = INPUT_SERIAL.read();
-    USB_COM_PORT.write(message);
-    USB_COM_PORT.write("\n");
-    TAIL_SERIAL.write(message);
   }
 
   if(INPUT_SERIAL.available())
