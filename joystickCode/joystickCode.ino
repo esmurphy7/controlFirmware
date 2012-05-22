@@ -18,6 +18,9 @@
 #define CALIBRATE_BUTTON 28
 #define THROTTLE_ANALOG_PIN 3
 
+// Global variables
+boolean joystickButtonWasPressed = false;
+
 void setup()
 {
   XBEE_SERIAL.begin(115200);
@@ -31,6 +34,8 @@ void loop()
   // Only send commands when joystick button is pressed
   if(digitalRead(JOYSTICK_BUTTON) == HIGH)
   {
+    joystickButtonWasPressed = true;
+    
     // Position of throttle potentiometer determines the delay between 
     // angle propegations
     int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,1000,250);
@@ -52,6 +57,11 @@ void loop()
       XBEE_SERIAL.write("s1");
       delay(throttle);
     }
+  }
+  else if(joystickButtonWasPressed)
+  {
+    joystickButtonWasPressed = false;
+    XBEE_SERIAL.write("k");    
   }
 }
 

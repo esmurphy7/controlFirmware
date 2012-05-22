@@ -56,7 +56,7 @@ int vertLowRange[]  = {0, 0, 0, 0, 0};
                                         
 char myModuleNumber;                    // My position in the module chain (1,2,3...)
 char endModuleNumber;                   // ? TODO:Not sure why we would need this
-
+byte killSwitch = true;                 // True if no movement should be done.
 
 // PID Controllers for the horizontal actuators
 PIDcontrol PIDcontrollerHorizontal[] = {
@@ -224,6 +224,9 @@ void loop()
       }
       headAngle[0] = HEAD_SERIAL.read();
       headAngle[1] = HEAD_SERIAL.read();
+      
+      // If we recieve new setpoints, disable kill switch
+      killSwitch = false;
       break;
 
     case 'v':
@@ -291,6 +294,16 @@ void loop()
       // manual actuator control
       manualControl();
       break;
+      
+    case 'k':
+      // Kill Switch
+      killSwitch = true;
+      for(int i=0; i < 5; i++)
+      {
+        analogWrite(VERT_ACTUATOR[i], 0);
+        analogWrite(HORZ_ACTUATOR[i], 0);
+      }
+      break;
     }
 
     //flush everything and get ready for next loop
@@ -315,8 +328,11 @@ void loop()
   }
 
 
-  //move the snake into position
-  move();
+  // Move the snake into position, if the kill switch it disabled
+  if(!killSwitch)
+  {
+    move();
+  }
 
   //head angles not '0', '1' or '2' are not recognized
   if(headAngle[0] != '0' &&
