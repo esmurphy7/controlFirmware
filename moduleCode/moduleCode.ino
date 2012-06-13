@@ -933,7 +933,8 @@ void manualControl()
   USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
   USB_COM_PORT.print("          k/l - horizontal actuation\n");
   USB_COM_PORT.print("          i/o - vertical actuation\n");
-  USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+  USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
+  USB_COM_PORT.print("          c - calibrate\n");
   USB_COM_PORT.print("          s - stop motor\n");
   USB_COM_PORT.print("          q - quit\n");
   
