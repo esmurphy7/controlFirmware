@@ -27,6 +27,13 @@
 
 const char myModuleNumber = 0;
 
+// Propagation delay storage delays
+unsigned int currentTime;
+unsigned int lastAngleReceivedTime;
+unsigned int timeDifference;
+unsigned int throttleDelay;
+
+
 /*************************************************************************
  setup(): Initializes serial ports, pins
 **************************************************************************/
@@ -46,6 +53,10 @@ void setup()
     pinMode(i,OUTPUT);
     analogWrite(i,0);
   }
+
+  currentTime = 0;
+  lastAngleReceivedTime = 0;
+  timeDifference = 0;
 }
 
 
@@ -78,11 +89,44 @@ void loop()
 
   if(INPUT_SERIAL.available())
   {
-    USB_COM_PORT.print("received message from xbee: ");
     message = INPUT_SERIAL.read();
-    USB_COM_PORT.write(message);
-    USB_COM_PORT.write("\n");
-    TAIL_SERIAL.write(message);
+    USB_COM_PORT.print("received message from xbee: ");
+    USB_COM_PORT.println(message);
+
+    if (message == 's')
+    {
+      currentTime = millis();
+      timeDifference = currentTime - lastAngleReceivedTime;
+
+      // setpoints to come, wait for all data to arrive, data includes angle and propagation delay
+      while(INPUT_SERIAL.available() < 3);
+      // get angle
+      message = INPUT_SERIAL.read();
+      // throttle delay low byte comes first followed by high byte
+      throttleDelay = (INPUT_SERIAL.read());
+      throttleDelay += (INPUT_SERIAL.read() << 8);
+
+      // throttle delay of 0 means this is the first angle
+      if ((timeDifference > (throttleDelay - 20)) && (timeDifference < (throttleDelay + 20)) || throttleDelay == 0)
+      {
+        // Delay between receiving angles is within tolerance ok to send the modules
+        TAIL_SERIAL.write('s');
+        TAIL_SERIAL.write(message);
+      }
+      else
+      {
+        USB_COM_PORT.print("droped\n\n");
+      }
+
+      USB_COM_PORT.print("time betwen: ");
+      USB_COM_PORT.print(timeDifference, DEC);
+      USB_COM_PORT.print("\tthrottleDelay: ");
+      USB_COM_PORT.println(throttleDelay, DEC);
+
+      // update last time an angle was received
+      lastAngleReceivedTime = currentTime;
+      return;
+    }
 
     if(message == 'h')
     {
@@ -92,10 +136,9 @@ void loop()
       }
       TAIL_SERIAL.write(message);
 
-      USB_COM_PORT.print("received message from xbee: ");
       message = INPUT_SERIAL.read();
-      USB_COM_PORT.write(message);
-      USB_COM_PORT.write("\n");
+      USB_COM_PORT.print("received message from xbee: ");
+      USB_COM_PORT.println(message);
       
       if(message == '0')
       {
@@ -132,9 +175,12 @@ void loop()
         }
       }
       INPUT_SERIAL.flush();
+      return;
     }
+
+    TAIL_SERIAL.write(message);
   }
-}
+}//end loop()
 
 
 /**************************************************************************************

@@ -176,6 +176,7 @@ void setup()
   delay(1000);
 }
 
+
 /***********************************************************************************
   loop(): Checks for serial messages and runs the PID controllers in an endless loop.
  ***********************************************************************************/
@@ -218,12 +219,7 @@ void loop()
     {
     case 's':
       //setpionts to come
-      while(HEAD_SERIAL.available() < 2)
-      {
-        delay(1);
-      }
-      headAngle[0] = HEAD_SERIAL.read();
-      headAngle[1] = HEAD_SERIAL.read();
+      headAngle[0] = HEAD_SERIAL.read();  //get horizontal setpoint angle
       
       // If we recieve new setpoints, disable kill switch
       killSwitch = false;

@@ -21,14 +21,22 @@
 // Global variables
 boolean joystickButtonWasPressed = false;
 
+
+/*************************************************************************
+ setup(): Initializes serial ports, pins
+**************************************************************************/
 void setup()
 {
   XBEE_SERIAL.begin(115200);
 
   // Internal pull up on the calibrate button
   digitalWrite(CALIBRATE_BUTTON, HIGH);
-}
+}//end setup()
 
+
+/*************************************************************************
+ loop(): main loop, sends messages to the headbox from the joystick
+**************************************************************************/
 void loop()
 {  
   // Only send commands when joystick button is pressed
@@ -38,7 +46,7 @@ void loop()
     
     // Position of throttle potentiometer determines the delay between 
     // angle propegations
-    int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,1000,250);
+    unsigned int throttle = map(analogRead(THROTTLE_ANALOG_PIN),0,670,1000,250);
       
     if(digitalRead(CALIBRATE_BUTTON) == LOW)
     {
@@ -48,13 +56,20 @@ void loop()
    
     if(digitalRead(JOYSTICK_LEFT_PIN) == HIGH)
     {
+      // send left angle
       XBEE_SERIAL.write("s0");
+      // send propagation delay
+      XBEE_SERIAL.write(lowByte(throttle));
+      XBEE_SERIAL.write(highByte(throttle));
       delay(throttle);
     } 
   
     if(digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
     {
+      // send right angle
       XBEE_SERIAL.write("s1");
+      XBEE_SERIAL.write(lowByte(throttle));
+      XBEE_SERIAL.write(highByte(throttle));
       delay(throttle);
     }
   }
@@ -63,7 +78,7 @@ void loop()
     joystickButtonWasPressed = false;
     XBEE_SERIAL.write("k");    
   }
-}
+}//end loop()
 
 
 
