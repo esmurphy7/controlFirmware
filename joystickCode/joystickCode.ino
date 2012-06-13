@@ -20,6 +20,7 @@
 
 // Global variables
 boolean joystickButtonWasPressed = false;
+boolean angleSent = false;
 
 
 /*************************************************************************
@@ -58,25 +59,52 @@ void loop()
     {
       // send left angle
       XBEE_SERIAL.write("s0");
-      // send propagation delay
-      XBEE_SERIAL.write(lowByte(throttle));
-      XBEE_SERIAL.write(highByte(throttle));
+
+      if (angleSent)
+      {
+        // send propagation delay
+        XBEE_SERIAL.write(lowByte(throttle));
+        XBEE_SERIAL.write(highByte(throttle));
+      }
+      else
+      {
+          XBEE_SERIAL.write((byte)0);
+          XBEE_SERIAL.write((byte)0);
+          angleSent = true;
+      }
       delay(throttle);
-    } 
-  
-    if(digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
+    }
+    else if (digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
     {
       // send right angle
       XBEE_SERIAL.write("s1");
-      XBEE_SERIAL.write(lowByte(throttle));
-      XBEE_SERIAL.write(highByte(throttle));
+      if (angleSent)
+      {
+        // send propagation delay
+        XBEE_SERIAL.write(lowByte(throttle));
+        XBEE_SERIAL.write(highByte(throttle));
+      }
+      else
+      {
+        XBEE_SERIAL.write((byte)0);
+        XBEE_SERIAL.write((byte)0);
+        angleSent = true;
+      }
       delay(throttle);
     }
+    else
+    {
+      angleSent = false;
+    }
   }
-  else if(joystickButtonWasPressed)
+  else
   {
-    joystickButtonWasPressed = false;
-    XBEE_SERIAL.write("k");    
+    if (joystickButtonWasPressed)
+    {
+      joystickButtonWasPressed = false;
+      XBEE_SERIAL.write("k");
+    }
+    angleSent = false;
   }
 }//end loop()
 
