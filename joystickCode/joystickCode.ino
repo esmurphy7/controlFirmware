@@ -17,6 +17,8 @@
 #define JOYSTICK_BUTTON 37
 #define CALIBRATE_BUTTON 28
 #define THROTTLE_ANALOG_PIN 3
+#define JAW_OPEN 47
+#define JAW_CLOSE 49
 
 // Global variables
 boolean joystickButtonWasPressed = false;
@@ -44,6 +46,17 @@ void loop()
   if(digitalRead(JOYSTICK_BUTTON) == HIGH)
   {
     joystickButtonWasPressed = true;
+    
+    //signal to open jaw
+    if(digitalRead(JAW_OPEN)==true){
+      XBEE_SERIAL.write("h0");
+      delay(1000);
+    }
+    else if(digitalRead(JAW_CLOSE)==true){
+      XBEE_SERIAL.write("h1");
+      delay(1000);
+    }
+    
     
     // Position of throttle potentiometer determines the delay between 
     // angle propegations
