@@ -20,7 +20,7 @@
 #define USB_COM_PORT Serial             // Serial for debugging
 
 // Actuator pins, these may be incorrect, but will be adjusted after testing
-#define JAW_CLOSE   4
+#define JAW_CLOSE   3
 #define JAW_OPEN    5
 #define HEAD_RAISE  6
 #define HEAD_LOWER  7
