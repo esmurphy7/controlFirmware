@@ -20,7 +20,7 @@
 #include "EEPROM.h"
 #include "titanoboa_pins.h"
 #include "PIDcontrol.h"
-
+#include "Lights.h"
 
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
@@ -76,6 +76,9 @@ PIDcontrol PIDcontrollerVertical[] = {
   PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4], even),
 };
 
+// lights object for cotrolling lights
+Lights myLights = Lights();
+
 
 /****************************************************************************
  setup(): Initializes serial ports, pins and loads EEPROM calibration
@@ -116,7 +119,12 @@ void setup()
     pinMode(HORZ_POS_SENSOR[i],INPUT);
     pinMode(VERT_POS_SENSOR[i],INPUT);
   }
-
+  
+  //initialize LED Pins
+  for(int i=0;i<8;i++){
+    pinMode(LED[i],OUTPUT);
+  }
+  
   // Set the constants of the PID controllers
   for(int i=0;i<5;i++)
   {
@@ -223,6 +231,30 @@ void loop()
       
       // If we recieve new setpoints, disable kill switch
       killSwitch = false;
+      break;
+    
+    case 'L':
+      //Light Propergation
+      Serial.println("L");
+      while(HEAD_SERIAL.available() < 1);
+      message = HEAD_SERIAL.read();
+      if(message == 'm'){
+        //change mode
+        while(HEAD_SERIAL.available() < 1);
+        message = HEAD_SERIAL.read();
+        myLights.changeMode(message-'0');
+        TAIL_SERIAL.print("Lm"+message);
+      }
+      else{
+        if(message == '1'){
+          message = myLights.push(true);
+        }
+        else{
+          message = myLights.push(false);
+        }
+        TAIL_SERIAL.write('L');
+        TAIL_SERIAL.write(message ? '1':'0');
+      }
       break;
 
     case 'v':
