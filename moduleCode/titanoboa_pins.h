@@ -205,14 +205,14 @@
 #define TX_DOWNSTREAM  TX2
 
 // LEDs
-#define LED_1  ARD32
-#define LED_2  ARD33
-#define LED_3  ARD34
-#define LED_4  ARD35
-#define LED_5  ARD36
-#define LED_6  ARD37
-#define LED_7  ARD38
-#define LED_8  ARD39
+#define LED_8  ARD32
+#define LED_7  ARD33
+#define LED_6  ARD34
+#define LED_5  ARD35
+#define LED_4  ARD36
+#define LED_3  ARD37
+#define LED_2  ARD38
+#define LED_1  ARD39
 
 
 // Position sensor pin arrays for easy looping
