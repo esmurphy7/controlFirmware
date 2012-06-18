@@ -24,7 +24,7 @@
 boolean joystickButtonWasPressed = false;
 boolean angleSent = false;
 
-unsigned long waitTill = 0;
+unsigned long waitTill = 0; // What does this do? Please comment.
 
 /*************************************************************************
  * setup(): Initializes serial ports, pins
@@ -49,11 +49,13 @@ void loop()
     joystickButtonWasPressed = true;
 
     //signal to open jaw
-    if(digitalRead(JAW_OPEN)==true){
+    if(digitalRead(JAW_OPEN)==true)
+    {
       XBEE_SERIAL.write("h0");
       waitTill = millis() + 1000;
     }
-    else if(digitalRead(JAW_CLOSE)==true){
+    else if(digitalRead(JAW_CLOSE)==true)
+    {
       XBEE_SERIAL.write("h1");
       waitTill = millis() + 1000;
     }
@@ -111,10 +113,13 @@ void loop()
       angleSent = false;
     }
 
-    while(millis() < waitTill){
+    // What does this do? Please comment.
+    while(millis() < waitTill)
+    {
       //delay for debouncing
       delay(5);
-      if(digitalRead(JOYSTICK_BUTTON) == LOW){
+      if(digitalRead(JOYSTICK_BUTTON) == LOW)
+      {
         XBEE_SERIAL.write("k");
         joystickButtonWasPressed = false;
         break;
@@ -128,7 +133,8 @@ void loop()
     {
       //delay for debouncing
       delay(5);
-      if(digitalRead(JOYSTICK_BUTTON) == LOW){
+      if(digitalRead(JOYSTICK_BUTTON) == LOW)
+      {
         XBEE_SERIAL.write("k");
         joystickButtonWasPressed = false;
       }
