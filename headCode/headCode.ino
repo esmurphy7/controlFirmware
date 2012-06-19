@@ -41,11 +41,11 @@ void setup()
   USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
 
-  for(int i=4;i<=7;i++)
-  {
-    pinMode(i,OUTPUT);
-    analogWrite(i,0);
-  }
+  // Initialize Actuator Controls Off
+  analogWrite(JAW_CLOSE, 0);
+  analogWrite(JAW_OPEN, 0);
+  analogWrite(HEAD_RAISE, 0);
+  analogWrite(HEAD_LOWER, 0);
 
   currentTime = 0;
   lastAngleReceivedTime = 0;
