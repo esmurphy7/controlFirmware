@@ -27,13 +27,6 @@
 
 const char myModuleNumber = 0;
 
-// Propagation delay storage delays
-unsigned int currentTime;
-unsigned int lastAngleReceivedTime;
-unsigned int timeDifference;
-unsigned int throttleDelay;
-
-
 /*************************************************************************
  setup(): Initializes serial ports, pins
 **************************************************************************/
@@ -59,7 +52,6 @@ void setup()
   timeDifference = 0;
 }
 
-
 /*************************************************************************
  loop(): main loop, checks for messages from the joystick and relays them
          to the first module
@@ -68,113 +60,39 @@ void loop()
 {
   char message;
   int actuator;
-  
-  // check for command from USB serial to enter manual control
-  // NOTE: this is a quick hack so that we can adjust actuators quickly if they get out of wack
-  //       this only puts one module in manual control, never operate titanoboa like this!!!
-  //       in future manual control mode should be selected from the joystick and all modules enter 
-  //       manual control mode and return to normal operation together
-  if (USB_COM_PORT.available()>0)
+
+  // Check for command from USB serial to enter manual control
+  if (USB_COM_PORT.available() > 0)
   {
-    USB_COM_PORT.print("checking for command on USB\n");
+    USB_COM_PORT.print("received message from USB\n");
     if (USB_COM_PORT.read() == 'M')
     {
-      //confirm this wasn't random noise
+      // Confirm this wasn't random noise
       if (USB_COM_PORT.read() == 'M')
       {
+        // Enter manual mode
         manualControl();
       }
     }
   }
 
+  // Check for commands over XBee
   if(INPUT_SERIAL.available())
   {
     message = INPUT_SERIAL.read();
     USB_COM_PORT.print("received message from xbee: ");
     USB_COM_PORT.println(message);
 
+    // Check for new setpoints command.
     if (message == 's')
     {
-      currentTime = millis();
-      timeDifference = currentTime - lastAngleReceivedTime;
-
-      // setpoints to come, wait for all data to arrive, data includes angle and propagation delay
-      while(INPUT_SERIAL.available() < 3);
-      // get angle
-      message = INPUT_SERIAL.read();
-      // throttle delay low byte comes first followed by high byte
-      throttleDelay = (INPUT_SERIAL.read());
-      throttleDelay += (INPUT_SERIAL.read() << 8);
-
-      // throttle delay of 0 means this is the first angle
-      if ((timeDifference > (throttleDelay - 20)) && (timeDifference < (throttleDelay + 20)) || throttleDelay == 0)
-      {
-        // Delay between receiving angles is within tolerance ok to send the modules
-        TAIL_SERIAL.write('s');
-        TAIL_SERIAL.write(message);
-      }
-      else
-      {
-        USB_COM_PORT.print("droped\n\n");
-      }
-
-      USB_COM_PORT.print("time betwen: ");
-      USB_COM_PORT.print(timeDifference, DEC);
-      USB_COM_PORT.print("\tthrottleDelay: ");
-      USB_COM_PORT.println(throttleDelay, DEC);
-
-      // update last time an angle was received
-      lastAngleReceivedTime = currentTime;
+      processSetpointsMessage();
       return;
     }
-
+    // Check for head/jaw movements command.
     if(message == 'h')
     {
-      while(INPUT_SERIAL.available() < 1)
-      {
-        delay(1);
-      }
-      TAIL_SERIAL.write(message);
-
-      message = INPUT_SERIAL.read();
-      USB_COM_PORT.print("received message from xbee: ");
-      USB_COM_PORT.println(message);
-      
-      if(message == '0')
-      {
-        actuator = JAW_OPEN;
-      }
-      else if(message == '1')
-      {
-        actuator = JAW_CLOSE;
-      }
-      else if(message == '2')
-      {
-        actuator = HEAD_RAISE;
-      }
-      else if(message == '3')
-      {
-        actuator = HEAD_LOWER;
-      }
-      else
-      {
-        actuator = -1;
-      }
-      
-      if(actuator != -1)
-      {
-        for(int i=0; i<=255; i++)
-        {
-          analogWrite(actuator, i);
-          delay(4);
-        }
-        for(int i=255; i>=0; i--)
-        {
-          analogWrite(actuator, i);
-          delay(4);
-        }
-      }
-      INPUT_SERIAL.flush();
+      processHeadJawMessage();
       return;
     }
 
@@ -182,6 +100,104 @@ void loop()
   }
 }//end loop()
 
+
+/**************************************************************************************
+  processSetpointsMessage(): Transmits setpoints for the first module for propegation 
+ *************************************************************************************/
+
+// Propagation delay storage delays
+unsigned int currentTime;
+unsigned int lastAngleReceivedTime;
+unsigned int timeDifference;
+unsigned int throttleDelay;
+
+void processSetpointsMessage()
+{
+  currentTime = millis();
+  timeDifference = currentTime - lastAngleReceivedTime;
+  
+  // setpoints to come, wait for all data to arrive, data includes angle and propagation delay
+  while(INPUT_SERIAL.available() < 3);
+  // get angle
+  message = INPUT_SERIAL.read();
+  // throttle delay low byte comes first followed by high byte
+  throttleDelay = (INPUT_SERIAL.read());
+  throttleDelay += (INPUT_SERIAL.read() << 8);
+  
+  // throttle delay of 0 means this is the first angle
+  if ((timeDifference > (throttleDelay - 20)) && (timeDifference < (throttleDelay + 20)) || throttleDelay == 0)
+  {
+    // Delay between receiving angles is within tolerance ok to send the modules
+    TAIL_SERIAL.write('s');
+    TAIL_SERIAL.write(message);
+  }
+  else
+  {
+    USB_COM_PORT.print("droped\n\n");
+  }
+  
+  USB_COM_PORT.print("time betwen: ");
+  USB_COM_PORT.print(timeDifference, DEC);
+  USB_COM_PORT.print("\tthrottleDelay: ");
+  USB_COM_PORT.println(throttleDelay, DEC);
+  
+  // update last time an angle was received
+  lastAngleReceivedTime = currentTime;
+  return; 
+}
+
+/**************************************************************************************
+  processHeadJawMessage(): Uses joystick commands to open the mouth or close the jaw 
+ *************************************************************************************/
+void processHeadJawMessage()
+{
+  while(INPUT_SERIAL.available() < 1)
+  {
+    delay(1);
+  }
+  TAIL_SERIAL.write(message);
+  
+  message = INPUT_SERIAL.read();
+  USB_COM_PORT.print("received message from xbee: ");
+  USB_COM_PORT.println(message);
+  
+  if(message == '0')
+  {
+    actuator = JAW_OPEN;
+  }
+  else if(message == '1')
+  {
+    actuator = JAW_CLOSE;
+  }
+  else if(message == '2')
+  {
+    actuator = HEAD_RAISE;
+  }
+  else if(message == '3')
+  {
+    actuator = HEAD_LOWER;
+  }
+  else
+  {
+    actuator = -1;
+  }
+  
+  if(actuator != -1)
+  {
+    for(int i=0; i<=255; i++)
+    {
+      analogWrite(actuator, i);
+      delay(4);
+    }
+    for(int i=255; i>=0; i--)
+    {
+      analogWrite(actuator, i);
+      delay(4);
+    }
+  }
+  INPUT_SERIAL.flush();
+  return; 
+}
 
 /**************************************************************************************
   manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
