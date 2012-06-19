@@ -25,7 +25,11 @@
 #define HEAD_RAISE  6
 #define HEAD_LOWER  7
 
-const char myModuleNumber = 0;
+// Propagation delay storage delays
+unsigned int currentTime;
+unsigned int lastAngleReceivedTime;
+unsigned int timeDifference;
+unsigned int throttleDelay;
 
 /*************************************************************************
  setup(): Initializes serial ports, pins
@@ -33,13 +37,9 @@ const char myModuleNumber = 0;
 void setup()
 {
   USB_COM_PORT.begin(115200);
-  Serial1.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-  
-  // Print out the loaded cabibration and angle array.
-  USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
-  USB_COM_PORT.println(myModuleNumber, DEC);
+  USB_COM_PORT.print("Hi I'm the Titanoboa Head!");
 
   // Initialize Actuator Controls Off
   analogWrite(JAW_CLOSE, 0);
@@ -59,7 +59,6 @@ void setup()
 void loop()
 {
   char message;
-  int actuator;
 
   // Check for command from USB serial to enter manual control
   if (USB_COM_PORT.available() > 0)
@@ -104,13 +103,6 @@ void loop()
 /**************************************************************************************
   processSetpointsMessage(): Transmits setpoints for the first module for propegation 
  *************************************************************************************/
-
-// Propagation delay storage delays
-unsigned int currentTime;
-unsigned int lastAngleReceivedTime;
-unsigned int timeDifference;
-unsigned int throttleDelay;
-
 void processSetpointsMessage()
 {
   currentTime = millis();
@@ -119,7 +111,7 @@ void processSetpointsMessage()
   // setpoints to come, wait for all data to arrive, data includes angle and propagation delay
   while(INPUT_SERIAL.available() < 3);
   // get angle
-  message = INPUT_SERIAL.read();
+  char message = INPUT_SERIAL.read();
   // throttle delay low byte comes first followed by high byte
   throttleDelay = (INPUT_SERIAL.read());
   throttleDelay += (INPUT_SERIAL.read() << 8);
@@ -151,11 +143,14 @@ void processSetpointsMessage()
  *************************************************************************************/
 void processHeadJawMessage()
 {
+  int actuator;
+  char message;  
+  
   while(INPUT_SERIAL.available() < 1)
   {
     delay(1);
   }
-  TAIL_SERIAL.write(message);
+  TAIL_SERIAL.write('h');
   
   message = INPUT_SERIAL.read();
   USB_COM_PORT.print("received message from xbee: ");
