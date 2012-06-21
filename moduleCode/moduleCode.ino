@@ -264,6 +264,13 @@ void loop()
      
     case 'c':
       //calibration
+      while (HEAD_SERIAL.available() < 1);
+      myModuleNumber = HEAD_SERIAL.read();
+
+      // Tell next module to also calibrate
+      TAIL_SERIAL.write('c');
+      TAIL_SERIAL.write(myModuleNumber + 1);
+
       calibrate();
       break;
       
@@ -539,9 +546,6 @@ void move()
  ***********************************************************************************/
 void calibrate()
 {
-    //tell next module to also calibrate
-    TAIL_SERIAL.write('c');
-
     //calibrate horizontal position and reset everything
     calibrateHorizontal();
     HEAD_SERIAL.flush();
