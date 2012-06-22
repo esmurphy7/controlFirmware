@@ -54,8 +54,8 @@ int lowRange[] = {0, 0, 0, 0, 0};
 int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
 int vertLowRange[]  = {0, 0, 0, 0, 0};
                                         
-char myModuleNumber;                    // My position in the module chain (1,2,3...)
-char endModuleNumber;                   // ? TODO:Not sure why we would need this
+byte myModuleNumber;                    // My position in the module chain (1,2,3...)
+byte endModuleNumber;                   // ? TODO:Not sure why we would need this
 byte killSwitch = true;                 // True if no movement should be done.
 
 // PID Controllers for the horizontal actuators

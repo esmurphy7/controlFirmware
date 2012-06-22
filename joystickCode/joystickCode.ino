@@ -67,7 +67,10 @@ void loop()
 
     if(digitalRead(CALIBRATE_BUTTON) == LOW)
     {
-      XBEE_SERIAL.write("c12");
+      XBEE_SERIAL.write("c");
+      // Tell first module it's the first module.
+      XBEE_SERIAL.write(1);
+      
       waitTill = millis() + 3000;
     }
 
