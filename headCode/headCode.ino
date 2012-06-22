@@ -6,8 +6,8 @@
   Part of the titanaboa.ca project
   
   Decription: This code runs on an Arduino MEGA to control the 
-  head actuators and by communicating to the main module BoaBox 
-  Arduinos to propagat a sequence of angles from head to tail at 
+  head actuators and communicate with the main modules
+  to propagate a sequence of angles from head to tail at 
   an interval initiated by an external controller.  Communicates
   with an external controller over Xbee.
 
@@ -19,7 +19,7 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
-// Actuator pins, these may be incorrect, but will be adjusted after testing
+// Actuator pins
 #define JAW_CLOSE   3
 #define JAW_OPEN    5
 #define HEAD_RAISE  6
@@ -95,6 +95,7 @@ void loop()
       return;
     }
 
+    // Pass through all other commands to the first module.
     TAIL_SERIAL.write(message);
   }
 }//end loop()
