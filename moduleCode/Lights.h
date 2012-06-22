@@ -9,6 +9,8 @@ off, on, propergate and random
 #include <Arduino.h>
 #include "titanoboa_pins.h"
 
+#define USB_COM_PORT Serial
+
 const int LED_PERIOD = 20;
 
 //class outputs PID control
@@ -89,6 +91,8 @@ public:
 
   void changeMode(int newMode){
     mode = newMode;
+    USB_COM_PORT.print("changing mode to ");
+    USB_COM_PORT.println(mode);
   }
 
   void LightsPWM(){

@@ -10,6 +10,7 @@
  */
 
 #define XBEE_SERIAL Serial3
+#define USB_COM_PORT Serial
 #define JOYSTICK_LEFT_PIN 41
 #define JOYSTICK_RIGHT_PIN 45
 #define JOYSTICK_UP_PIN 39     // TODO: Confirm pin number
@@ -32,9 +33,12 @@ unsigned long waitTill = 0; // What does this do? Please comment.
 void setup()
 {
   XBEE_SERIAL.begin(115200);
+  USB_COM_PORT.begin(115200);
 
   // Internal pull up on the calibrate button
   digitalWrite(CALIBRATE_BUTTON, HIGH);
+
+  USB_COM_PORT.println("Hi I'm Titanoboa, ready to rule the world!");
 }//end setup()
 
 
@@ -59,7 +63,6 @@ void loop()
       XBEE_SERIAL.write("h1");
       waitTill = millis() + 1000;
     }
-
 
     // Position of throttle potentiometer determines the delay between 
     // angle propegations
@@ -89,6 +92,12 @@ void loop()
         angleSent = true;
       }
       waitTill = millis() + throttle;
+
+      //delay so modules have time to sort last set point but not enough to be noticable
+      delay(5);
+      //send lights command
+      XBEE_SERIAL.print('L');
+      XBEE_SERIAL.print(random(0,2)<1 ? '0':'1');
     }
     else if (digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
     {
@@ -107,13 +116,19 @@ void loop()
         angleSent = true;
       }
       waitTill = millis() + throttle;
+
+      //delay so modules have time to sort last set point but not enought to be noticable
+      delay(5);
+      //send lights command
+      XBEE_SERIAL.print('L');
+      XBEE_SERIAL.print(random(0,2)<1 ? '0':'1');
     }
     else
     {
       angleSent = false;
     }
 
-    // What does this do? Please comment.
+    // This is a hacked together delay() replacement that also monitors the kill switch
     while(millis() < waitTill)
     {
       //delay for debouncing
@@ -125,7 +140,6 @@ void loop()
         break;
       }
     }
-
   }
   else
   {
@@ -140,6 +154,17 @@ void loop()
       }
     }
     angleSent = false;
+  }
+
+  // message passing to and from usb
+  // Should be careful with this in the future not to send commands that do bad things
+  if (USB_COM_PORT.available() > 0)
+  {
+    XBEE_SERIAL.write(USB_COM_PORT.read());
+  }
+  if(XBEE_SERIAL.available() > 0)
+  {
+    USB_COM_PORT.write(XBEE_SERIAL.read());
   }
 
 }//end loop()

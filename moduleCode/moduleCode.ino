@@ -27,7 +27,7 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
-const int MOTOR_SPEED = 130;            // Analog output for pump speed when turned on
+const int MOTOR_SPEED = 200;            // Analog output for pump speed when turned on
 const int VERT_DEAD_ZONE = 20;          // Vertical safety range
 
 
@@ -77,7 +77,7 @@ PIDcontrol PIDcontrollerVertical[] = {
 };
 
 // lights object for cotrolling lights
-Lights myLights = Lights();
+Lights myLights = Lights(2);  //default is propagate mode
 
 
 /****************************************************************************
@@ -234,8 +234,8 @@ void loop()
       break;
     
     case 'L':
-      //Light Propergation
-      Serial.println("L");
+      //Light Propagation
+      USB_COM_PORT.println("L");
       while(HEAD_SERIAL.available() < 1);
       message = HEAD_SERIAL.read();
       if(message == 'm'){
@@ -243,7 +243,8 @@ void loop()
         while(HEAD_SERIAL.available() < 1);
         message = HEAD_SERIAL.read();
         myLights.changeMode(message-'0');
-        TAIL_SERIAL.print("Lm"+message);
+        TAIL_SERIAL.print("Lm");
+        TAIL_SERIAL.print(message);
       }
       else{
         if(message == '1'){
@@ -331,6 +332,10 @@ void loop()
         analogWrite(VERT_ACTUATOR[i], 0);
         analogWrite(HORZ_ACTUATOR[i], 0);
       }
+
+      //ensure the motor is turned off and pass the message down
+      analogWrite(MOTOR_CONTROL, 0);
+      TAIL_SERIAL.write('k');
       break;
     }
 
@@ -362,6 +367,9 @@ void loop()
     move();
   }
 
+  //update lights
+  myLights.update();
+
   //head angles not '0', '1' or '2' are not recognized
   if(headAngle[0] != '0' &&
     headAngle[0] != '1' &&
@@ -379,7 +387,6 @@ void loop()
   TAIL_SERIAL.write('s');
   //send the next angle down
   TAIL_SERIAL.write(tailAngle[0]);
-  TAIL_SERIAL.write(tailAngle[1]);
 
   //ready to go one
   ready();
