@@ -22,10 +22,17 @@
 #include "PIDcontrol.h"
 #include "Lights.h"
 
+
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
+
+// Memory locations for items stored to EEPROM
+#define MY_MODULE_NUMBER_ADDRESS  0
+#define HORIZONTAL_CALIBRATION_ADDRESS  2
+#define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
+#define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
 
 const int MOTOR_SPEED = 200;            // Analog output for pump speed when turned on
 const int VERT_DEAD_ZONE = 20;          // Vertical safety range
@@ -38,6 +45,10 @@ char horzAngleArray[] = {               // Current horizontal and vertical posit
   '3','3','3','3','3'};                 // the actuators.
 char vertAngleArray[] = {               // 0 = Bent Left, 1 = Bent Right  <-- TODO:confirm
   '3','3','3','3','3'};                 // 2 = Straight,  3 = Undefined
+
+// Array of angles we recorded as straight for the verticals
+int vertStraightArray[] = {0, 0, 0, 0, 0};
+
 
 unsigned long horzTimerArray[] = {      // Timer arrays used to timeout when waiting for 
   0,0,0,0,0};                           // an actuator to reach its set point
@@ -69,11 +80,11 @@ PIDcontrol PIDcontrollerHorizontal[] = {
 
 // PID Controllers for the vertical actuators
 PIDcontrol PIDcontrollerVertical[] = {
-  PIDcontrol(VERT_POS_SENSOR[0], VERT_ACTUATOR_CTRL[0], VERT_ACTUATOR[0], even),
-  PIDcontrol(VERT_POS_SENSOR[1], VERT_ACTUATOR_CTRL[1], VERT_ACTUATOR[1], !even),
-  PIDcontrol(VERT_POS_SENSOR[2], VERT_ACTUATOR_CTRL[2], VERT_ACTUATOR[2], even),
-  PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3], !even),
-  PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4], even),
+  PIDcontrol(VERT_POS_SENSOR[0], VERT_ACTUATOR_CTRL[0], VERT_ACTUATOR[0], !even),
+  PIDcontrol(VERT_POS_SENSOR[1], VERT_ACTUATOR_CTRL[1], VERT_ACTUATOR[1], even),
+  PIDcontrol(VERT_POS_SENSOR[2], VERT_ACTUATOR_CTRL[2], VERT_ACTUATOR[2], !even),
+  PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3], even),
+  PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4], !even),
 };
 
 // lights object for cotrolling lights
@@ -908,15 +919,17 @@ void straightenVertical()
 {
   // Move till vertAngleArray is matched???
   boolean inPosition = false;
-
-  int goal = 127;
   
-  USB_COM_PORT.println("straightening vertical");
+  USB_COM_PORT.println("\nstraightening vertical");
   for (int i=0; i<5; i++)
   {
-    PIDcontrollerVertical[i].setSetPoint(map(goal, 0, 255, vertLowRange[i], vertHighRange[i]));
-    USB_COM_PORT.print("current vertical position is ");
-    USB_COM_PORT.println(map(analogRead(VERT_POS_SENSOR[i]), vertLowRange[i], vertHighRange[i], 0, 255)); 
+    PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
+    USB_COM_PORT.print("current vertical position for vertebrae ");
+    USB_COM_PORT.print(i+1);
+    USB_COM_PORT.print(" is ");
+    USB_COM_PORT.print(analogRead(VERT_POS_SENSOR[i]));
+    USB_COM_PORT.print(", target is ");
+    USB_COM_PORT.println(vertStraightArray[i]);
   }
 
   // Time limit so if stuck, goes to next
@@ -927,9 +940,9 @@ void straightenVertical()
 
     for (int i=0; i<5; i++)
     {
-      int currentAngle = map(analogRead(VERT_POS_SENSOR[i]), vertLowRange[i], vertHighRange[i], 0, 255);
+      int currentAngle = analogRead(VERT_POS_SENSOR[i]);
 
-      if (abs(currentAngle - goal) > DEAD_ZONE)
+      if (abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE)
       {
         analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
         PIDcontrollerVertical[i].updateOutput();
@@ -954,10 +967,81 @@ void straightenVertical()
   
   for (int i=0; i<5; i++)
   {
-    USB_COM_PORT.print("current vertical position is ");
-    USB_COM_PORT.println(map(analogRead(VERT_POS_SENSOR[i]), vertLowRange[i], vertHighRange[i], 0, 255)); 
+    USB_COM_PORT.print("current vertical position for vertebrae ");
+    USB_COM_PORT.print(i+1);
+    USB_COM_PORT.print(" is ");
+    USB_COM_PORT.println(analogRead(VERT_POS_SENSOR[i]));
   }
 } //end straightenVertical()
+
+
+/**************************************************************************************
+  readSensors():
+ *************************************************************************************/
+void readSensors()
+{
+  int sensorVal = 0;
+
+  for(int i=0;i<5;i++)
+  {
+    // Get the current raw value
+    sensorVal = analogRead(HORZ_POS_SENSOR[i]);
+
+    USB_COM_PORT.print("Horizontal sensor ");
+    USB_COM_PORT.print(i+1);
+    USB_COM_PORT.print(": current position ");
+    USB_COM_PORT.println(sensorVal);
+  }
+
+  for(int i=0;i<5;i++)
+  {
+    // Get the current raw value
+    sensorVal = analogRead(VERT_POS_SENSOR[i]);
+
+    USB_COM_PORT.print("Vertical sensor ");
+    USB_COM_PORT.print(i+1);
+    USB_COM_PORT.print(": current position ");
+    USB_COM_PORT.print(sensorVal);
+    USB_COM_PORT.print(", straight is ");
+    USB_COM_PORT.println(vertStraightArray[i]);
+  }
+}
+
+
+/**************************************************************************************
+  saveVerticalPosition():
+ *************************************************************************************/
+void saveVerticalPosition()
+{
+  for(int i=0;i<5;i++)
+  {
+    // Get the current raw value
+    vertStraightArray[i] = analogRead(VERT_POS_SENSOR[i]);
+    // Set low and high ranges as +/- 100 of current position
+    vertLowRange[i] = vertStraightArray[i] - 100;
+    vertHighRange[i] = vertStraightArray[i] + 100;
+
+    USB_COM_PORT.print("Vertical sensor ");
+    USB_COM_PORT.print(i);
+    USB_COM_PORT.print(": current position ");
+    USB_COM_PORT.print(vertStraightArray[i]);
+    USB_COM_PORT.print(", low limit ");
+    USB_COM_PORT.print(vertLowRange[i]);
+    USB_COM_PORT.print(", high limit ");
+    USB_COM_PORT.println(vertHighRange[i]);
+  }
+
+  // Save current vertical position to EEPROM
+  // 10-bit values must be split into two bytes for storage.
+  /*for(int i=0;i<5;i++)
+  {
+    // save high and low range values
+
+    // save current position as straight
+    EEPROM.write(i*5+VERTICAL_STRAIGHT_ADDRESS, lowByte(vertStraightArray[i]));
+    EEPROM.write(i*5+VERTICAL_STRAIGHT_ADDRESS+1, highByte(vertStraightArray[i]));
+  }*/
+}
 
 
 /**************************************************************************************
@@ -978,6 +1062,9 @@ void manualControl()
   USB_COM_PORT.print("          i/o - vertical actuation\n");
   USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
   USB_COM_PORT.print("          c - calibrate\n");
+  USB_COM_PORT.print("          p - print raw values of position sensors\n");
+  USB_COM_PORT.print("          r - save current vertical position as straight\n");
+  USB_COM_PORT.print("          v - straighten verticals\n");
   USB_COM_PORT.print("          s - stop motor\n");
   USB_COM_PORT.print("          q - quit\n");
   
@@ -989,8 +1076,31 @@ void manualControl()
       switch(byteIn)
       {
         case 'c':
-          USB_COM_PORT.print("Running calibration...\n");
+          USB_COM_PORT.print("\nRunning calibration...\n");
           calibrate();
+          break;
+        case 'p':
+          readSensors();
+          break;
+        case 'r':
+          USB_COM_PORT.print("\nSaving current vertical position\n");
+          saveVerticalPosition();
+          break;
+        case 'v':
+          // only straighten verticals if there is a stored vertical position
+          if ((vertStraightArray[0] != 0) &&
+              (vertStraightArray[1] != 0) &&
+              (vertStraightArray[2] != 0) &&
+              (vertStraightArray[3] != 0) &&
+              (vertStraightArray[4] != 0))
+            {
+              USB_COM_PORT.print("\nStraightening verticals\n");
+              straightenVertical();
+            }
+            else
+            {
+              USB_COM_PORT.print("\nUnable to straighten as there is no stored data\n");
+            }
           break;
         case '1':
           segSelect = 0;
@@ -1113,6 +1223,7 @@ void manualControl()
   }
   USB_COM_PORT.print("\nManual Control mode exited");
 }
+
 
 /**************************************************************************************
   StopMov(): In manual mode, stops movement of all actuators.
