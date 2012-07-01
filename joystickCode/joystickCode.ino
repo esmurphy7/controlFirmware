@@ -20,6 +20,7 @@
 #define THROTTLE_ANALOG_PIN 3
 #define JAW_OPEN 47
 #define JAW_CLOSE 49
+#define VERTICAL_STRAIGHTEN 35
 
 // Global variables
 boolean joystickButtonWasPressed = false;
@@ -62,6 +63,13 @@ void loop()
     {
       XBEE_SERIAL.write("h1");
       waitTill = millis() + 1000;
+    }
+
+    if (digitalRead(VERTICAL_STRAIGHTEN) == HIGH)
+    {
+      USB_COM_PORT.print("straighten vertical\n");
+      XBEE_SERIAL.write("l");
+      delay(1000);
     }
 
     // Position of throttle potentiometer determines the delay between 

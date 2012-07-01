@@ -88,7 +88,7 @@ PIDcontrol PIDcontrollerVertical[] = {
 };
 
 // lights object for cotrolling lights
-Lights myLights = Lights(2);  //default is propagate mode
+Lights myLights = Lights();  //default is off
 
 
 /****************************************************************************
@@ -158,6 +158,16 @@ void setup()
   {
     vertStraightArray[i] = EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS)
                            + (EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS+1) << 8);
+  }
+
+  //setup even/odd for even/odd modules
+  if (myModuleNumber == 4)
+  {
+    PIDcontrollerVertical[0].setEven(even);
+    PIDcontrollerVertical[1].setEven(!even);
+    PIDcontrollerVertical[2].setEven(even);
+    PIDcontrollerVertical[3].setEven(!even);
+    PIDcontrollerVertical[4].setEven(even);
   }
 
   // Initialize the horizontal angle array based on the current
@@ -351,8 +361,12 @@ void loop()
       break;
 
     case 'l':
+      // straighten verticals on module 1 & 4
+      if ((myModuleNumber == 1) || (myModuleNumber == 4))
+      {
+        straightenVertical();
+      }
       TAIL_SERIAL.print("l");
-      straighten();
       ready();
       break;
       
