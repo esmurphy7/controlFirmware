@@ -104,7 +104,7 @@ void setup()
   // Turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
   analogWrite(MOTOR_CONTROL,0);
-  
+
   // Initialize solenoid valve control ouputs
   for(int i=0;i<5;i++)
   {
@@ -113,7 +113,7 @@ void setup()
     pinMode(VERT_ACTUATOR[i],OUTPUT);
     analogWrite(VERT_ACTUATOR[i],0);
   }
-  
+
   // Initialize solenoid valve selection ouputs
   // Each valve has two solenoids: 1 for extending
   // 1 for retracting. This signal selects which one 
@@ -123,14 +123,14 @@ void setup()
     pinMode(HORZ_ACTUATOR_CTRL[i],OUTPUT);
     pinMode(VERT_ACTUATOR_CTRL[i],OUTPUT);
   }
-  
+
   // Initialize position sensor inputs.
   for(int i=0;i<5;i++)
   {
     pinMode(HORZ_POS_SENSOR[i],INPUT);
     pinMode(VERT_POS_SENSOR[i],INPUT);
   }
-  
+
   //initialize LED Pins
   for(int i=0;i<8;i++){
     pinMode(LED[i],OUTPUT);
@@ -153,6 +153,13 @@ void setup()
     PIDcontrollerHorizontal[i].setEven(EEPROM.read(i*5+6));
   }
   
+  // Load vertical straight array from EEPROM
+  for(int i=0;i<5;i++)
+  {
+    vertStraightArray[i] = EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS)
+                           + (EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS+1) << 8);
+  }
+
   // Initialize the horizontal angle array based on the current
   // position of the pistons.
   for(int i=0;i<5;i++)
@@ -168,7 +175,7 @@ void setup()
   }
 
   // Print out the loaded cabibration and angle array.
-  USB_COM_PORT.print("Hi I'm Titanoboa, MODULE #: ");
+  USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
   USB_COM_PORT.println("> Loaded Calibration and Initialized Horizontal Angle Array");
   USB_COM_PORT.print("HIGH: ");
@@ -191,7 +198,19 @@ void setup()
     USB_COM_PORT.print(horzAngleArray[i]);
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.println('\n');  
+  USB_COM_PORT.println('\n');
+
+  // Print out saved straight angle array for module 1 & 4
+  if ((myModuleNumber == 1) || (myModuleNumber == 4))
+  {
+    for(int i=0;i<5;i++)
+    {
+      USB_COM_PORT.print("Saved vertical straight position for vertebrae ");
+      USB_COM_PORT.print(i+1);
+      USB_COM_PORT.print(" is ");
+      USB_COM_PORT.println(vertStraightArray[i]);
+    }
+  }
   delay(1000);
 }
 
@@ -1022,7 +1041,7 @@ void saveVerticalPosition()
     vertHighRange[i] = vertStraightArray[i] + 100;
 
     USB_COM_PORT.print("Vertical sensor ");
-    USB_COM_PORT.print(i);
+    USB_COM_PORT.print(i+1);
     USB_COM_PORT.print(": current position ");
     USB_COM_PORT.print(vertStraightArray[i]);
     USB_COM_PORT.print(", low limit ");
@@ -1033,14 +1052,12 @@ void saveVerticalPosition()
 
   // Save current vertical position to EEPROM
   // 10-bit values must be split into two bytes for storage.
-  /*for(int i=0;i<5;i++)
+  for(int i=0;i<5;i++)
   {
-    // save high and low range values
-
     // save current position as straight
     EEPROM.write(i*5+VERTICAL_STRAIGHT_ADDRESS, lowByte(vertStraightArray[i]));
     EEPROM.write(i*5+VERTICAL_STRAIGHT_ADDRESS+1, highByte(vertStraightArray[i]));
-  }*/
+  }
 }
 
 
@@ -1055,7 +1072,7 @@ void manualControl()
   boolean motor = false;
   int actuationDelay = 200;
   char delaySetting = 'm';
-  
+
   USB_COM_PORT.print("\nManual Control mode entered\n");
   USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
   USB_COM_PORT.print("          k/l - horizontal actuation\n");
@@ -1067,7 +1084,7 @@ void manualControl()
   USB_COM_PORT.print("          v - straighten verticals\n");
   USB_COM_PORT.print("          s - stop motor\n");
   USB_COM_PORT.print("          q - quit\n");
-  
+
   while(manual == true)
   {
     if(Serial.available() > 0){
@@ -1132,7 +1149,7 @@ void manualControl()
           USB_COM_PORT.print("Seg5\n");
           motor = false;
           break;
-        
+
         case 'd':
           StopMov();
           delaySetting = USB_COM_PORT.read();
@@ -1156,7 +1173,7 @@ void manualControl()
               break;
           }
           break;
-          
+
         case 'l':
           if(motor == false)
           {
@@ -1169,7 +1186,7 @@ void manualControl()
             StopMov();
           }
           break;
-         
+
         case 'k':
           if(motor == false)
           {
@@ -1182,7 +1199,7 @@ void manualControl()
             StopMov();
           }
           break;
-        
+
         case 'i':
           if(motor == false)
           {
@@ -1207,18 +1224,18 @@ void manualControl()
             StopMov();
           }
           break;
-        
+
         case 's':
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
           break;
-        
+
         case 'q':
           manual = false;
           break;
       }//end switch
     }//end if serial
-    
+
     byteIn = 'z';
   }
   USB_COM_PORT.print("\nManual Control mode exited");
