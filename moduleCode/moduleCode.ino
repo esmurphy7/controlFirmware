@@ -70,6 +70,8 @@ byte endModuleNumber;                   // ? TODO:Not sure why we would need thi
 byte killSwitch = true;                 // True if no movement should be done.
 
 // PID Controllers for the horizontal actuators
+// Declaration of horizontal PID controllers, default even and odd values applied here
+// but get updated during calibration
 PIDcontrol PIDcontrollerHorizontal[] = {
   PIDcontrol(HORZ_POS_SENSOR[0], HORZ_ACTUATOR_CTRL[0], HORZ_ACTUATOR[0], even),
   PIDcontrol(HORZ_POS_SENSOR[1], HORZ_ACTUATOR_CTRL[1], HORZ_ACTUATOR[1], !even),
@@ -79,6 +81,8 @@ PIDcontrol PIDcontrollerHorizontal[] = {
 };
 
 // PID Controllers for the vertical actuators
+// Declaration of vertical PID controllers, default even and odd values only apply to
+// odd numbered modules
 PIDcontrol PIDcontrollerVertical[] = {
   PIDcontrol(VERT_POS_SENSOR[0], VERT_ACTUATOR_CTRL[0], VERT_ACTUATOR[0], !even),
   PIDcontrol(VERT_POS_SENSOR[1], VERT_ACTUATOR_CTRL[1], VERT_ACTUATOR[1], even),
@@ -160,8 +164,9 @@ void setup()
                            + (EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS+1) << 8);
   }
 
-  //setup even/odd for even/odd modules
-  if (myModuleNumber == 4)
+  // setup even/odd for even modules, default values applied at declaration only apply to
+  // odd numbered modules
+  if (myModuleNumber%2 == 0)
   {
     PIDcontrollerVertical[0].setEven(even);
     PIDcontrollerVertical[1].setEven(!even);
@@ -187,6 +192,10 @@ void setup()
   // Print out the loaded cabibration and angle array.
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
+
+  USB_COM_PORT.print("\nCurrent voltage reading: ");
+  USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
+
   USB_COM_PORT.println("> Loaded Calibration and Initialized Horizontal Angle Array");
   USB_COM_PORT.print("HIGH: ");
   for(int i=0;i<5;i++){
@@ -210,16 +219,20 @@ void setup()
   }
   USB_COM_PORT.println('\n');
 
-  // Print out saved straight angle array for module 1 & 4
-  if ((myModuleNumber == 1) || (myModuleNumber == 4))
+  // Print out saved vertical straight angle array
+  for(int i=0;i<5;i++)
   {
-    for(int i=0;i<5;i++)
-    {
-      USB_COM_PORT.print("Saved vertical straight position for vertebrae ");
-      USB_COM_PORT.print(i+1);
-      USB_COM_PORT.print(" is ");
-      USB_COM_PORT.println(vertStraightArray[i]);
-    }
+    USB_COM_PORT.print("Saved vertical straight position for vertebrae ");
+    USB_COM_PORT.print(i+1);
+    USB_COM_PORT.print(" is ");
+    USB_COM_PORT.println(vertStraightArray[i]);
+  }
+
+  // Print out even/odd setting for verticals
+  USB_COM_PORT.print("\nEVEN?: ");
+  for(int i=0;i<5;i++){
+    USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven() ? 'T' : 'F');
+    USB_COM_PORT.print('\t');
   }
   delay(1000);
 }
@@ -305,6 +318,7 @@ void loop()
      
     case 'c':
       //calibration
+      USB_COM_PORT.println("Calibrate command received");
       while (HEAD_SERIAL.available() < 1);
       myModuleNumber = HEAD_SERIAL.read();
 
@@ -361,11 +375,8 @@ void loop()
       break;
 
     case 'l':
-      // straighten verticals on module 1 & 4
-      if ((myModuleNumber == 1) || (myModuleNumber == 4))
-      {
-        straightenVertical();
-      }
+      // straighten verticals
+      straightenVertical();
       TAIL_SERIAL.print("l");
       ready();
       break;
@@ -511,6 +522,7 @@ void propagate()
  ***********************************************************************************/
 
 const int MAX_WAIT_TIME = 3000;  // Time to try moving actuator before giving up
+const int MAX_WAIT_TIME_VERT = 1000;
 const int DEAD_ZONE = 10;        // Safty range to not move 
 int count = 0;
 
@@ -967,7 +979,7 @@ void straightenVertical()
 
   // Time limit so if stuck, goes to next
   unsigned long startTime = millis();
-  while (inPosition == false && (millis()-startTime) < MAX_WAIT_TIME)
+  while (inPosition == false && (millis()-startTime) < MAX_WAIT_TIME_VERT)
   {
     inPosition = true;
 
