@@ -185,6 +185,8 @@ void processSetpointsMessage()
     // Delay between receiving angles is within tolerance ok to send the modules
     TAIL_SERIAL.write('s');
     TAIL_SERIAL.write(message);
+    USB_COM_PORT.print("new setpoint: ");
+    USB_COM_PORT.println(message);
   }
   else
   {
@@ -297,22 +299,7 @@ void manualControl()
   int sensors[6];
   #endif
   
-  USB_COM_PORT.print("\nManual Control mode entered\n");
-  USB_COM_PORT.print("commands: j or h to select jaw or head actuator.");
-  #ifdef HEADBOARD2 
-	USB_COM_PORT.print("u to select Aux actuator\n");
-	#endif
-	#ifdef HEADBOARD1
-	USB_COM_PORT.print("\n");
-	#endif
-  #ifdef HEADBOARD2
-  USB_COM_PORT.print("          a/b - leds [0-6]\n");
-  USB_COM_PORT.print("          c - list sensor values\n");
-#endif
-  USB_COM_PORT.print("          k/l - actuation\n");
-  USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
-  USB_COM_PORT.print("          s - stop motor\n");
-  USB_COM_PORT.print("          q - quit\n");
+    displayMenu();
   
   while(manual == true)
   {
@@ -320,6 +307,7 @@ void manualControl()
     {
       byteIn = USB_COM_PORT.read();
       
+      // characters in use: a, b, c, j, h, u, m, d, l, k, s, q
       switch(byteIn)
       {
 		#ifdef HEADBOARD2
@@ -396,7 +384,20 @@ void manualControl()
           USB_COM_PORT.print("Auxiliary actuator selected\n");
           break;
 		  #endif
-        
+
+        // new motor speed setting received
+        case 'm':
+        {
+            while (INPUT_SERIAL.available() < 1);
+            int ms = INPUT_SERIAL.read();
+            TAIL_SERIAL.print('m');
+            TAIL_SERIAL.print(ms);
+            USB_COM_PORT.print("new motor speed received: ");
+            USB_COM_PORT.print(ms, DEC);
+            USB_COM_PORT.println();
+            break;
+        }
+
         case 'd':
           StopMov();
           delaySetting = USB_COM_PORT.read();
@@ -487,7 +488,11 @@ void manualControl()
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
           break;
-        
+
+        case 'e':
+            displayMenu();
+            break;
+
         case 'q':
           manual = false;
           break;
@@ -498,6 +503,32 @@ void manualControl()
   }
   USB_COM_PORT.print("\nManual Control mode exited\n");
 }
+
+
+/**************************************************************************************
+  displayMenu():
+ *************************************************************************************/
+void displayMenu()
+{
+    USB_COM_PORT.print("\nManual control mode menu\n");
+    USB_COM_PORT.print("commands: j or h to select jaw or head actuator.");
+#ifdef HEADBOARD2
+    USB_COM_PORT.print("u to select Aux actuator\n");
+#endif
+#ifdef HEADBOARD1
+    USB_COM_PORT.print("\n");
+#endif
+#ifdef HEADBOARD2
+    USB_COM_PORT.print("          a/b - leds [0-6]\n");
+    USB_COM_PORT.print("          c - list sensor values\n");
+#endif
+    USB_COM_PORT.print("          k/l - actuation\n");
+    USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
+    USB_COM_PORT.print("          s - stop motor\n");
+    USB_COM_PORT.print("          e - menu");
+    USB_COM_PORT.print("          q - quit\n");
+}
+
 
 /**************************************************************************************
   StopMov(): In manual mode, stops movement of all actuators.

@@ -33,8 +33,8 @@
 #define HORIZONTAL_CALIBRATION_ADDRESS  2
 #define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
+#define CALIBRATE_MOTOR_SPEED  200
 
-const int MOTOR_SPEED = 200;            // Analog output for pump speed when turned on
 const int VERT_DEAD_ZONE = 20;          // Vertical safety range
 
 
@@ -68,6 +68,7 @@ int vertLowRange[]  = {0, 0, 0, 0, 0};
 byte myModuleNumber;                    // My position in the module chain (1,2,3...)
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
 byte killSwitch = true;                 // True if no movement should be done.
+int motorSpeed = 200;                   // Analog output for pump speed when turned on
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -275,9 +276,20 @@ void loop()
   // check for messages from upstream port
   if (HEAD_SERIAL.available() > 0)
   {
-
+    //letters in use: m, s, L, v, c, h, g, l, M, k
     switch (HEAD_SERIAL.read())
     {
+    //update motor speed
+    case 'm':
+        USB_COM_PORT.print("new motor speed received: ");
+        while (HEAD_SERIAL.available() < 1);
+        motorSpeed = HEAD_SERIAL.read();
+        TAIL_SERIAL.write('m');
+        TAIL_SERIAL.write((char)motorSpeed);
+        USB_COM_PORT.print("new motor speed received: ");
+        USB_COM_PORT.println(motorSpeed);
+        break;
+
     case 's':
       //setpionts to come
       headAngle[0] = HEAD_SERIAL.read();  //get horizontal setpoint angle
@@ -360,7 +372,7 @@ void loop()
         }
       }
 
-      analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
+      analogWrite(MOTOR_CONTROL, motorSpeed);
       delay(1000);
       analogWrite(MOTOR_CONTROL,0);
       break;
@@ -368,7 +380,7 @@ void loop()
     case 'g':
       //manual control of head actuators, need to turn motor on and off
       USB_COM_PORT.print("turning motor on\n");
-      analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+      analogWrite(MOTOR_CONTROL, motorSpeed);
       delay(200);  //for now just run for 200ms
       analogWrite(MOTOR_CONTROL, 0);
       USB_COM_PORT.print("turning motor off\n");
@@ -636,7 +648,7 @@ void calibrate()
 void calibrateHorizontal()
 {
   // HIGH: Move to side when the solenoid selection signal is HIGH
-  analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
   for (int i = 0; i < 5; i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
@@ -658,7 +670,7 @@ void calibrateHorizontal()
 
 
   // LOW: Move to side when the selection signal is LOW
-  analogWrite(MOTOR_CONTROL,MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
   for(int i=0;i<5;i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], LOW);
@@ -743,7 +755,7 @@ void calibrateHorizontal()
  *************************************************************************************/
 void calibrateVertical()
 {
-  analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
 
   // for vertical calibration don't run actuators to their extremes all in the same 
   // direction otherwise will end up with a giant U that will tip over
@@ -799,7 +811,7 @@ void calibrateVertical()
   }
 
   //Now go to the other extremes
-  analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
   for (int i=0; i<5; i++)
   {
     if (myModuleNumber%2 == 0)
@@ -936,7 +948,7 @@ void straighten()
       int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
 
       if(abs(currentAngle-goal)>DEAD_ZONE){
-        analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+        analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
         PIDcontrollerHorizontal[i].updateOutput();
         inPosition=false;
       }
@@ -989,7 +1001,7 @@ void straightenVertical()
 
       if (abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE)
       {
-        analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+        analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
         PIDcontrollerVertical[i].updateOutput();
         inPosition = false;
       }
@@ -1099,17 +1111,7 @@ void manualControl()
   int actuationDelay = 200;
   char delaySetting = 'm';
 
-  USB_COM_PORT.print("\nManual Control mode entered\n");
-  USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
-  USB_COM_PORT.print("          k/l - horizontal actuation\n");
-  USB_COM_PORT.print("          i/o - vertical actuation\n");
-  USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
-  USB_COM_PORT.print("          c - calibrate\n");
-  USB_COM_PORT.print("          p - print raw values of position sensors\n");
-  USB_COM_PORT.print("          r - save current vertical position as straight\n");
-  USB_COM_PORT.print("          v - straighten verticals\n");
-  USB_COM_PORT.print("          s - stop motor\n");
-  USB_COM_PORT.print("          q - quit\n");
+    displayMenu();
 
   while(manual == true)
   {
@@ -1178,6 +1180,7 @@ void manualControl()
 
         case 'd':
           StopMov();
+          while (USB_COM_PORT.available() < 1);
           delaySetting = USB_COM_PORT.read();
           switch (delaySetting)
           {
@@ -1204,7 +1207,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(5, MOTOR_SPEED);
+            analogWrite(5, motorSpeed);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect, HIGH);
             USB_COM_PORT.print("l dir\n");
@@ -1217,7 +1220,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(5, MOTOR_SPEED);
+            analogWrite(MOTOR_CONTROL, motorSpeed);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect,LOW);
             USB_COM_PORT.print("k dir\n");
@@ -1230,7 +1233,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(5, MOTOR_SPEED);
+            analogWrite(MOTOR_CONTROL, motorSpeed);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, LOW);
             USB_COM_PORT.print("i dir\n");
@@ -1242,7 +1245,7 @@ void manualControl()
         case 'o':
           if(motor == false)
           {
-            analogWrite(5, MOTOR_SPEED);
+            analogWrite(MOTOR_CONTROL, motorSpeed);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, HIGH);
             USB_COM_PORT.print("o dir\n");
@@ -1256,6 +1259,10 @@ void manualControl()
           USB_COM_PORT.print("STOPPED\n");
           break;
 
+        case 'e':
+            displayMenu();
+            break;
+
         case 'q':
           manual = false;
           break;
@@ -1265,6 +1272,26 @@ void manualControl()
     byteIn = 'z';
   }
   USB_COM_PORT.print("\nManual Control mode exited");
+}
+
+
+/**************************************************************************************
+  displayMenu():
+ *************************************************************************************/
+void displayMenu()
+{
+    USB_COM_PORT.print("\nManual Control mode entered\n");
+    USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
+    USB_COM_PORT.print("          k/l - horizontal actuation\n");
+    USB_COM_PORT.print("          i/o - vertical actuation\n");
+    USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
+    USB_COM_PORT.print("          c - calibrate\n");
+    USB_COM_PORT.print("          p - print raw values of position sensors\n");
+    USB_COM_PORT.print("          r - save current vertical position as straight\n");
+    USB_COM_PORT.print("          v - straighten verticals\n");
+    USB_COM_PORT.print("          s - stop motor\n");
+    USB_COM_PORT.print("          e - menu");
+    USB_COM_PORT.print("          q - quit\n");
 }
 
 
