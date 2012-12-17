@@ -486,48 +486,30 @@ void ready()
 void propagate()
 {
   tailAngle[0] = horzAngleArray[4];
-  tailAngle[1] = vertAngleArray[4];
 
   for(int i=4;i>0;i--)
   {
     if(horzAngleArray[i] != horzAngleArray[i-1])
     {
       horzTimerArray[i] = millis();
-    }
-    horzAngleArray[i] = horzAngleArray[i-1];
-
-    if(vertAngleArray[i] != vertAngleArray[i-1])
-    {
       vertTimerArray[i] = millis();
     }
-    vertAngleArray[i] = vertAngleArray[i-1];
+    horzAngleArray[i] = horzAngleArray[i-1];
   }
 
   if(horzAngleArray[0] != headAngle[0])
   {
     horzTimerArray[0] = millis();
-  }
-  horzAngleArray[0] = headAngle[0];
-
-  if(vertAngleArray[0] != headAngle[1])
-  {
     vertTimerArray[0] = millis();
   }
-  vertAngleArray[0] = headAngle[1];
+  horzAngleArray[0] = headAngle[0];
 
   USB_COM_PORT.print('\n');
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT.print(horzAngleArray[i]);
   }
-  USB_COM_PORT.println(' horz\n');
-
-  for(int i=0;i<5;i++)
-  {
-    USB_COM_PORT.print(vertAngleArray[i]);
-  }
-  USB_COM_PORT.println(' vert');
-
+  USB_COM_PORT.println(" horz\n");
 }//end propagate()
 
 
@@ -537,16 +519,15 @@ void propagate()
 
 const int MAX_WAIT_TIME = 3000;  // Time to try moving actuator before giving up
 const int MAX_WAIT_TIME_VERT = 1000;
-const int DEAD_ZONE = 10;        // Safty range to not move 
+const int DEAD_ZONE = 10;        // Safety range to not move
 int count = 0;
 
 void move()
 {
-  //to see if any in segment moved
-  //so we can turn off motor when it's reached setpoint
-  boolean moved = false;
-
-  int goal;
+    //set if any segment moved, so we can turn off motor when setpoint reached
+    boolean moved = false;
+    int goal;
+    int currentAngle;
 
   for (int i=0; i < 5; i++)
   {
@@ -571,12 +552,12 @@ void move()
 
     PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
 
-    int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
+        currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
 
     if ((abs(currentAngle-goal)>DEAD_ZONE) &&
        (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
     {
-      analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
+        analogWrite(MOTOR_CONTROL, motorSpeed);
       PIDcontrollerHorizontal[i].updateOutput();
       moved = true;
     }
@@ -585,37 +566,30 @@ void move()
       analogWrite(HORZ_ACTUATOR[i],0);
     }
 
-    //vertical
-    if((millis()-vertTimerArray[i]) < MAX_WAIT_TIME)
-    {
-      analogWrite(MOTOR_CONTROL, MOTOR_SPEED);
-      if(vertAngleArray[i] == '0')
-      {
-        digitalWrite(VERT_ACTUATOR_CTRL[i],LOW);
-        analogWrite(VERT_ACTUATOR[i],255);
-        moved = true;
-      }
-      else if(vertAngleArray[i] == '1')
-      {
-        digitalWrite(VERT_ACTUATOR_CTRL[i],HIGH);
-        analogWrite(VERT_ACTUATOR[i],255);
-        moved = true;
-      }
-      else if(vertAngleArray[i] == '2')
-      {
-        //do nothing
-      }
+        //vertical
+        PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
+        currentAngle = analogRead(VERT_POS_SENSOR[i]);
+
+        if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
+            (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
+        {
+            analogWrite(MOTOR_CONTROL, motorSpeed);
+            PIDcontrollerVertical[i].updateOutput();
+            moved = true;
+            USB_COM_PORT.print("v");
+            USB_COM_PORT.println(i);
+        }
+        else
+        {
+            analogWrite(VERT_ACTUATOR[i], 0);
+        }
     }
-    else
-    {
-      analogWrite(VERT_ACTUATOR[i],0);
-    }
-  }
+
   if(moved == false)
   {
     analogWrite(MOTOR_CONTROL, 0);
   }
-}
+}// end move()
 
 
 /***********************************************************************************
