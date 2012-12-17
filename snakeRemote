@@ -1,0 +1,149 @@
+/*A_5SegmentDigitalTiming controllor
+ used at vancouver 125 celebrations
+ various messy improvs
+ 
+ Created  July 10, 2011 Julian Fong
+ 
+ modified Dec 11, 2012 Julian Fong
+ another imporv code get promoted to the ranks of full code
+ 
+ 
+ */
+import processing.serial.*;
+import controlP5.*;
+import java.lang.*;
+//requires adding of controlP5 to libary folder
+//go to sketch import ilibrary and install it
+//or for temperary fix, under "Sketch" on menu bar "Add File..." 
+
+// serial port
+Serial myPort;
+
+//name of the GUI object
+ControlP5 controlP5;
+
+//direction button
+RadioButton directionButton;
+
+//the sliders
+Slider throttle;
+
+//buffer to red and print serial messsages back
+String serialReadBuffer = "          ";
+
+//sent time for throttle
+float prevSentTime = 0;
+
+void setup() {
+  size(400, 400);
+  smooth();
+
+  controlP5 = new ControlP5(this);
+
+  // List all the available serial ports
+  println(Serial.list());
+
+  // I know that the first port in the serial list on my mac
+  // is always my  Arduino, so I open Serial.list()[0].
+  // Open whatever port is the one you're using.
+  myPort = new Serial(this, Serial.list()[0], 115200);
+
+  frameRate(30);
+
+  //add and set up the direction button
+  directionButton = controlP5.addRadioButton("radioButton", 150, 100);
+  directionButton.setItemsPerRow(2);
+  directionButton.setSpacingColumn(50);
+  directionButton.setSize(50, 50);
+  directionButton.addItem("LEFT", 0);
+  directionButton.addItem("RIGHT", 1);
+  directionButton.deactivateAll();
+  //directionButton.getCaptionLabel()
+
+  // create a throttle slider
+  throttle = controlP5.addSlider("Throttle")
+    .setPosition(50, 50)
+      .setSize(20, 200)
+        .setRange(100, 1000)
+          .setValue(300.0);
+  
+  //jaw opening and closing button
+  // change the trigger event, by default it is PRESSED.
+  controlP5.addBang("jawOpen")
+     .setPosition(40, 300)
+     .setSize(40, 40)
+     .setTriggerEvent(Bang.RELEASE)
+     .setCaptionLabel("Jaw Open");
+  
+  controlP5.addBang("jawClose")
+     .setPosition(100, 300)
+     .setSize(40, 40)
+     .setTriggerEvent(Bang.RELEASE)
+     .setCaptionLabel("Jaw Close");
+}
+
+void draw() {
+  background(190);
+  frameRate(30);
+
+  text("click the buttons \nor use the arrow keys", 160, 175);
+  
+  text(serialReadBuffer,300,400);
+
+  //send direction if the direction buttons are ON a.k.a not -1.0
+  if (directionButton.value() >= 0) {
+    if (directionButton.value() == 0) {
+      myPort.write("s0");
+      println("sent 's0'");
+    }
+    else if (directionButton.value() == 1) {
+      myPort.write("s1");
+      println("sent 's1'");
+    }
+    prevSentTime = millis();
+    directionButton.deactivateAll();
+  }
+}
+
+void keyPressed() {
+  if (keyCode == UP) {
+    directionButton.deactivateAll();
+    throttle.setValue(throttle.getValue()+10);
+  }
+  else if (keyCode == DOWN) {
+    directionButton.deactivateAll();
+    throttle.setValue(throttle.getValue()-10);
+  }
+  if((millis()-prevSentTime)>throttle.getValue()){
+    if (keyCode == LEFT) {
+      directionButton.activate(0);
+    }
+    else if (keyCode == RIGHT) {
+      directionButton.activate(1);
+    }
+  }
+}
+
+void keyReleased() {
+  if (keyCode == LEFT || keyCode == RIGHT) {
+      directionButton.deactivateAll();
+      myPort.write("k");
+      println("sent 'k'");
+    }
+}
+
+public void jawOpen() {
+  myPort.write("h0");
+  println("sent 'h0'");
+}
+
+
+public void jawClose() {
+  myPort.write("h1");
+  println("sent 'h1'");
+}
+
+void serialEvent(Serial myPort) {
+  char readByte = (char)myPort.read();
+  serialReadBuffer = serialReadBuffer.substring(1,9)+readByte;
+}
