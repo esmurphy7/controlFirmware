@@ -33,7 +33,9 @@
 #define HORIZONTAL_CALIBRATION_ADDRESS  2
 #define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
+
 #define CALIBRATE_MOTOR_SPEED  200
+#define JAW_MOTOR_SPEED        90
 
 const int VERT_DEAD_ZONE = 20;          // Vertical safety range
 
@@ -372,9 +374,9 @@ void loop()
         }
       }
 
-      analogWrite(MOTOR_CONTROL, motorSpeed);
-      delay(1000);
-      analogWrite(MOTOR_CONTROL,0);
+      analogWrite(MOTOR_CONTROL, JAW_MOTOR_SPEED);
+      delay(2500);
+      analogWrite(MOTOR_CONTROL, 0);
       break;
       
     case 'g':
@@ -1290,8 +1292,8 @@ void displayMenu()
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          v - straighten verticals\n");
     USB_COM_PORT.print("          s - stop motor\n");
-    USB_COM_PORT.print("          e - menu");
-    USB_COM_PORT.print("          q - quit\n");
+    USB_COM_PORT.print("          e - menu\n");
+    USB_COM_PORT.print("          q - quit\n\n");
 }
 
 

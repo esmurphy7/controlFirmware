@@ -71,7 +71,7 @@ void setup()
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-  USB_COM_PORT.print("Hi I'm the Titanoboa Head!");
+    USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
 
   // Initialize Actuator Controls Off
  #ifdef HEADBOARD1
@@ -144,12 +144,24 @@ void loop()
     USB_COM_PORT.print("received message from xbee: ");
     USB_COM_PORT.println(message);
 
+        // Kill command
+        if (message == 'k')
+        {
+            analogWrite(JAW_OPEN, 0);
+            analogWrite(JAW_CLOSE, 0);
+            analogWrite(HEAD_RAISE, 0);
+            analogWrite(HEAD_LOWER, 0);
+            analogWrite(AUX_EXTEND, 0);
+            analogWrite(AUX_RETRACT, 0);
+        }
+
     // Check for new setpoints command.
     if (message == 's')
     {
       processSetpointsMessage();
       return;
     }
+
     // Check for head/jaw movements command.
     if(message == 'h')
     {
@@ -215,25 +227,46 @@ void processHeadJawMessage()
   {
     delay(1);
   }
-  TAIL_SERIAL.write('h');
+    TAIL_SERIAL.write("hx");  //x is a dummy character because the headboard is expecting 2 characters
   
-  message = INPUT_SERIAL.read();
-  USB_COM_PORT.print("received message from xbee: ");
-  USB_COM_PORT.println(message);
+    message = INPUT_SERIAL.read();
+    USB_COM_PORT.print("received jaw message: ");
+    USB_COM_PORT.println(message);
   
   if(message == '0')
   {
-    actuator = JAW_OPEN;
-	#ifdef HEADBOARD2
+      actuator = -1;
+#ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-	#endif
+#endif
+        for(int i=100; i<=255; i++)
+        {
+            analogWrite(JAW_OPEN, i);
+            delay(10);
+        }
+        for(int i=255; i>=50; i--)
+        {
+            analogWrite(JAW_OPEN, i);
+            delay(6);
+        }
+        analogWrite(JAW_OPEN, 0);
   }
   else if(message == '1')
   {
-    actuator = JAW_CLOSE;
-	#ifdef HEADBOARD2
+        actuator = -1;
+#ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
-	#endif
+#endif
+        for(int i=0; i<=255; i++)
+        {
+            analogWrite(JAW_CLOSE, i);
+            delay(3);
+        }
+        for(int i=255; i>=0; i--)
+        {
+            analogWrite(JAW_CLOSE, i);
+            delay(4);
+        }
   }
   else if(message == '2')
   {
@@ -254,7 +287,6 @@ void processHeadJawMessage()
   {
     actuator = AUX_EXTEND;
     digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
-
   }
     else if(message == '5')
   {
@@ -525,8 +557,8 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - actuation\n");
     USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          s - stop motor\n");
-    USB_COM_PORT.print("          e - menu");
-    USB_COM_PORT.print("          q - quit\n");
+    USB_COM_PORT.print("          e - menu\n");
+    USB_COM_PORT.print("          q - quit\n\n");
 }
 
 

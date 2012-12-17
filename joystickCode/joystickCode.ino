@@ -80,17 +80,19 @@ void loop()
         USB_COM_PORT.println(motorSpeed);
     }
 
-    //signal to open jaw
-    if(digitalRead(JAW_OPEN)==true)
-    {
-      XBEE_SERIAL.write("h0");
-      waitTill = millis() + 1000;
-    }
-    else if(digitalRead(JAW_CLOSE)==true)
-    {
-      XBEE_SERIAL.write("h1");
-      waitTill = millis() + 1000;
-    }
+        //signal to open/close jaw
+        if (digitalRead(JAW_OPEN) == true)
+        {
+            USB_COM_PORT.println("opening jaw");
+            XBEE_SERIAL.write("h0");
+            waitTill = millis() + 1000;
+        }
+        else if (digitalRead(JAW_CLOSE) == true)
+        {
+            USB_COM_PORT.println("closing jaw");
+            XBEE_SERIAL.write("h1");
+            waitTill = millis() + 1000;
+        }
 
     if (digitalRead(VERTICAL_STRAIGHTEN) == HIGH)
     {
