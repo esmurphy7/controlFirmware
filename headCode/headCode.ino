@@ -221,7 +221,7 @@ void processSetpointsMessage()
 void processHeadJawMessage()
 {
   int actuator;
-  char message;  
+  char headjawmessage;  
   
   while(INPUT_SERIAL.available() < 1)
   {
@@ -229,16 +229,18 @@ void processHeadJawMessage()
   }
     TAIL_SERIAL.write("hx");  //x is a dummy character because the headboard is expecting 2 characters
   
-    message = INPUT_SERIAL.read();
+    headjawmessage = INPUT_SERIAL.read();
     USB_COM_PORT.print("received jaw message: ");
-    USB_COM_PORT.println(message);
+    USB_COM_PORT.println(headjawmessage);
   
-  if(message == '0')
+  if(headjawmessage == '0')
   {
-      actuator = -1;
+      //actuator = -1;
+	  actuator = JAW_OPEN;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
 #endif
+		/*
         for(int i=100; i<=255; i++)
         {
             analogWrite(JAW_OPEN, i);
@@ -250,13 +252,16 @@ void processHeadJawMessage()
             delay(6);
         }
         analogWrite(JAW_OPEN, 0);
+		*/
   }
-  else if(message == '1')
+  else if(headjawmessage == '1')
   {
-        actuator = -1;
+        //actuator = -1;
+		actuator = JAW_CLOSE;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
 #endif
+		/*
         for(int i=0; i<=255; i++)
         {
             analogWrite(JAW_CLOSE, i);
@@ -267,15 +272,16 @@ void processHeadJawMessage()
             analogWrite(JAW_CLOSE, i);
             delay(4);
         }
+		*/
   }
-  else if(message == '2')
+  else if(headjawmessage == '2')
   {
     actuator = HEAD_RAISE;
 	#ifdef HEADBOARD2
 		digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
 	#endif
   }
-  else if(message == '3')
+  else if(headjawmessage == '3')
   {
     actuator = HEAD_LOWER;
 	#ifdef HEADBOARD2
@@ -283,12 +289,12 @@ void processHeadJawMessage()
 	#endif
   }
 #ifdef HEADBOARD2
-  else if(message == '4')
+  else if(headjawmessage == '4')
   {
     actuator = AUX_EXTEND;
     digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
   }
-    else if(message == '5')
+    else if(headjawmessage == '5')
   {
     actuator = AUX_RETRACT;
     digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
@@ -299,20 +305,21 @@ void processHeadJawMessage()
     actuator = -1;
   }
   
-  if(actuator != -1)
+  if(actuator != -1) //If we've not attempted to select an invalid actuator...
   {
-    for(int i=0; i<=255; i++)
+    for(int i=0; i<=255; i++) //Open the valve bit by bit by ramping PWM out up
+    {
+      analogWrite(actuator, i);
+      delay(4); //TODO: This delay of 4ms may have to be tweaked
+    }
+    for(int i=255; i>=0; i--) //Close the valve by ramping pwm down
     {
       analogWrite(actuator, i);
       delay(4);
     }
-    for(int i=255; i>=0; i--)
-    {
-      analogWrite(actuator, i);
-      delay(4);
-    }
+	actuator = -1; //Resets actuator variable 
   }
-  INPUT_SERIAL.flush();
+  INPUT_SERIAL.flush(); //This may not be the smartest action we can take
   return; 
 }
 
