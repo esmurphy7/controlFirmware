@@ -239,7 +239,6 @@ void processHeadJawMessage()
   if(headjawmessage == '0')
   {
       actuator = -1;
-	  //actuator = JAW_OPEN;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
 #endif
@@ -260,7 +259,6 @@ void processHeadJawMessage()
   else if(headjawmessage == '1')
   {
         actuator = -1;
-		//actuator = JAW_CLOSE;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
 #endif
