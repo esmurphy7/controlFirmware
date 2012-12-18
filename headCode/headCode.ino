@@ -235,12 +235,12 @@ void processHeadJawMessage()
   
   if(headjawmessage == '0')
   {
-      //actuator = -1;
-	  actuator = JAW_OPEN;
+      actuator = -1;
+	  //actuator = JAW_OPEN;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
 #endif
-		/*
+		
         for(int i=100; i<=255; i++)
         {
             analogWrite(JAW_OPEN, i);
@@ -252,16 +252,16 @@ void processHeadJawMessage()
             delay(6);
         }
         analogWrite(JAW_OPEN, 0);
-		*/
+		
   }
   else if(headjawmessage == '1')
   {
-        //actuator = -1;
-		actuator = JAW_CLOSE;
+        actuator = -1;
+		//actuator = JAW_CLOSE;
 #ifdef HEADBOARD2
 		digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
 #endif
-		/*
+
         for(int i=0; i<=255; i++)
         {
             analogWrite(JAW_CLOSE, i);
@@ -272,7 +272,7 @@ void processHeadJawMessage()
             analogWrite(JAW_CLOSE, i);
             delay(4);
         }
-		*/
+
   }
   else if(headjawmessage == '2')
   {
@@ -317,7 +317,7 @@ void processHeadJawMessage()
       analogWrite(actuator, i);
       delay(4);
     }
-	actuator = -1; //Resets actuator variable 
+	//actuator = -1; //Resets actuator variable 
   }
   INPUT_SERIAL.flush(); //This may not be the smartest action we can take
   return; 
