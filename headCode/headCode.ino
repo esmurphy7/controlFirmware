@@ -142,7 +142,10 @@ void loop()
   {
     message = INPUT_SERIAL.read();
     USB_COM_PORT.print("received message from xbee: ");
-    USB_COM_PORT.println(message);
+    USB_COM_PORT.print(message);
+    USB_COM_PORT.print(" [");
+    USB_COM_PORT.print(message, DEC);
+    USB_COM_PORT.print("]\n");
 
         // Kill command
         if (message == 'k')
@@ -260,7 +263,7 @@ void processHeadJawMessage()
         for(int i=0; i<=255; i++)
         {
             analogWrite(JAW_CLOSE, i);
-            delay(3);
+            delay(4);
         }
         for(int i=255; i>=0; i--)
         {

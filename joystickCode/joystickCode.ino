@@ -27,9 +27,9 @@
 // Knobs
 #define THROTTLE_PIN     1
 #define MOTOR_SPEED_PIN  3
-#define RSVD_1_PIN       0
+#define RSVD_0_PIN       0
 #define RSVD_2_PIN       2
-#define RSVD_3_PIN       4
+#define RSVD_4_PIN       4
 
 
 // Global variables
@@ -37,6 +37,7 @@ boolean joystickButtonWasPressed = false;
 boolean angleSent = false;
 
 int motorSpeed = 200;
+byte verticalOnTheFly = true;
 
 unsigned long waitTill = 0; // What does this do? Please comment.
 
@@ -79,6 +80,21 @@ void loop()
         USB_COM_PORT.print(", new value: ");
         USB_COM_PORT.println(motorSpeed);
     }
+
+        // check for vertical straightening on the fly disable/enable
+        buttonVal = analogRead(RSVD_0_PIN);
+        if ((buttonVal < 475) && (verticalOnTheFly == true))
+        {
+            USB_COM_PORT.println("turning off vertical straightening while slithering");
+            verticalOnTheFly = false;
+            XBEE_SERIAL.write("f0");
+        }
+        else if ((buttonVal > 525) && (verticalOnTheFly == false))
+        {
+            USB_COM_PORT.println("turning on vertical straightening while slithering");
+            verticalOnTheFly = true;
+            XBEE_SERIAL.write("f1");
+        }
 
         //signal to open/close jaw
         if (digitalRead(JAW_OPEN) == true)
@@ -389,7 +405,7 @@ void manualControl()
 
         byteIn = 'z';
     }
-    USB_COM_PORT.print("\nManual Control mode exited");
+    USB_COM_PORT.println("\nManual Control mode exited");
 }// end manualcontrol
 
 
@@ -432,8 +448,8 @@ void readAllButtons()
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of reserved 1 knob
-    buttonVal = analogRead(RSVD_1_PIN);
-    USB_COM_PORT.print("Reserved 1: ");
+    buttonVal = analogRead(RSVD_0_PIN);
+    USB_COM_PORT.print("Reserved 0: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of reserved 2 knob
@@ -442,8 +458,8 @@ void readAllButtons()
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of reserved 3 knob
-    buttonVal = analogRead(RSVD_3_PIN);
-    USB_COM_PORT.print("Reserved 3: ");
+    buttonVal = analogRead(RSVD_4_PIN);
+    USB_COM_PORT.print("Reserved 4: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of jaw switch

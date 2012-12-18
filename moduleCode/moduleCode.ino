@@ -34,7 +34,7 @@
 #define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
 
-#define CALIBRATE_MOTOR_SPEED  200
+#define CALIBRATE_MOTOR_SPEED  150
 #define JAW_MOTOR_SPEED        90
 
 const int VERT_DEAD_ZONE = 20;          // Vertical safety range
@@ -71,6 +71,7 @@ byte myModuleNumber;                    // My position in the module chain (1,2,
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
 byte killSwitch = true;                 // True if no movement should be done.
 int motorSpeed = 200;                   // Analog output for pump speed when turned on
+byte verticalOnTheFly = true;           // Enable/disable vertical straightening on the fly
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -278,12 +279,13 @@ void loop()
   // check for messages from upstream port
   if (HEAD_SERIAL.available() > 0)
   {
-    //letters in use: m, s, L, v, c, h, g, l, M, k
+      byte nextMessage;
+
+    //letters in use: m, f, s, L, v, c, h, g, l, M, k
     switch (HEAD_SERIAL.read())
     {
     //update motor speed
     case 'm':
-        USB_COM_PORT.print("new motor speed received: ");
         while (HEAD_SERIAL.available() < 1);
         motorSpeed = HEAD_SERIAL.read();
         TAIL_SERIAL.write('m');
@@ -291,6 +293,24 @@ void loop()
         USB_COM_PORT.print("new motor speed received: ");
         USB_COM_PORT.println(motorSpeed);
         break;
+
+        //enable/disable vertical straightening while slithering
+        case 'f':
+            while (HEAD_SERIAL.available() < 1);
+            nextMessage = HEAD_SERIAL.read();
+            if (nextMessage == '0')
+            {
+                USB_COM_PORT.println("turning off vertical straightening while slithering");
+                verticalOnTheFly = false;
+                TAIL_SERIAL.write("f0");
+            }
+            else if (nextMessage == '1')
+            {
+                USB_COM_PORT.println("turning on vertical straightening while slithering");
+                verticalOnTheFly = true;
+                TAIL_SERIAL.write("f1");
+            }
+            break;
 
     case 's':
       //setpionts to come
@@ -492,17 +512,17 @@ void propagate()
     if(horzAngleArray[i] != horzAngleArray[i-1])
     {
       horzTimerArray[i] = millis();
-      vertTimerArray[i] = millis();
     }
-    horzAngleArray[i] = horzAngleArray[i-1];
+      horzAngleArray[i] = horzAngleArray[i-1];
+      vertTimerArray[i] = millis();
   }
 
   if(horzAngleArray[0] != headAngle[0])
   {
     horzTimerArray[0] = millis();
-    vertTimerArray[0] = millis();
   }
-  horzAngleArray[0] = headAngle[0];
+    horzAngleArray[0] = headAngle[0];
+    vertTimerArray[0] = millis();
 
   USB_COM_PORT.print('\n');
   for(int i=0;i<5;i++)
@@ -566,22 +586,25 @@ void move()
       analogWrite(HORZ_ACTUATOR[i],0);
     }
 
-        //vertical
-        PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
-        currentAngle = analogRead(VERT_POS_SENSOR[i]);
+        if (verticalOnTheFly == true)
+        {
+            //vertical
+            PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
+            currentAngle = analogRead(VERT_POS_SENSOR[i]);
 
-        if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
-            (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
-        {
-            analogWrite(MOTOR_CONTROL, motorSpeed);
-            PIDcontrollerVertical[i].updateOutput();
-            moved = true;
-            USB_COM_PORT.print("v");
-            USB_COM_PORT.println(i);
-        }
-        else
-        {
-            analogWrite(VERT_ACTUATOR[i], 0);
+            if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
+                (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
+            {
+                analogWrite(MOTOR_CONTROL, motorSpeed);
+                PIDcontrollerVertical[i].updateOutput();
+                moved = true;
+                USB_COM_PORT.print("v");
+                USB_COM_PORT.println(i);
+            }
+            else
+            {
+                analogWrite(VERT_ACTUATOR[i], 0);
+            }
         }
     }
 
@@ -1247,7 +1270,7 @@ void manualControl()
 
     byteIn = 'z';
   }
-  USB_COM_PORT.print("\nManual Control mode exited");
+  USB_COM_PORT.println("\nManual Control mode exited");
 }
 
 
