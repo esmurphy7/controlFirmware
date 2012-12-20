@@ -258,21 +258,12 @@ void loop()
 
   char message;
 
-  // check for command from USB serial to enter manual control
-  // NOTE: this is a quick hack for NightQuest so that we can adjust actuators quickly if they get out of wack
-  //       this only puts one module in manual control, never operate titanoboa like this!!!
-  //       in future manual control mode should be selected from the joystick and all modules enter manual control
-  //       mode and return to normal operation together
+  // Check the USB port for command to enter manual mode
   if (USB_COM_PORT.available()>0)
   {
-    USB_COM_PORT.print("checking for command on USB\n");
     if (USB_COM_PORT.read() == 'M')
     {
-      //confirm this wasn't random noise
-      if (USB_COM_PORT.read() == 'M')
-      {
-        manualControl();
-      }
+      manualControl();
     }
   }
 
