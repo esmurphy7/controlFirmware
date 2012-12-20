@@ -351,16 +351,7 @@ void loop()
       break;
      
     case 'c':
-      //calibration
-      USB_COM_PORT.println("Calibrate command received");
-      while (HEAD_SERIAL.available() < 1);
-      myModuleNumber = HEAD_SERIAL.read();
-
-      // Tell next module to also calibrate
-      TAIL_SERIAL.write('c');
-      TAIL_SERIAL.write(myModuleNumber + 1);
-
-      calibrate();
+      processCalibrateCommand();
       break;
       
     case 'h':
@@ -603,10 +594,19 @@ void move()
 
 
 /***********************************************************************************
-  calibrate(): run horizontal and vertical calibration
+  processCalibrateCommand(): run horizontal and vertical calibration
  ***********************************************************************************/
-void calibrate()
+void processCalibrateCommand()
 {
+    // Determine my modules number
+    USB_COM_PORT.println("Calibrate command received");
+    while (HEAD_SERIAL.available() < 1);
+    myModuleNumber = HEAD_SERIAL.read();
+
+    // Tell next module to also calibrate
+    TAIL_SERIAL.write('c');
+    TAIL_SERIAL.write(myModuleNumber + 1);
+
     //calibrate horizontal position and reset everything
     calibrateHorizontal();
     HEAD_SERIAL.flush();
@@ -621,7 +621,7 @@ void calibrate()
 
     delay(100);
 
-} //end calibrate()
+} //end processCalibrateCommand()
 
 
 /**************************************************************************************
