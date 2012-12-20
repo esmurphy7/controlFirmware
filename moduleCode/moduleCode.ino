@@ -268,7 +268,7 @@ void loop()
     switch (command)
     {
       case 's':
-        processNewSettingsCommand();
+        processNewSettingsAndSetpoints();
         break;
       
       case 'c':
@@ -302,18 +302,18 @@ void loop()
 }//end loop()
 
 /************************************************************************************
-  processNewSettingsCommand(): Recieves new settings and setpoints from the head
+  processNewSettingsAndSetpoints(): Recieves new settings and setpoints from the head
  ***********************************************************************************/
 
-void processNewSettingsCommand()
+void processNewSettingsAndSetpoints()
 {
-  // Get settings from upstream. Store in an array.
+  // Get data array from upstream. Store in an array.
   for (int i = 0; i < 125; ++i)
   {
     settingsPacket[i] = HEAD_SERIAL.read();
   }
   
-  // Send settings downstream.
+  // Send data array downstream.
   TAIL_SERIAL.write('s');
   for (int i = 0; i < 125; ++i)
   {
