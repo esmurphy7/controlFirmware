@@ -261,24 +261,30 @@ void loop()
   if (HEAD_SERIAL.available() > 0)
   {
     //letters in use: c, h, g, l, k
-    switch (HEAD_SERIAL.read())
+    char command = HEAD_SERIAL.read();
+    switch (command)
     {
-
-    case 'c':
-      processCalibrateCommand();
-      break;
+      case 'c':
+        processCalibrateCommand();
+        break;
       
-    case 'h':
-      processLongMotorPulseCommand();
-      break;
-      
-    case 'g':
-      processShortMotorPulseCommand();
-      break;
+      case 'h':
+        processLongMotorPulseCommand();
+        break;
+        
+      case 'g':
+        processShortMotorPulseCommand();
+        break;
 
-    case 'k':
-      processKillSwitchCommand();
-      break;
+      case 'k':
+        processKillSwitchCommand();
+        break;
+        
+      default:
+        USB_COM_PORT.print("Invalid command from upstream serial = ");
+        USB_COM_PORT.println(command);
+        HEAD_SERIAL.flush();
+        
     }
   }
 
@@ -1181,6 +1187,7 @@ void StopMov()
 
   return;
 }
+
 
 
 
