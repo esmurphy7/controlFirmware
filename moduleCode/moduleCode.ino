@@ -364,48 +364,11 @@ void loop()
       break;
       
     case 'h':
-      //for moving head, turns on and off motor
-      while(HEAD_SERIAL.available()<1)
-      {
-        delay(1);
-      }
-
-      message = HEAD_SERIAL.read();
-      if(message == '5')
-      {
-        digitalWrite(HORZ_ACTUATOR_CTRL[0],LOW);
-      }
-      else if(message == '6')
-      {
-        digitalWrite(HORZ_ACTUATOR_CTRL[0],HIGH);
-      }
-      
-      if(message == '5' || message == '6')
-      {
-        for(int i=0;i<=255;i++)
-        {
-          analogWrite(HORZ_ACTUATOR[0],i);
-          delay(2);
-        }
-        for(int i=255;i>=0;i--)
-        {
-          analogWrite(HORZ_ACTUATOR[0],i);
-          delay(2);
-        }
-      }
-
-      analogWrite(MOTOR_CONTROL, JAW_MOTOR_SPEED);
-      delay(2500);
-      analogWrite(MOTOR_CONTROL, 0);
+      processLongMotorPulseCommand();
       break;
       
     case 'g':
-      //manual control of head actuators, need to turn motor on and off
-      USB_COM_PORT.print("turning motor on\n");
-      analogWrite(MOTOR_CONTROL, motorSpeed);
-      delay(200);  //for now just run for 200ms
-      analogWrite(MOTOR_CONTROL, 0);
-      USB_COM_PORT.print("turning motor off\n");
+      processShortMotorPulseCommand();
       break;
 
     case 'l':
@@ -420,17 +383,7 @@ void loop()
       break;
       
     case 'k':
-      // Kill Switch
-      killSwitch = true;
-      for(int i=0; i < 5; i++)
-      {
-        analogWrite(VERT_ACTUATOR[i], 0);
-        analogWrite(HORZ_ACTUATOR[i], 0);
-      }
-
-      //ensure the motor is turned off and pass the message down
-      analogWrite(MOTOR_CONTROL, 0);
-      TAIL_SERIAL.write('k');
+      processKillSwitchCommand();
       break;
     }
 
@@ -472,6 +425,66 @@ void loop()
   TAIL_SERIAL.write(tailAngle[0]);
 
 }//end loop()
+
+
+/************************************************************************************
+  processKillSwitchCommand(): Turns off the motor and all actuators
+ ***********************************************************************************/
+
+void processKillSwitchCommand()
+{ 
+  killSwitch = true;
+  for(int i=0; i < 5; i++)
+  {
+    analogWrite(VERT_ACTUATOR[i], 0);
+    analogWrite(HORZ_ACTUATOR[i], 0);
+  }
+  analogWrite(MOTOR_CONTROL, 0);
+  TAIL_SERIAL.write('k');
+}
+
+/************************************************************************************
+  processLongMotorPulseCommand(): Pulses the first module motor on and off. Used for 
+                                  jaw actuation.
+ ***********************************************************************************/
+
+void processLongMotorPulseCommand()
+{ 
+  while(HEAD_SERIAL.available()<1)
+  {
+    delay(1);
+  }
+
+  byte message = HEAD_SERIAL.read();
+
+  // This command is only for the first module
+  if (myModuleNumber != 1)
+    return;
+    
+  USB_COM_PORT.print("Turning motor on for 2500ms\n");
+  analogWrite(MOTOR_CONTROL, JAW_MOTOR_SPEED);
+  delay(2500);
+  analogWrite(MOTOR_CONTROL, 0);
+  USB_COM_PORT.print("Turning motor off\n");  
+}
+
+/************************************************************************************
+  processShortMotorPulseCommand(): Turns the first module motor on and off. Used for 
+                                   controlling the jaw in manual mode.
+ ***********************************************************************************/
+ 
+void processShortMotorPulseCommand()
+{ 
+  // This command is only for the first module
+  if (myModuleNumber != 1)
+    return;
+    
+  USB_COM_PORT.print("Turning motor on for 200ms\n");
+  analogWrite(MOTOR_CONTROL, motorSpeed);
+  delay(200);
+  analogWrite(MOTOR_CONTROL, 0);
+  USB_COM_PORT.print("Turning motor off\n");  
+}
 
 
 /************************************************************************************
