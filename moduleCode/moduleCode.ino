@@ -339,7 +339,7 @@ void processKillSwitchCommand()
 
 /************************************************************************************
   processLongMotorPulseCommand(): Pulses the first module motor on and off. Used for 
-                                  jaw actuation.
+                                  jaw and head lift actuation.
  ***********************************************************************************/
 
 void processLongMotorPulseCommand()
@@ -357,7 +357,7 @@ void processLongMotorPulseCommand()
 
 /************************************************************************************
   processShortMotorPulseCommand(): Turns the first module motor on and off. Used for 
-                                   controlling the jaw in manual mode.
+                                   controlling the jaw and head lift in manual mode.
  ***********************************************************************************/
  
 void processShortMotorPulseCommand()
