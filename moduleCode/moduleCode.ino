@@ -398,7 +398,33 @@ void loop()
 
 }//end loop()
 
+/************************************************************************************
+  processNewSettingsCommand(): Recieves new settings and setpoints from the head
+ ***********************************************************************************/
 
+void processNewSettingsCommand()
+{
+ 
+}
+ 
+ /************************************************************************************
+  processRunPIDCommand(): Runs the PID loop on each actuator
+ ***********************************************************************************/
+ 
+void processRunPIDCommand()
+{
+ 
+}
+ 
+ /************************************************************************************
+  processDiagnosticsCommand(): Responds to the head's request to get diagnsotic info.
+ ***********************************************************************************/
+
+void processDiagnosticsCommand()
+{
+ 
+}
+ 
 /************************************************************************************
   processKillSwitchCommand(): Turns off the motor and all actuators
  ***********************************************************************************/
