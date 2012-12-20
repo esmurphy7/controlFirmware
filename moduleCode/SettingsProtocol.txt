@@ -1,0 +1,31 @@
+
+
+Byte0 - Number of Modules [8-bit]
+Byte1 - Module 1, Veritbrae 1, Horizontal Setpoint [8-bit]
+.
+. 6 Modules, 5 Vertibrae each
+.
+Byte30 - Module 6, Vertibrae 5, Horizontal Setpoint [8-bit]
+Byte31 - Module 1, Vertibrae 1, Vertical Setpoint [8-bit]
+.
+. 6 Modules, 5 Vertibrae each
+.
+Byte60 - Module 6, Vertibrae 5, Vertical Setpoint [8-bit]
+Byte61 - Module 1 Lights [8-bit]
+.
+. 6 Modules
+.
+Byte66 - Module 5 Lights [8-bit]
+Byte67 - Spare
+Byte68 - Spare
+Byte69 - Spare
+Byte70 - Slithering Motor Speed  [10-bit] (MSB)
+Byte71 - Slithering Motor Speed  [10-bit]
+
+..
+..
+..
+..
+..
+
+Byte125 - Checksum

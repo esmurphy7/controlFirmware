@@ -66,7 +66,10 @@ int lowRange[] = {0, 0, 0, 0, 0};
 // Assume a linear sensor characteristic between these two points.
 int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
 int vertLowRange[]  = {0, 0, 0, 0, 0};
-                                        
+              
+// Settings
+byte settingsPacket[125];
+      
 byte myModuleNumber;                    // My position in the module chain (1,2,3...)
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
 byte killSwitch = true;                 // True if no movement should be done.
@@ -264,6 +267,10 @@ void loop()
     char command = HEAD_SERIAL.read();
     switch (command)
     {
+      case 's':
+        processNewSettingsCommand();
+        break;
+      
       case 'c':
         processCalibrateCommand();
         break;
@@ -300,7 +307,18 @@ void loop()
 
 void processNewSettingsCommand()
 {
- 
+  // Get settings from upstream. Store in an array.
+  for (int i = 0; i < 125; ++i)
+  {
+    settingsPacket[i] = HEAD_SERIAL.read();
+  }
+  
+  // Send settings downstream.
+  TAIL_SERIAL.write('s');
+  for (int i = 0; i < 125; ++i)
+  {
+    TAIL_SERIAL.write(settingsPacket[i]);
+  }  
 }
  
  /************************************************************************************
