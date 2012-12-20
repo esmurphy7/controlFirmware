@@ -287,10 +287,9 @@ void loop()
         
     }
   }
-
-  if(TAIL_SERIAL.available()>0)
+  while (TAIL_SERIAL.available() > 0)
   {
-    TAIL_SERIAL.flush();
+    HEAD_SERIAL.write(TAIL_SERIAL.read());
   }
 
 }//end loop()
@@ -1187,6 +1186,7 @@ void StopMov()
 
   return;
 }
+
 
 
 
