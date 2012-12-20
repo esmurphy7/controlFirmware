@@ -1106,7 +1106,7 @@ void manualControl()
       {
         case 'c':
           USB_COM_PORT.print("\nRunning calibration...\n");
-          calibrate();
+          calibrateHorizontal();
           break;
         case 'p':
           readSensors();
@@ -1269,7 +1269,7 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - horizontal actuation\n");
     USB_COM_PORT.print("          i/o - vertical actuation\n");
     USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
-    USB_COM_PORT.print("          c - calibrate\n");
+    USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          p - print raw values of position sensors\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          v - straighten verticals\n");
