@@ -573,7 +573,7 @@ void calibrateHorizontal()
     EEPROM.write(i*5+6,PIDcontrollerHorizontal[i].getEven());
   }
 
-  straighten();
+  straightenHorizontal();
    
   // Print out calibration
   USB_COM_PORT.println("");
@@ -779,9 +779,9 @@ void calibrateVertical()
 
 
 /**************************************************************************************
-  straighten(): Makes Titanaboa straight as an arrow.
+  straightenHorizontal(): Makes Titanaboa straight as an arrow.
  *************************************************************************************/
-void straighten()
+void straightenHorizontal()
 {
   // Move till horzAngleArray is matched
   boolean inPosition = false;
@@ -819,7 +819,7 @@ void straighten()
     analogWrite(HORZ_ACTUATOR[i],0);
     horzAngleArray[i] = '2';
   }
-} //end straighten()
+} //end straightenHorizontal()
 
 
 /**************************************************************************************
