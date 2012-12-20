@@ -412,7 +412,6 @@ void loop()
       // straighten verticals
       straightenVertical();
       TAIL_SERIAL.print("l");
-      ready();
       break;
       
     case 'M':
@@ -441,18 +440,6 @@ void loop()
 
   if(TAIL_SERIAL.available()>0)
   {
-    switch(TAIL_SERIAL.read())
-    {
-    case 'r':
-      while(TAIL_SERIAL.available()<1)
-      {
-        delay(1);
-      }
-      HEAD_SERIAL.write('r');
-      HEAD_SERIAL.write(TAIL_SERIAL.read());
-
-      break;
-    }
     TAIL_SERIAL.flush();
   }
 
@@ -484,20 +471,7 @@ void loop()
   //send the next angle down
   TAIL_SERIAL.write(tailAngle[0]);
 
-  //ready to go one
-  ready();
-
 }//end loop()
-
-
-/***********************************************************************************
-  ready(): TODO: Why do we need this?
- ***********************************************************************************/
-void ready()
-{
-  HEAD_SERIAL.write('r');
-  HEAD_SERIAL.write(myModuleNumber);
-}
 
 
 /************************************************************************************
@@ -626,7 +600,6 @@ void calibrate()
     TAIL_SERIAL.flush();
 
     delay(100);
-    ready();
     
     //calibrate vertical position and reset everything
     //calibrateVertical();
@@ -634,8 +607,7 @@ void calibrate()
     TAIL_SERIAL.flush();
 
     delay(100);
-    ready();
-      
+
 } //end calibrate()
 
 
