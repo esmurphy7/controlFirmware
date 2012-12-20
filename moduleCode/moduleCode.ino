@@ -243,21 +243,11 @@ void setup()
 
 
 /***********************************************************************************
-  loop(): Checks for serial messages and runs the PID controllers in an endless loop.
+  loop(): Checks and executes commands from the Head or USB Port.
  ***********************************************************************************/
- 
-char headAngle[] = {                    // Angles recieved from the upsteam module
-  '3','3'  };                           // module are temporarily stored here. 
-char tailAngle[] = {                    // ? TODO:not sure why we need angles from the 
-  '3','3'  };                           // downstream module
  
 void loop()
 {
-  headAngle[0] = '3';
-  headAngle[1] = '3';
-
-  char message;
-
   // Check the USB port for command to enter manual mode
   if (USB_COM_PORT.available()>0)
   {
@@ -267,75 +257,13 @@ void loop()
     }
   }
 
-  // check for messages from upstream port
+  // Check upstead Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
-      byte nextMessage;
-
-    //letters in use: m, f, s, L, c, h, g, l, k
+    //letters in use: c, h, g, l, k
     switch (HEAD_SERIAL.read())
     {
-    //update motor speed
-    case 'm':
-        while (HEAD_SERIAL.available() < 1);
-        motorSpeed = HEAD_SERIAL.read();
-        TAIL_SERIAL.write('m');
-        TAIL_SERIAL.write((char)motorSpeed);
-        USB_COM_PORT.print("new motor speed received: ");
-        USB_COM_PORT.println(motorSpeed);
-        break;
 
-        //enable/disable vertical straightening while slithering
-        case 'f':
-            while (HEAD_SERIAL.available() < 1);
-            nextMessage = HEAD_SERIAL.read();
-            if (nextMessage == '0')
-            {
-                USB_COM_PORT.println("turning off vertical straightening while slithering");
-                verticalOnTheFly = false;
-                TAIL_SERIAL.write("f0");
-            }
-            else if (nextMessage == '1')
-            {
-                USB_COM_PORT.println("turning on vertical straightening while slithering");
-                verticalOnTheFly = true;
-                TAIL_SERIAL.write("f1");
-            }
-            break;
-
-    case 's':
-      //setpionts to come
-      headAngle[0] = HEAD_SERIAL.read();  //get horizontal setpoint angle
-      
-      // If we recieve new setpoints, disable kill switch
-      killSwitch = false;
-      break;
-    
-    case 'L':
-      //Light Propagation
-      USB_COM_PORT.println("L");
-      while(HEAD_SERIAL.available() < 1);
-      message = HEAD_SERIAL.read();
-      if(message == 'm'){
-        //change mode
-        while(HEAD_SERIAL.available() < 1);
-        message = HEAD_SERIAL.read();
-        myLights.changeMode(message-'0');
-        TAIL_SERIAL.print("Lm");
-        TAIL_SERIAL.print(message);
-      }
-      else{
-        if(message == '1'){
-          message = myLights.push(true);
-        }
-        else{
-          message = myLights.push(false);
-        }
-        TAIL_SERIAL.write('L');
-        TAIL_SERIAL.write(message ? '1':'0');
-      }
-      break;
-     
     case 'c':
       processCalibrateCommand();
       break;
@@ -348,53 +276,16 @@ void loop()
       processShortMotorPulseCommand();
       break;
 
-    case 'l':
-      // straighten verticals
-      straightenVertical();
-      TAIL_SERIAL.print("l");
-      break;
-      
     case 'k':
       processKillSwitchCommand();
       break;
     }
-
-    //flush everything and get ready for next loop
-    HEAD_SERIAL.flush();
   }
 
   if(TAIL_SERIAL.available()>0)
   {
     TAIL_SERIAL.flush();
   }
-
-
-  // Move the snake into position, if the kill switch it disabled
-  if(!killSwitch)
-  {
-    move();
-  }
-
-  //update lights
-  myLights.update();
-
-  //head angles not '0', '1' or '2' are not recognized
-  if(headAngle[0] != '0' &&
-    headAngle[0] != '1' &&
-    headAngle[0] != '2' &&
-    headAngle[1] != '0' &&
-    headAngle[1] != '1' &&
-    headAngle[1] != '2')
-  {
-    return;
-  }
-
-  //read new angle and propagate it down
-  propagate();
-
-  TAIL_SERIAL.write('s');
-  //send the next angle down
-  TAIL_SERIAL.write(tailAngle[0]);
 
 }//end loop()
 
@@ -483,40 +374,6 @@ void processShortMotorPulseCommand()
   analogWrite(MOTOR_CONTROL, 0);
   USB_COM_PORT.print("Turning motor off\n");  
 }
-
-
-/************************************************************************************
-  propagate(): Properly moves angles downstream and out towards the following module
- ***********************************************************************************/
-void propagate()
-{
-  tailAngle[0] = horzAngleArray[4];
-
-  for(int i=4;i>0;i--)
-  {
-    if(horzAngleArray[i] != horzAngleArray[i-1])
-    {
-      horzTimerArray[i] = millis();
-    }
-      horzAngleArray[i] = horzAngleArray[i-1];
-      vertTimerArray[i] = millis();
-  }
-
-  if(horzAngleArray[0] != headAngle[0])
-  {
-    horzTimerArray[0] = millis();
-  }
-    horzAngleArray[0] = headAngle[0];
-    vertTimerArray[0] = millis();
-
-  USB_COM_PORT.print('\n');
-  for(int i=0;i<5;i++)
-  {
-    USB_COM_PORT.print(horzAngleArray[i]);
-  }
-  USB_COM_PORT.println(" horz\n");
-}//end propagate()
-
 
 /************************************************************************************
   move(): Modulates the values to achieve position set points (Runs the PID)
