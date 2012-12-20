@@ -230,7 +230,7 @@ void processHeadJawMessage()
   {
     delay(1);
   }
-    TAIL_SERIAL.write("hx");  //x is a dummy character because the headboard is expecting 2 characters
+    TAIL_SERIAL.write("h");
   
     headjawmessage = INPUT_SERIAL.read();
     USB_COM_PORT.print("received jaw message: ");

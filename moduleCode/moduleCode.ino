@@ -344,13 +344,6 @@ void processKillSwitchCommand()
 
 void processLongMotorPulseCommand()
 { 
-  while(HEAD_SERIAL.available()<1)
-  {
-    delay(1);
-  }
-
-  byte message = HEAD_SERIAL.read();
-
   // This command is only for the first module
   if (myModuleNumber != 1)
     return;
