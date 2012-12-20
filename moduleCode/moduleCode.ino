@@ -246,7 +246,7 @@ void setup()
 
 
 /***********************************************************************************
-  loop(): Checks and executes commands from the Head or USB Port.
+  loop(): Checks for Upstream Serial or USB Serial commands. Executes them.
  ***********************************************************************************/
  
 void loop()
@@ -260,7 +260,7 @@ void loop()
     }
   }
 
-  // Check upstead Serial for commands from the head
+  // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
     //letters in use: c, h, g, l, k
