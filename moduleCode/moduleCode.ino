@@ -281,7 +281,7 @@ void loop()
   {
       byte nextMessage;
 
-    //letters in use: m, f, s, L, v, c, h, g, l, M, k
+    //letters in use: m, f, s, L, c, h, g, l, k
     switch (HEAD_SERIAL.read())
     {
     //update motor speed
@@ -344,11 +344,6 @@ void loop()
         TAIL_SERIAL.write(message ? '1':'0');
       }
       break;
-
-    case 'v':
-      // display current voltage level
-      USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
-      break;
      
     case 'c':
       processCalibrateCommand();
@@ -366,11 +361,6 @@ void loop()
       // straighten verticals
       straightenVertical();
       TAIL_SERIAL.print("l");
-      break;
-      
-    case 'M':
-      // manual actuator control
-      manualControl();
       break;
       
     case 'k':
