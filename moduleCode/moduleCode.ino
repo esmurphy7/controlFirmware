@@ -46,7 +46,7 @@ boolean even = false;                   // Unused, will be set in EEPROM after c
 char horzAngleArray[] = {               // Current horizontal and vertical position of 
   '3','3','3','3','3'};                 // the actuators.
 char vertAngleArray[] = {               // 0 = Bent Left, 1 = Bent Right  <-- TODO:confirm
-  '3','3','3','3','3'};                 // 2 = Straight,  3 = Undefined
+  '3','3','3','3','3'};                 // 2 = Straight,  3 = Disabled
 
 // Array of angles we recorded as straight for the verticals
 int vertStraightArray[] = {0, 0, 0, 0, 0};
@@ -74,7 +74,6 @@ byte myModuleNumber;                    // My position in the module chain (1,2,
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
 byte killSwitch = true;                 // True if no movement should be done.
 int motorSpeed = 200;                   // Analog output for pump speed when turned on
-byte verticalOnTheFly = true;           // Enable/disable vertical straightening on the fly
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -316,11 +315,10 @@ void processNewSettingsAndSetpoints()
     TAIL_SERIAL.write(settings[i]);
   }
   
-  // Check the kill switch [Setting byte 70.0]
+  // Check the kill switch [Setting bit 70.0]
   killSwitch = (settings[70] && 0b00000001) > 0;
   if (killSwitch == true)
   {
-    killSwitch = true;
     for(int i=0; i < 5; i++)
     {
       analogWrite(VERT_ACTUATOR[i], 0);
@@ -329,11 +327,15 @@ void processNewSettingsAndSetpoints()
     analogWrite(MOTOR_CONTROL, 0);
   }
   
-  // Get vertical on the fly setting [Setting byte 70.1]
-  verticalOnTheFly = (settings[70] && 0b00000010) > 0;
+  // Copy new motor speed [Setting byte 72]
+  motorSpeed = settings[72];
   
-  // Get new motor speed [Setting bytes 71 and 72]
-  motorSpeed = settings[71];
+  // Copy new setpoints [Setting bytes 0 to 59]
+  for (int i = 0; i < 5; ++i)
+  {
+    horzAngleArray[i] = (char)settings[myModuleNumber * 5 + i];
+    vertAngleArray[i] = (char)settings[myModuleNumber * 5 + i + 30];    
+  }
 }
  
  /************************************************************************************
@@ -443,7 +445,8 @@ void move()
       analogWrite(HORZ_ACTUATOR[i],0);
     }
 
-        if (verticalOnTheFly == true)
+        // Currently the vertical actuators only know how to straighten
+        if (vertAngleArray[i] == '2')
         {
             //vertical
             PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
