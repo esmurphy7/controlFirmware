@@ -466,6 +466,12 @@ void move()
                 analogWrite(VERT_ACTUATOR[i], 0);
             }
         }
+        
+        // If were not in straightening mode, turn actuator off.
+        else
+        {
+            analogWrite(VERT_ACTUATOR[i], 0);
+        }
     }
 
   if(moved == false)
