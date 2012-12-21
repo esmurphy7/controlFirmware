@@ -13,49 +13,11 @@
 
 */
 
-#define HEADBOARD2
-//#define HEADBOARD1
-#if defined(HEADBOARD2) && defined(HEADBOARD1)
-	#error "Headboard1 and Headboard2 settings are mutually exclusive"
-#endif
-
-//#include "titanoboa_pins.h"
-#ifdef HEADBOARD2
 #include "titanoboa_headboard_pins.h"
-#endif
 
 #define INPUT_SERIAL Serial3            // Xbee
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
-
-
-
-// Actuator pins
-#ifdef HEADBOARD2
-#define JAW_OPEN	HEAD_ACTUATOR_3 //Yep, if I had just wired individual pwm channels to each valve control, this would look a lot simpler. Bleh. -Mike
-#define JAW_CLOSE	HEAD_ACTUATOR_3
-#define JAW_CTRL	HEAD_ACTUATOR_CTRL_3
-#define JAW_OPEN_CTRL_SELECT	1
-#define JAW_CLOSE_CTRL_SELECT	0
-
-#define HEAD_RAISE	HEAD_ACTUATOR_2
-#define HEAD_LOWER	HEAD_ACTUATOR_2
-#define HEAD_CTRL	HEAD_ACTUATOR_CTRL_2
-#define HEAD_RAISE_CTRL_SELECT	0
-#define HEAD_LOWER_CTRL_SELECT	1
-
-#define AUX_EXTEND	HEAD_ACTUATOR_1
-#define AUX_RETRACT	HEAD_ACTUATOR_1
-#define AUX_CTRL	HEAD_ACTUATOR_CTRL_1
-#define AUX_EXTEND_CTRL_SELECT	0
-#define AUX_RETRACT_CTRL_SELECT	1
-#endif
-#ifdef HEADBOARD1
-#define JAW_CLOSE   3
-#define JAW_OPEN    5
-#define HEAD_RAISE  6
-#define HEAD_LOWER  7
-#endif
 
 // Propagation delay storage delays
 unsigned int currentTime;
@@ -71,44 +33,41 @@ void setup()
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-    USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
+  USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
 
-  // Initialize Actuator Controls Off
- #ifdef HEADBOARD1
- analogWrite(JAW_CLOSE, 0);
-  analogWrite(JAW_OPEN, 0);
-  analogWrite(HEAD_RAISE, 0);
-  analogWrite(HEAD_LOWER, 0);
-#endif
-  //Initialize new headboard pins, similar outputs to a boashield
-#ifdef HEADBOARD2
-  pinMode(DITHER, OUTPUT);
-  digitalWrite(DITHER, LOW); //Have dither set as low in this case (no actuation at all)
-
+  // LED Outputs
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
   pinMode(LED_3, OUTPUT);
   pinMode(LED_4, OUTPUT);
   pinMode(LED_5, OUTPUT);
-  pinMode(LED_6, OUTPUT);
-  
+  pinMode(LED_6, OUTPUT);  
+
+  // Initialize Actuator Controls Off
+  pinMode(DITHER, OUTPUT);
+  digitalWrite(DITHER, LOW); //Have dither set as low in this case (no actuation at all)
+ 
+  // Initialize actuator PWM outputs
   for(int i=0;i<3;i++)
   {
-    pinMode(HEAD_ACTUATOR[i],OUTPUT); //Set all actuator outputs to output, and set them to 0
+    pinMode(HEAD_ACTUATOR[i],OUTPUT);
     analogWrite(HEAD_ACTUATOR[i],0);
   }
-    for(int i=0;i<3;i++)
+  
+  // Initialize actuator control outputs
+  // Setting control outputs to zero selects odd pairs (1,3,5 as opposed to 2,4,6)  
+  for(int i=0;i<3;i++)
   {
-    pinMode(HEAD_ACTUATOR_CTRL[i],OUTPUT); //Set all actuator control outputs (selects pairs, digital) to output, 0
-	digitalWrite(HEAD_ACTUATOR_CTRL[i], LOW); //Setting to zero selects odd pairs (1,3,5 as opposed to 2,4,6)
+    pinMode(HEAD_ACTUATOR_CTRL[i], OUTPUT);
+    digitalWrite(HEAD_ACTUATOR_CTRL[i], LOW);
   }
 
   // Initialize position sensor inputs.
   for(int i=0;i<5;i++)
   {
-    pinMode(HEAD_POS_SENSOR[i],INPUT); //Set all actuator position sensors to input
+    pinMode(HEAD_POS_SENSOR[i],INPUT);
   }
-#endif
+
   currentTime = 0;
   lastAngleReceivedTime = 0;
   timeDifference = 0;
@@ -147,16 +106,16 @@ void loop()
     USB_COM_PORT.print(message, DEC);
     USB_COM_PORT.print("]\n");
 
-        // Kill command
-        if (message == 'k')
-        {
-            analogWrite(JAW_OPEN, 0);
-            analogWrite(JAW_CLOSE, 0);
-            analogWrite(HEAD_RAISE, 0);
-            analogWrite(HEAD_LOWER, 0);
-            analogWrite(AUX_EXTEND, 0);
-            analogWrite(AUX_RETRACT, 0);
-        }
+    // Kill command
+    if (message == 'k')
+    {
+      analogWrite(JAW_OPEN, 0);
+      analogWrite(JAW_CLOSE, 0);
+      analogWrite(HEAD_RAISE, 0);
+      analogWrite(HEAD_LOWER, 0);
+      analogWrite(AUX_EXTEND, 0);
+      analogWrite(AUX_RETRACT, 0);
+    }
 
     // Check for new setpoints command.
     if (message == 's')
@@ -230,66 +189,57 @@ void processHeadJawMessage()
   {
     delay(1);
   }
-    TAIL_SERIAL.write("h");
   
-    headjawmessage = INPUT_SERIAL.read();
-    USB_COM_PORT.print("received jaw message: ");
-    USB_COM_PORT.println(headjawmessage);
+  TAIL_SERIAL.write("h");
+  
+  headjawmessage = INPUT_SERIAL.read();
+  USB_COM_PORT.print("received jaw message: ");
+  USB_COM_PORT.println(headjawmessage);
   
   if(headjawmessage == '0')
   {
-      actuator = -1;
-#ifdef HEADBOARD2
-		digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-#endif
-		
-        for(int i=100; i<=255; i++)
-        {
-            analogWrite(JAW_OPEN, i);
-            delay(10);
-        }
-        for(int i=255; i>=50; i--)
-        {
-            analogWrite(JAW_OPEN, i);
-            delay(6);
-        }
-        analogWrite(JAW_OPEN, 0);
+    actuator = -1;
+    digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
+      
+    for(int i=100; i<=255; i++)
+    {
+      analogWrite(JAW_OPEN, i);
+      delay(10);
+    }
+    for(int i=255; i>=50; i--)
+    {
+      analogWrite(JAW_OPEN, i);
+      delay(6);
+    }
+    analogWrite(JAW_OPEN, 0);
 		
   }
   else if(headjawmessage == '1')
   {
-        actuator = -1;
-#ifdef HEADBOARD2
-		digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
-#endif
+    actuator = -1;
+    digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
 
-        for(int i=0; i<=255; i++)
-        {
-            analogWrite(JAW_CLOSE, i);
-            delay(4);
-        }
-        for(int i=255; i>=0; i--)
-        {
-            analogWrite(JAW_CLOSE, i);
-            delay(4);
-        }
-
+    for(int i=0; i<=255; i++)
+    {
+      analogWrite(JAW_CLOSE, i);
+      delay(4);
+    }
+    for(int i=255; i>=0; i--)
+    {
+      analogWrite(JAW_CLOSE, i);
+      delay(4);
+    }
   }
   else if(headjawmessage == '2')
   {
     actuator = HEAD_RAISE;
-	#ifdef HEADBOARD2
-		digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
-	#endif
+    digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
   }
   else if(headjawmessage == '3')
   {
     actuator = HEAD_LOWER;
-	#ifdef HEADBOARD2
     digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
-	#endif
   }
-#ifdef HEADBOARD2
   else if(headjawmessage == '4')
   {
     actuator = AUX_EXTEND;
@@ -299,7 +249,6 @@ void processHeadJawMessage()
   {
     actuator = AUX_RETRACT;
     digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
-#endif
   }
   else
   {
@@ -318,14 +267,13 @@ void processHeadJawMessage()
       analogWrite(actuator, i);
       delay(4);
     }
-	//actuator = -1; //Resets actuator variable 
   }
   INPUT_SERIAL.flush(); //This may not be the smartest action we can take
   return; 
 }
 
 /**************************************************************************************
-  manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
+  manualControl(): Allows for manual actuator control over the USB_COM_PORT
  *************************************************************************************/
 void manualControl()
 {
@@ -334,12 +282,10 @@ void manualControl()
   int actuatorSel = 0;
   int actuationDelay = 200;
   char delaySetting = 'm';
-  #ifdef HEADBOARD2
   int led_choice = -1;
   int sensors[6];
-  #endif
   
-    displayMenu();
+  displayMenu();
   
   while(manual == true)
   {
@@ -350,7 +296,6 @@ void manualControl()
       // characters in use: a, b, c, j, h, u, m, d, l, k, s, q
       switch(byteIn)
       {
-		#ifdef HEADBOARD2
         case 'a':
           while(USB_COM_PORT.available() < 1)
           {
@@ -406,7 +351,6 @@ void manualControl()
           }
           USB_COM_PORT.print("\r\n");
           break;
-         #endif
         case 'j':
           actuatorSel = 0;
           StopMov();
@@ -417,13 +361,11 @@ void manualControl()
           StopMov();
           USB_COM_PORT.print("Head actuator selected\n");
           break;
-		  #ifdef HEADBOARD2
         case 'u':
           actuatorSel = 2;
           StopMov();
           USB_COM_PORT.print("Auxiliary actuator selected\n");
           break;
-		  #endif
 
         // new motor speed setting received
         case 'm':
@@ -469,25 +411,19 @@ void manualControl()
           USB_COM_PORT.print("l dir\n");
           if (actuatorSel == 0)
           {
-			#ifdef HEADBOARD2
-				digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
-            #endif
-			analogWrite(JAW_CLOSE, 255);
+            digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
+            analogWrite(JAW_CLOSE, 255);
           }
           else if (actuatorSel == 1)
           {
-			#ifdef HEADBOARD2
-				digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
-            #endif
-			analogWrite(HEAD_LOWER, 255);
+            digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
+            analogWrite(HEAD_LOWER, 255);
           }
-		  #ifdef HEADBOARD2
-			  else if(actuatorSel == 2)
-			  {
-				digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
-				analogWrite(AUX_EXTEND, 255);
-			  }
-		  #endif
+          else if(actuatorSel == 2)
+          {
+            digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
+            analogWrite(AUX_EXTEND, 255);
+          }
           delay(400);
           StopMov();
           break;
@@ -500,24 +436,18 @@ void manualControl()
           USB_COM_PORT.print("k dir\n");
           if (actuatorSel == 0)
           {
-			#ifdef HEADBOARD2
-				digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-            #endif
-			analogWrite(JAW_OPEN, 255);
+            digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
+            analogWrite(JAW_OPEN, 255);
           }
           else if (actuatorSel == 1)
           {
-			#ifdef HEADBOARD2
-				digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
-            #endif
-			analogWrite(HEAD_RAISE, 255);
+            digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
+            analogWrite(HEAD_RAISE, 255);
           }
           else if(actuatorSel == 2)
           {
-			#ifdef HEADBOARD2
-				digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
-            #endif
-			analogWrite(AUX_RETRACT, 255);
+            digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
+            analogWrite(AUX_RETRACT, 255);
           }
           delay(400);
           StopMov();
@@ -552,16 +482,10 @@ void displayMenu()
 {
     USB_COM_PORT.print("\nManual control mode menu\n");
     USB_COM_PORT.print("commands: j or h to select jaw or head actuator.");
-#ifdef HEADBOARD2
     USB_COM_PORT.print("u to select Aux actuator\n");
-#endif
-#ifdef HEADBOARD1
     USB_COM_PORT.print("\n");
-#endif
-#ifdef HEADBOARD2
     USB_COM_PORT.print("          a/b - leds [0-6]\n");
     USB_COM_PORT.print("          c - list sensor values\n");
-#endif
     USB_COM_PORT.print("          k/l - actuation\n");
     USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          s - stop motor\n");
@@ -579,10 +503,8 @@ void StopMov()
   analogWrite(JAW_CLOSE, 0);
   analogWrite(HEAD_RAISE, 0);
   analogWrite(HEAD_LOWER, 0);
-  #ifdef HEADBOARD2
-	analogWrite(AUX_EXTEND, 0);
-	analogWrite(AUX_RETRACT, 0);
-  #endif
+  analogWrite(AUX_EXTEND, 0);
+  analogWrite(AUX_RETRACT, 0);
   return;
 }
 
