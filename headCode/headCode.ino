@@ -93,85 +93,20 @@ void loop()
     }
   }
 
-  // Check for commands over XBee
-  if(INPUT_SERIAL.available())
-  {
-    message = INPUT_SERIAL.read();
-    USB_COM_PORT.print("received message from xbee: ");
-    USB_COM_PORT.print(message);
-    USB_COM_PORT.print(" [");
-    USB_COM_PORT.print(message, DEC);
-    USB_COM_PORT.print("]\n");
-
-    // Kill command
-    if (message == 'k')
-    {
-      analogWrite(JAW_OPEN, 0);
-      analogWrite(JAW_CLOSE, 0);
-      analogWrite(HEAD_RAISE, 0);
-      analogWrite(HEAD_LOWER, 0);
-      analogWrite(AUX_EXTEND, 0);
-      analogWrite(AUX_RETRACT, 0);
-    }
-
-    // Check for new setpoints command.
-    if (message == 's')
-    {
-      processSetpointsMessage();
-      return;
-    }
-
-    // Check for head/jaw movements command.
-    if(message == 'h')
-    {
-      processHeadJawMessage();
-      return;
-    }
-
-    // Pass through all other commands to the first module.
-    TAIL_SERIAL.write(message);
-  }
-}//end loop()
-
-
-/**************************************************************************************
-  processSetpointsMessage(): Transmits setpoints for the first module for propegation 
- *************************************************************************************/
-void processSetpointsMessage()
-{
-  currentTime = millis();
-  timeDifference = currentTime - lastAngleReceivedTime;
+  // Request settings from joystick (Estimate 3ms)
+      // Timeout if no response. Enable kill switch. (and log error)
+      
+  // Send new settings and setpoints to the modules. (Estimate 10ms)
+      // Wait for acknowledgement
+      // Timeout if missing an acknowledgement. (and log error)
   
-  // setpoints to come, wait for all data to arrive, data includes angle and propagation delay
-  while(INPUT_SERIAL.available() < 3);
-  // get angle
-  char message = INPUT_SERIAL.read();
-  // throttle delay low byte comes first followed by high byte
-  throttleDelay = (INPUT_SERIAL.read());
-  throttleDelay += (INPUT_SERIAL.read() << 8);
+  // Run PID loop on modules (Estimate 5ms)
+      // Wait for acknowledgement 
+      // Timeout if missing an acknowledgement. (and log error)
   
-  // throttle delay of 0 means this is the first angle
-  if ((timeDifference > (throttleDelay - 20)) && (timeDifference < (throttleDelay + 20)) || throttleDelay == 0)
-  {
-    // Delay between receiving angles is within tolerance ok to send the modules
-    TAIL_SERIAL.write('s');
-    TAIL_SERIAL.write(message);
-    USB_COM_PORT.print("new setpoint: ");
-    USB_COM_PORT.println(message);
-  }
-  else
-  {
-    USB_COM_PORT.print("dropped\n\n");
-  }
-  
-  USB_COM_PORT.print("time between: ");
-  USB_COM_PORT.print(timeDifference, DEC);
-  USB_COM_PORT.print("\tthrottleDelay: ");
-  USB_COM_PORT.println(throttleDelay, DEC);
-  
-  // update last time an angle was received
-  lastAngleReceivedTime = currentTime;
-  return; 
+  // Request some diagnostic info from modules (Estimate 25ms)
+      // Wait for all to come in, then send over Ethernet.
+      // Timeout if missing data from a module. (and log error)
 }
 
 /**************************************************************************************
