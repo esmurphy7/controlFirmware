@@ -262,10 +262,14 @@ void loop()
   // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
-    //letters in use: c, h, g, l, k
+    //letters in use: p, s, c, h, g, l, k
     char command = HEAD_SERIAL.read();
     switch (command)
     {
+      case 'p':
+        move();
+        break;
+      
       case 's':
         processNewSettingsAndSetpoints();
         break;
@@ -314,7 +318,27 @@ void processNewSettingsAndSetpoints()
   {
     TAIL_SERIAL.write(settings[i]);
   }
-  
+
+  // Copy new setpoints [Setting bytes 0 to 59]
+  for (int i = 0; i < 5; ++i)
+  {
+    char newHorzSetpoint = (char)settings[myModuleNumber * 5 + i];
+    char newVertSetpoint = (char)settings[myModuleNumber * 5 + i + 30];
+    
+    // If this is a new setpoint, reset the PID timout timer
+    if (newHorzSetpoint != horzAngleArray[i])
+    {
+      horzTimerArray[i] = millis();
+    }
+    if (newVertSetpoint != vertAngleArray[i])
+    {
+      vertTimerArray[i] = millis();
+    }        
+    
+    horzAngleArray[i] = newHorzSetpoint;
+    vertAngleArray[i] = newVertSetpoint;
+  }
+
   // Check the kill switch [Setting bit 70.0]
   killSwitch = (settings[70] && 0b00000001) > 0;
   if (killSwitch == true)
@@ -329,22 +353,6 @@ void processNewSettingsAndSetpoints()
   
   // Copy new motor speed [Setting byte 72]
   motorSpeed = settings[72];
-  
-  // Copy new setpoints [Setting bytes 0 to 59]
-  for (int i = 0; i < 5; ++i)
-  {
-    horzAngleArray[i] = (char)settings[myModuleNumber * 5 + i];
-    vertAngleArray[i] = (char)settings[myModuleNumber * 5 + i + 30];    
-  }
-}
- 
- /************************************************************************************
-  processRunPIDCommand(): Runs the PID loop on each actuator
- ***********************************************************************************/
- 
-void processRunPIDCommand()
-{
- 
 }
  
  /************************************************************************************
