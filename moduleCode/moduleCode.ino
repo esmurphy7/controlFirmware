@@ -68,7 +68,7 @@ int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
 int vertLowRange[]  = {0, 0, 0, 0, 0};
               
 // Settings
-byte settingsPacket[125];
+byte settings[125];
       
 byte myModuleNumber;                    // My position in the module chain (1,2,3...)
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
@@ -283,10 +283,6 @@ void loop()
         processShortMotorPulseCommand();
         break;
 
-      case 'k':
-        processKillSwitchCommand();
-        break;
-        
       default:
         USB_COM_PORT.print("Invalid command from upstream serial = ");
         USB_COM_PORT.println(command);
@@ -310,15 +306,28 @@ void processNewSettingsAndSetpoints()
   // Get data array from upstream. Store in an array.
   for (int i = 0; i < 125; ++i)
   {
-    settingsPacket[i] = HEAD_SERIAL.read();
+    settings[i] = HEAD_SERIAL.read();
   }
   
   // Send data array downstream.
   TAIL_SERIAL.write('s');
   for (int i = 0; i < 125; ++i)
   {
-    TAIL_SERIAL.write(settingsPacket[i]);
-  }  
+    TAIL_SERIAL.write(settings[i]);
+  }
+  
+  // Check the kill switch [Setting byte 70.0]
+  killSwitch = (settings[70] && 0b00000001);
+  if (killSwitch == true)
+  {
+    killSwitch = true;
+    for(int i=0; i < 5; i++)
+    {
+      analogWrite(VERT_ACTUATOR[i], 0);
+      analogWrite(HORZ_ACTUATOR[i], 0);
+    }
+    analogWrite(MOTOR_CONTROL, 0);
+  }
 }
  
  /************************************************************************************
@@ -339,22 +348,6 @@ void processDiagnosticsCommand()
  
 }
  
-/************************************************************************************
-  processKillSwitchCommand(): Turns off the motor and all actuators
- ***********************************************************************************/
-
-void processKillSwitchCommand()
-{ 
-  killSwitch = true;
-  for(int i=0; i < 5; i++)
-  {
-    analogWrite(VERT_ACTUATOR[i], 0);
-    analogWrite(HORZ_ACTUATOR[i], 0);
-  }
-  analogWrite(MOTOR_CONTROL, 0);
-  TAIL_SERIAL.write('k');
-}
-
 /************************************************************************************
   processLongMotorPulseCommand(): Pulses the first module motor on and off. Used for 
                                   jaw and head lift actuation.
