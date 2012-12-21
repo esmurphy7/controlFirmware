@@ -403,14 +403,15 @@ int count = 0;
 
 void move()
 {
-    //set if any segment moved, so we can turn off motor when setpoint reached
-    boolean moved = false;
-    int goal;
-    int currentAngle;
+  //set if any segment moved, so we can turn off motor when setpoint reached
+  boolean moved = false;
+  int goal;
+  int currentAngle;
 
   for (int i=0; i < 5; i++)
   {
-    //horizontal
+    ////// HORIZONTAL ////////
+    
     if (horzAngleArray[i]=='0')
     {
       goal = 10;
@@ -430,49 +431,53 @@ void move()
     }
 
     PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
-
-        currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
-
+    currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
+    
+    // If we are have not reached the deadzone and haven't timed out
     if ((abs(currentAngle-goal)>DEAD_ZONE) &&
        (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
     {
-        analogWrite(MOTOR_CONTROL, motorSpeed);
+      // Update the acutator PID output
+      analogWrite(MOTOR_CONTROL, motorSpeed);
       PIDcontrollerHorizontal[i].updateOutput();
       moved = true;
     }
+    // We are in the deadzone or we took too long to get there    
     else
     {
       analogWrite(HORZ_ACTUATOR[i],0);
     }
-
-        // Currently the vertical actuators only know how to straighten
-        if (vertAngleArray[i] == '2')
-        {
-            //vertical
-            PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
-            currentAngle = analogRead(VERT_POS_SENSOR[i]);
-
-            if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
-                (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
-            {
-                analogWrite(MOTOR_CONTROL, motorSpeed);
-                PIDcontrollerVertical[i].updateOutput();
-                moved = true;
-                USB_COM_PORT.print("v");
-                USB_COM_PORT.println(i);
-            }
-            else
-            {
-                analogWrite(VERT_ACTUATOR[i], 0);
-            }
-        }
-        
-        // If were not in straightening mode, turn actuator off.
-        else
-        {
-            analogWrite(VERT_ACTUATOR[i], 0);
-        }
+    
+    ////// VERITICAL ////////
+    
+    // Currently the vertical actuators only know how to straighten
+    if (vertAngleArray[i] == '2')
+    {
+      PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
+      currentAngle = analogRead(VERT_POS_SENSOR[i]);
+      
+      // If we are have not reached the deadzone and haven't timed out
+      if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
+          (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
+      {
+        // Update the acutator PID output        
+        analogWrite(MOTOR_CONTROL, motorSpeed);
+        PIDcontrollerVertical[i].updateOutput();
+        moved = true;
+      }
+      // We are in the deadzone or we took too long to get there
+      else
+      {
+        analogWrite(VERT_ACTUATOR[i], 0);
+      }
     }
+    
+    // If were not in straightening mode, turn actuator off.
+    else
+    {
+      analogWrite(VERT_ACTUATOR[i], 0);
+    }
+  }
 
   if(moved == false)
   {
