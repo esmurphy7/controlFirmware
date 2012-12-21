@@ -462,6 +462,8 @@ void manualControl()
 
         case 'q':
           manual = false;
+          INPUT_SERIAL.flush();
+          TAIL_SERIAL.flush();
           break;
       }//end switch
     }//end if serial

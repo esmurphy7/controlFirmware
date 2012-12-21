@@ -182,6 +182,7 @@ void manualControl()
 
             case 'q':
                 manual = false;
+                XBEE_SERIAL.flush();
                 break;
 
             default:
