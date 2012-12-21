@@ -84,15 +84,9 @@ void loop()
   // Check for command from USB serial to enter manual control
   if (USB_COM_PORT.available() > 0)
   {
-    USB_COM_PORT.print("received message from USB\n");
     if (USB_COM_PORT.read() == 'M')
     {
-      // Confirm this wasn't random noise
-      if (USB_COM_PORT.read() == 'M')
-      {
-        // Enter manual mode
-        manualControl();
-      }
+      manualControl();
     }
   }
 
