@@ -448,7 +448,7 @@ void move()
       analogWrite(HORZ_ACTUATOR[i],0);
     }
     
-    ////// VERITICAL ////////
+    ////// VERTICAL ////////
     
     // Currently the vertical actuators only know how to straighten
     if (vertAngleArray[i] == '2')
@@ -491,28 +491,28 @@ void move()
  ***********************************************************************************/
 void processCalibrateCommand()
 {
-    // Determine my modules number
-    USB_COM_PORT.println("Calibrate command received");
-    while (HEAD_SERIAL.available() < 1);
-    myModuleNumber = HEAD_SERIAL.read();
+  // Determine my modules number
+  USB_COM_PORT.println("Calibrate command received");
+  while (HEAD_SERIAL.available() < 1);
+  myModuleNumber = HEAD_SERIAL.read();
 
-    // Tell next module to also calibrate
-    TAIL_SERIAL.write('c');
-    TAIL_SERIAL.write(myModuleNumber + 1);
+  // Tell next module to also calibrate
+  TAIL_SERIAL.write('c');
+  TAIL_SERIAL.write(myModuleNumber + 1);
 
-    //calibrate horizontal position and reset everything
-    calibrateHorizontal();
-    HEAD_SERIAL.flush();
-    TAIL_SERIAL.flush();
+  //calibrate horizontal position and reset everything
+  calibrateHorizontal();
+  HEAD_SERIAL.flush();
+  TAIL_SERIAL.flush();
 
-    delay(100);
-    
-    //calibrate vertical position and reset everything
-    //calibrateVertical();
-    HEAD_SERIAL.flush();
-    TAIL_SERIAL.flush();
+  delay(100);
+  
+  //calibrate vertical position and reset everything
+  //calibrateVertical();
+  HEAD_SERIAL.flush();
+  TAIL_SERIAL.flush();
 
-    delay(100);
+  delay(100);
 
 } //end processCalibrateCommand()
 
