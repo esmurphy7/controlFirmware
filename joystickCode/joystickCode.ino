@@ -31,16 +31,6 @@
 #define RSVD_2_PIN       2
 #define RSVD_4_PIN       4
 
-
-// Global variables
-boolean joystickButtonWasPressed = false;
-boolean angleSent = false;
-
-int motorSpeed = 200;
-byte verticalOnTheFly = true;
-
-unsigned long waitTill = 0; // What does this do? Please comment.
-
 /*************************************************************************
  * setup(): Initializes serial ports, pins
  **************************************************************************/
@@ -61,183 +51,35 @@ void setup()
  **************************************************************************/
 void loop()
 {
-    int buttonVal;
-
-  // Only send commands when joystick button is pressed
-  if(digitalRead(JOYSTICK_BUTTON) == HIGH)
-  {
-    joystickButtonWasPressed = true;
-
-    // check for motor speed change
-    buttonVal = map(analogRead(MOTOR_SPEED_PIN), 0, 1023, 0, 255);
-    if (abs(buttonVal - motorSpeed) > 5)
-    {
-        USB_COM_PORT.print("detected motor speed change, old value: ");
-        USB_COM_PORT.print(motorSpeed);
-        motorSpeed = buttonVal;
-        XBEE_SERIAL.write('m');
-        XBEE_SERIAL.write(motorSpeed);
-        USB_COM_PORT.print(", new value: ");
-        USB_COM_PORT.println(motorSpeed);
-    }
-
-        // check for vertical straightening on the fly disable/enable
-        buttonVal = analogRead(RSVD_0_PIN);
-        if ((buttonVal < 475) && (verticalOnTheFly == true))
-        {
-            USB_COM_PORT.println("turning off vertical straightening while slithering");
-            verticalOnTheFly = false;
-            XBEE_SERIAL.write("f0");
-        }
-        else if ((buttonVal > 525) && (verticalOnTheFly == false))
-        {
-            USB_COM_PORT.println("turning on vertical straightening while slithering");
-            verticalOnTheFly = true;
-            XBEE_SERIAL.write("f1");
-        }
-
-        //signal to open/close jaw
-        if (digitalRead(JAW_OPEN) == true)
-        {
-            USB_COM_PORT.println("opening jaw");
-            XBEE_SERIAL.write("h0");
-            waitTill = millis() + 1000;
-        }
-        else if (digitalRead(JAW_CLOSE) == true)
-        {
-            USB_COM_PORT.println("closing jaw");
-            XBEE_SERIAL.write("h1");
-            waitTill = millis() + 1000;
-        }
-
-    if (digitalRead(VERTICAL_STRAIGHTEN) == HIGH)
-    {
-      USB_COM_PORT.print("straighten vertical\n");
-      XBEE_SERIAL.write("l");
-      delay(1000);
-    }
-
-    // Position of throttle potentiometer determines the delay between 
-    // angle propagations
-    unsigned int throttle = map(analogRead(THROTTLE_PIN), 0, 1023, 1000, 250);
-
-    if(digitalRead(CALIBRATE_BUTTON) == LOW)
-    {
-      XBEE_SERIAL.write("c");
-      // Tell first module it's the first module.
-      XBEE_SERIAL.write(1);
-      
-      waitTill = millis() + 3000;
-    }
-
-    if(digitalRead(JOYSTICK_LEFT_PIN) == HIGH)
-    {
-      // send left angle
-      XBEE_SERIAL.write("s0");
-
-      if (angleSent)
-      {
-        // send propagation delay
-        XBEE_SERIAL.write(lowByte(throttle));
-        XBEE_SERIAL.write(highByte(throttle));
-      }
-      else
-      {
-        XBEE_SERIAL.write((byte)0);
-        XBEE_SERIAL.write((byte)0);
-        angleSent = true;
-      }
-      waitTill = millis() + throttle;
-
-      //delay so modules have time to sort last set point but not enough to be noticable
-      delay(5);
-      //send lights command
-      XBEE_SERIAL.print('L');
-      XBEE_SERIAL.print(random(0,2)<1 ? '0':'1');
-    }
-    else if (digitalRead(JOYSTICK_RIGHT_PIN) == HIGH)
-    {
-      // send right angle
-      XBEE_SERIAL.write("s1");
-      if (angleSent)
-      {
-        // send propagation delay
-        XBEE_SERIAL.write(lowByte(throttle));
-        XBEE_SERIAL.write(highByte(throttle));
-      }
-      else
-      {
-        XBEE_SERIAL.write((byte)0);
-        XBEE_SERIAL.write((byte)0);
-        angleSent = true;
-      }
-      waitTill = millis() + throttle;
-
-      //delay so modules have time to sort last set point but not enought to be noticable
-      delay(5);
-      //send lights command
-      XBEE_SERIAL.print('L');
-      XBEE_SERIAL.print(random(0,2)<1 ? '0':'1');
-    }
-    else
-    {
-      angleSent = false;
-    }
-
-    // This is a hacked together delay() replacement that also monitors the kill switch
-    while(millis() < waitTill)
-    {
-      //delay for debouncing
-      delay(5);
-      if(digitalRead(JOYSTICK_BUTTON) == LOW)
-      {
-        XBEE_SERIAL.write("k");
-        joystickButtonWasPressed = false;
-        break;
-      }
-    }
-  }
-  else
-  {
-    if(joystickButtonWasPressed)
-    {
-      //delay for debouncing
-      delay(5);
-      if(digitalRead(JOYSTICK_BUTTON) == LOW)
-      {
-        XBEE_SERIAL.write("k");
-        joystickButtonWasPressed = false;
-      }
-    }
-    angleSent = false;
-  }
-
-  // message passing to and from usb
-  // Should be careful with this in the future not to send commands that do bad things
+  // Check USB serial for command to enter manaul mode.
   if (USB_COM_PORT.available() > 0)
   {
-    USB_COM_PORT.print("received message from USB\n");
     if (USB_COM_PORT.read() == 'M')
     {
-      // Confirm this wasn't random noise
-      if (USB_COM_PORT.read() == 'M')
-      {
-        // Enter manual mode
-        manualControl();
-      }
-    }
+      manualMode();
+    }   
   }
+  
+  // Read the status of the buttons and switches
+  boolean killSwitchPressed = digitalRead(JOYSTICK_BUTTON) == HIGH;
+  boolean jawOpenSwitchPressed = digitalRead(JAW_OPEN) == HIGH;
+  boolean jawCloseSwitchPressed = digitalRead(JAW_CLOSE) == HIGH;
+  boolean straightenVertSwitchPressed = digitalRead(VERTICAL_STRAIGHTEN) == HIGH;
+  boolean calibrateButtonPressed = digitalRead(CALIBRATE_BUTTON) == LOW;
+  boolean joystickLeftPressed = digitalRead(JOYSTICK_LEFT_PIN) == HIGH;
+  boolean joystickRightPressed = digitalRead(JOYSTICK_RIGHT_PIN) == HIGH;
+  
+  unsigned short motorSpeedKnob = analogRead(MOTOR_SPEED_PIN);
+  unsigned short verticalOnTheFlyKnob = analogRead(RSVD_0_PIN);
+  unsigned short propagationDelayKnob = analogRead(THROTTLE_PIN);
 
-  if(XBEE_SERIAL.available() > 0)
-  {
-    USB_COM_PORT.write(XBEE_SERIAL.read());
-  }
+  // TODO: Send button and switch status 
 
 }//end loop()
 
 
 /**************************************************************************************
-  manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
+  manualControl(): Allows for manual control over the USB_SERIAL_PORT
  *************************************************************************************/
 void manualControl()
 {
@@ -259,134 +101,8 @@ void manualControl()
 
             switch(byteIn)
             {
-            case 'c':
-                USB_COM_PORT.print("\nNOT YET IMPLEMENTED: Running calibration...\n");
-                //calibrate();
-                break;
-
             case 'p':
                 readAllButtons();
-                break;
-
-            case 'r':
-                USB_COM_PORT.print("\nNOT YET IMPLEMENTED: Saving current vertical position\n");
-                //saveVerticalPosition();
-                break;
-
-            case 'a':
-                USB_COM_PORT.print("\nNOT YET IMPLEMENTED: Straightening verticals\n");
-                //straightenVertical();
-                break;
-
-            case 'm':
-            {
-                USB_COM_PORT.print("\nNOT YET IMPLEMENTED: module select\n");
-/*
-                nextChar = USB_COM_PORT.read();
-                switch (nextChar)
-                {
-			    case '1':
-			        moduleSelect = 0;
-			        USB_COM_PORT.print("Module1\n");
-			        break;
-			    case '2':
-			        moduleSelect = 1;
-			        USB_COM_PORT.print("Module2\n");
-			        break;
-			    case '3':
-			        moduleSelect = 2;
-			        USB_COM_PORT.print("Module3\n");
-			        break;
-			    case '4':
-			        moduleSelect = 3;
-			        USB_COM_PORT.print("Module4\n");
-			        break;
-			    case '5':
-			        moduleSelect = 4;
-			        USB_COM_PORT.print("Module5\n");
-			        break;
-                }
-*/
-            }
-            break;
-
-            case 'v':
-            {
-                USB_COM_PORT.print("\nNOT YET IMPLEMENTED: vertebrae select\n");
-/*
-                nextChar = USB_COM_PORT.read();
-                switch (nextChar)
-                {
-                case '1':
-                    segSelect = 0;
-                    USB_COM_PORT.print("Seg1\n");
-                    break;
-                case '2':
-                    segSelect = 1;
-                    USB_COM_PORT.print("Seg2\n");
-                    break;
-                case '3':
-                    segSelect = 2;
-                    USB_COM_PORT.print("Seg3\n");
-                    break;
-                case '4':
-                    segSelect = 3;
-                    USB_COM_PORT.print("Seg4\n");
-                    break;
-                case '5':
-                    segSelect = 4;
-                    USB_COM_PORT.print("Seg5\n");
-                    break;
-                }
-*/
-            }
-            break;
-
-            case 'd':
-            {
-                while (USB_COM_PORT.available() < 1);
-                delaySetting = USB_COM_PORT.read();
-                switch (delaySetting)
-                {
-                case 's':
-                    actuationDelay = 150;
-                    USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
-                    break;
-                case 'm':
-                    actuationDelay = 200;
-                    USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
-                    break;
-                case 'l':
-                    actuationDelay = 300;
-                    USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
-                    break;
-                default:
-                    actuationDelay = 200;
-                    USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
-                    break;
-                }
-            }
-            break;
-
-            case 'l':
-                USB_COM_PORT.print("NOT YET IMPLEMENTED: l dir\n");
-                break;
-
-            case 'k':
-                USB_COM_PORT.print("NOT YET IMPLEMENTED: k dir\n");
-                break;
-
-            case 'i':
-                USB_COM_PORT.print("NOT YET IMPLEMENTED: i dir\n");
-                break;
-
-            case 'o':
-                USB_COM_PORT.print("NOT YET IMPLEMENTED: o dir\n");
-                break;
-
-            case 's':
-                //StopMov();
-                USB_COM_PORT.print("NOT YET IMPLEMENTED: STOPPED\n");
                 break;
 
             case 'e':
@@ -398,7 +114,7 @@ void manualControl()
                 break;
 
             default:
-                USB_COM_PORT.print("doesn't do anything\n");
+                USB_COM_PORT.println("doesn't do anything\n");
                 break;
             }//end switch
         }//end if USB_COM_PORT
@@ -415,16 +131,7 @@ void manualControl()
 void displayMenu()
 {
     USB_COM_PORT.print("\nManual control mode menu\n");
-    USB_COM_PORT.print("commands: m1-5 to select module\n");
-    USB_COM_PORT.print("          v1-5 to select vertebrae\n");
-    USB_COM_PORT.print("          k/l (extend/retract) - horizontal actuation\n");
-    USB_COM_PORT.print("          i/o (extend/retract) - vertical actuation\n");
-    USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
-    USB_COM_PORT.print("          c - calibrate\n");
-    USB_COM_PORT.print("          p - print raw values of all knobs, buttons, etc\n");
-    USB_COM_PORT.print("          r - record current vertical position as straight\n");
-    USB_COM_PORT.print("          a - straighten verticals\n");
-    USB_COM_PORT.print("          s - stop motor\n");
+    USB_COM_PORT.print("commands: p - print raw values of all knobs, buttons, etc\n");
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n");
 }
