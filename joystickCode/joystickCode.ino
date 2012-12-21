@@ -5,7 +5,16 @@
  Created: August 2011 
  Part of the titanaboa.ca project
  
- Description: This file needs commenting and a description.
+ Description: Runs on the arduino MEGA in the joystick. When requested
+ by the head, this code sends the status of all the switches and knobs
+ to the head. 
+ 
+ The joystick has:
+ - A power switch
+ - 4 way joystick with a momentary pushbutton on top.
+ - 2 momentary switches.
+ - 1 toggle switch.
+ - 5 knobs.
  
  */
 
@@ -42,12 +51,13 @@ void setup()
   // Internal pull up on the calibrate button
   digitalWrite(CALIBRATE_BUTTON, HIGH);
 
-  USB_COM_PORT.println("Hi I'm the Joystick, ready to rule the world!");
+  USB_COM_PORT.println("Hi I'm the Joystick, ready to rule the world!\n");
+  
 }//end setup()
 
 
 /*************************************************************************
- * loop(): main loop, sends messages to the headbox from the joystick
+ * loop(): Listens for commands from USB Serial or the Head board over XBee
  **************************************************************************/
 void loop()
 {
@@ -68,6 +78,7 @@ void loop()
     {
       case 'j':
         processSwitchAndKnobRequest();
+        XBEE_SERIAL.flush();
         break;
         
       default:
@@ -79,6 +90,10 @@ void loop()
 }//end loop()
 
 
+/*************************************************************************
+ * processSwitchAndKnobRequest(): Sends the status of all switches and knobs
+                                  to the head over XBEE.
+ **************************************************************************/
 void processSwitchAndKnobRequest()
 {
   // Read switches
