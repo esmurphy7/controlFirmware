@@ -32,17 +32,17 @@ Byte66 - Module 6 Lights [8-bit]
 Byte67 - Spare
 Byte68 - Spare
 Byte69 - Spare
-Byte70 - Boolean Settings
-    70.0 - Kill Switch
-    70.1 - Spare
+Byte70 - Boolean Settings [8-bit]
+    70.0 - Kill Switch [1-bit]
+    70.1 - VerticalOnTheFly [1-bit]
     70.2 - Spare
     70.3 - Spare
     70.4 - Spare
     70.5 - Spare
     70.6 - Spare
     70.7 - Spare
-Byte71 - Slithering Motor Speed  [10-bit] (MSB)
-Byte72 - Slithering Motor Speed  [10-bit]
+Byte71 - Slithering Motor Speed  [8-bit] 
+Byte72 - 
 Byte73 - 
 Byte74 - 
 Byte75 - 

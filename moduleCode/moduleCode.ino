@@ -317,7 +317,7 @@ void processNewSettingsAndSetpoints()
   }
   
   // Check the kill switch [Setting byte 70.0]
-  killSwitch = (settings[70] && 0b00000001);
+  killSwitch = (settings[70] && 0b00000001) > 0;
   if (killSwitch == true)
   {
     killSwitch = true;
@@ -328,6 +328,12 @@ void processNewSettingsAndSetpoints()
     }
     analogWrite(MOTOR_CONTROL, 0);
   }
+  
+  // Get vertical on the fly setting [Setting byte 70.1]
+  verticalOnTheFly = (settings[70] && 0b00000010) > 0;
+  
+  // Get new motor speed [Setting bytes 71 and 72]
+  motorSpeed = settings[71];
 }
  
  /************************************************************************************
