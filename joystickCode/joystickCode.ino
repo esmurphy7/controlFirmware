@@ -42,7 +42,7 @@ void setup()
   // Internal pull up on the calibrate button
   digitalWrite(CALIBRATE_BUTTON, HIGH);
 
-  USB_COM_PORT.println("Hi I'm Titanoboa, ready to rule the world!");
+  USB_COM_PORT.println("Hi I'm the Joystick, ready to rule the world!");
 }//end setup()
 
 
@@ -56,27 +56,83 @@ void loop()
   {
     if (USB_COM_PORT.read() == 'M')
     {
-      manualMode();
+      manualControl();
     }   
   }
   
-  // Read the status of the buttons and switches
+  // Check XBEE serial for commands from the head.
+  if (XBEE_SERIAL.available() > 0)
+  {
+    char command = XBEE_SERIAL.read();
+    switch(command)
+    {
+      case 'j':
+        processSwitchAndKnobRequest();
+        break;
+        
+      default:
+        USB_COM_PORT.print("invalid command recieved = ");
+        USB_COM_PORT.println(command);
+        XBEE_SERIAL.flush();
+    }
+  }
+}//end loop()
+
+
+void processSwitchAndKnobRequest()
+{
+  // Read switches
   boolean killSwitchPressed = digitalRead(JOYSTICK_BUTTON) == HIGH;
+  boolean joystickLeftPressed = digitalRead(JOYSTICK_LEFT_PIN) == HIGH;
+  boolean joystickRightPressed = digitalRead(JOYSTICK_RIGHT_PIN) == HIGH;
+  boolean joystickUpPressed =  digitalRead(JOYSTICK_UP_PIN) == HIGH;
+  boolean joystickDownPressed =  digitalRead(JOYSTICK_DOWN_PIN) == HIGH;
+  boolean spareSwitch1 = false; // Need to add a circuit to the joystick for this.
+  boolean spareSwitch2 = false; // Need to add a circuit to the joystick for this.
+  boolean spareSwitch3 = false; // Need to add a circuit to the joystick for this.
   boolean jawOpenSwitchPressed = digitalRead(JAW_OPEN) == HIGH;
   boolean jawCloseSwitchPressed = digitalRead(JAW_CLOSE) == HIGH;
   boolean straightenVertSwitchPressed = digitalRead(VERTICAL_STRAIGHTEN) == HIGH;
   boolean calibrateButtonPressed = digitalRead(CALIBRATE_BUTTON) == LOW;
-  boolean joystickLeftPressed = digitalRead(JOYSTICK_LEFT_PIN) == HIGH;
-  boolean joystickRightPressed = digitalRead(JOYSTICK_RIGHT_PIN) == HIGH;
   
+  // Read knobs
   unsigned short motorSpeedKnob = analogRead(MOTOR_SPEED_PIN);
-  unsigned short verticalOnTheFlyKnob = analogRead(RSVD_0_PIN);
   unsigned short propagationDelayKnob = analogRead(THROTTLE_PIN);
+  unsigned short verticalOnTheFlyKnob = analogRead(RSVD_0_PIN);
+  unsigned short spareKnob1 = analogRead(RSVD_2_PIN);
+  unsigned short spareKnob2 = analogRead(RSVD_4_PIN);  
+  
+  // Transmit
+  byte joystickPacket[30];  
+  joystickPacket[0] = (byte)killSwitchPressed;
+  joystickPacket[1] = (byte)joystickLeftPressed;
+  joystickPacket[2] = (byte)joystickRightPressed;
+  joystickPacket[3] = (byte)joystickUpPressed;
+  joystickPacket[4] = (byte)joystickDownPressed;
+  joystickPacket[5] = (byte)jawOpenSwitchPressed;
+  joystickPacket[6] = (byte)jawCloseSwitchPressed;
+  joystickPacket[7] = (byte)straightenVertSwitchPressed;
+  joystickPacket[8] = (byte)calibrateButtonPressed;
+  joystickPacket[9] = (byte)spareSwitch1;
+  joystickPacket[10] = (byte)spareSwitch2;
+  joystickPacket[11] = (byte)spareSwitch3;
 
-  // TODO: Send button and switch status 
-
-}//end loop()
-
+  joystickPacket[12] = highByte(motorSpeedKnob);
+  joystickPacket[13] = lowByte(motorSpeedKnob);
+  joystickPacket[14] = highByte(propagationDelayKnob);
+  joystickPacket[15] = lowByte(propagationDelayKnob);
+  joystickPacket[16] = highByte(verticalOnTheFlyKnob);
+  joystickPacket[17] = lowByte(verticalOnTheFlyKnob);
+  joystickPacket[18] = highByte(spareKnob1);
+  joystickPacket[19] = lowByte(spareKnob1);
+  joystickPacket[20] = highByte(spareKnob2);
+  joystickPacket[21] = lowByte(spareKnob2);
+  
+  for (int i = 0; i < 30; ++i)
+  {
+    XBEE_SERIAL.write(joystickPacket[i]);
+  }
+}
 
 /**************************************************************************************
   manualControl(): Allows for manual control over the USB_SERIAL_PORT
