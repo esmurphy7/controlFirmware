@@ -121,6 +121,15 @@ void setup()
 **************************************************************************/
 void loop()
 {
+  // Check USB serial for command to enter manaul mode  
+  if (USB_COM_PORT.available() > 0)
+  {
+    if (USB_COM_PORT.read() == 'M')
+    {
+      manualControl(); 
+    }    
+  }
+  
   // Get the status of each knob and switch on the joystick
   readAndRequestJoystickData();
   
@@ -154,14 +163,15 @@ void waitForModuleAcknowledgments(char* commandName, short timeout)
   // Wait for acknowledgments
   char acks[6];  
   byte acksRecieved = TAIL_SERIAL.readBytes(acks, numberOfModules);
-  if (acksRecieved < numberOfModules)
+  if (acksRecieved != numberOfModules)
   {
     USB_COM_PORT << "ERROR: Only " << acksRecieved << " of " << numberOfModules << 
       " modules acknowledged " << commandName << " command within " << timeout << "ms\n";
     return;
   }
   
-  // Makes sure they are all a's
+  // Each module should acknowledge by sending us it's module number
+  // Make sure this is what happened. 
   for (int i = 0; i < numberOfModules; ++i)
   {
     if (acks[i] != i + 1)
@@ -556,19 +566,6 @@ void manualControl()
           USB_COM_PORT.print("Auxiliary actuator selected\n");
           break;
 
-        // new motor speed setting received
-        case 'm':
-        {
-            while (INPUT_SERIAL.available() < 1);
-            int ms = INPUT_SERIAL.read();
-            TAIL_SERIAL.print('m');
-            TAIL_SERIAL.print(ms);
-            USB_COM_PORT.print("new motor speed received: ");
-            USB_COM_PORT.print(ms, DEC);
-            USB_COM_PORT.println();
-            break;
-        }
-
         case 'd':
           StopMov();
           delaySetting = USB_COM_PORT.read();
@@ -613,7 +610,7 @@ void manualControl()
             digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
             analogWrite(AUX_EXTEND, 255);
           }
-          delay(400);
+          delay(actuationDelay);
           StopMov();
           break;
          
@@ -638,7 +635,7 @@ void manualControl()
             digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
             analogWrite(AUX_RETRACT, 255);
           }
-          delay(400);
+          delay(actuationDelay);
           StopMov();
           USB_COM_PORT.print("done, motor can turn off\n");
           break;
@@ -672,8 +669,8 @@ void manualControl()
 void displayMenu()
 {
     USB_COM_PORT.print("\nManual control mode menu\n");
-    USB_COM_PORT.print("commands: j or h to select jaw or head actuator.");
-    USB_COM_PORT.print("u to select Aux actuator\n");
+    USB_COM_PORT.print("commands: j or h to select jaw or head actuator.\n");
+    USB_COM_PORT.print("          u to select Aux actuator\n");
     USB_COM_PORT.print("\n");
     USB_COM_PORT.print("          a/b - leds [0-6]\n");
     USB_COM_PORT.print("          c - list sensor values\n");
