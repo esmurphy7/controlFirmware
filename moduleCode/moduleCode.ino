@@ -262,26 +262,25 @@ void loop()
   // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
-    //letters in use: p, s, c, h, g, l, k
+    //letters in use: p, s, c, h, g, n
     char command = HEAD_SERIAL.read();
     switch (command)
     {
       case 'p':
         move();
         break;
-      
       case 's':
         processNewSettingsAndSetpoints();
         break;
-      
+      case 'n':
+        processCountModulesCommand();
+        break;
       case 'c':
         processCalibrateCommand();
         break;
-      
       case 'h':
         processLongMotorPulseCommand();
         break;
-        
       case 'g':
         processShortMotorPulseCommand();
         break;
@@ -292,12 +291,35 @@ void loop()
         clearSerialBuffer(HEAD_SERIAL);
     }
   }
-  while (TAIL_SERIAL.available() > 0)
+                                 // TEMP: \|/ We need to ground the last serial down RX
+  while (TAIL_SERIAL.available() > 0 && myModuleNumber != 2)
   {
     HEAD_SERIAL.write(TAIL_SERIAL.read());
   }
 
 }//end loop()
+
+/************************************************************************************
+  processCountModulesCommand(): Tells the head this modules exists, records myModuleNumber.
+ ***********************************************************************************/
+void processCountModulesCommand()
+{
+  USB_COM_PORT.print("I am module number... ");
+  while (HEAD_SERIAL.available() < 1);
+  
+  // Record my module number
+  myModuleNumber = HEAD_SERIAL.read();
+  EEPROM.write(0, myModuleNumber);
+  
+  // Tell the next module it's number
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write('n');
+  TAIL_SERIAL.write(myModuleNumber + 1);
+  
+  // Tell the head I exist.
+  HEAD_SERIAL.write(myModuleNumber);  
+  USB_COM_PORT.println(myModuleNumber);  
+}
 
 /************************************************************************************
   processNewSettingsAndSetpoints(): Recieves new settings and setpoints from the head
@@ -321,8 +343,8 @@ void processNewSettingsAndSetpoints()
   // Copy new setpoints [Setting bytes 0 to 59]
   for (int i = 0; i < 5; ++i)
   {
-    char newHorzSetpoint = (char)settings[myModuleNumber * 5 + i];
-    char newVertSetpoint = (char)settings[myModuleNumber * 5 + i + 30];
+    char newHorzSetpoint = (char)settings[(myModuleNumber-1) * 5 + i];
+    char newVertSetpoint = (char)settings[(myModuleNumber-1) * 5 + i + 30];
     
     // If this is a new setpoint, reset the PID timout timer
     if (newHorzSetpoint != horzAngleArray[i])
@@ -352,9 +374,9 @@ void processNewSettingsAndSetpoints()
   
   // Copy new motor speed [Setting byte 72]
   motorSpeed = settings[72];
-  USB_COM_PORT.print(motorSpeed);
-  USB_COM_PORT.print("\t");
-  USB_COM_PORT.println(horzAngleArray[4]);
+  //USB_COM_PORT.print(motorSpeed);
+  //USB_COM_PORT.print("\t");
+  //USB_COM_PORT.println(horzAngleArray[4]);
 }
 
 /**************************************************************************************
@@ -609,8 +631,6 @@ void calibrateHorizontal()
   
   // Save calibration to EEPROM
   // 10-bit values must be split into two bytes for storage.
-  EEPROM.write(0,myModuleNumber);
-  EEPROM.write(1,endModuleNumber);
   for(int i=0;i<5;i++){ 
     EEPROM.write(i*5+2,lowByte(highRange[i]));
     EEPROM.write(i*5+3,highByte(highRange[i]));
@@ -782,8 +802,6 @@ void calibrateVertical()
   
   // Save calibration to EEPROM
   // 10-bit values must be split into two bytes for storage.
-  //EEPROM.write(0,myModuleNumber);
-  //EEPROM.write(1,endModuleNumber);
   /*for(int i=0;i<5;i++){ 
     EEPROM.write(i*5+2, lowByte(vertHighRange[i]));
     EEPROM.write(i*5+3, highByte(vertHighRange[i]));
