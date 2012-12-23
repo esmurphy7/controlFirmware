@@ -55,6 +55,7 @@ boolean lights[30];
 
 // Other data
 byte numberOfModules = 0;
+boolean joystickIsConnected = false;
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -189,7 +190,7 @@ void runSensorCalibration()
 }
 
 /**************************************************************************************
-  countNumberOfModules(): Counts the number of modules connected to the head.
+  countNumberOfModules(): Counts the number of modules connected to the serial daisy chain.
  *************************************************************************************/
 void countNumberOfModules()
 {
@@ -249,13 +250,13 @@ void sendSetpointsAndSettings()
   waitForModuleAcknowledgments("settings", 40);
 }
 
-unsigned long lastUpdateTime = 0;
-
 /**************************************************************************************
   updateSetpoints(): Propagates the setpoints when it it time to do so.
  *************************************************************************************/
 void updateSetpoints()
 {
+  static unsigned long lastUpdateTime = 0;
+
   // Propagate setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
       (controller.left || controller.right) &&
@@ -281,13 +282,11 @@ void updateSetpoints()
                      responded for 300ms it retries. After 1 retry we are disconnected.
                      It takes between 39 to 210ms for the joystick to responsed (avg: 76ms)
  *************************************************************************************/
-
-boolean joystickIsConnected = false;
-unsigned long lastJoystickRequestTime = 0;
-byte joystickRetryAttempts = 0;
-
 void readAndRequestJoystickData()
 {
+  static unsigned long lastJoystickRequestTime = 0;
+  static byte joystickRetryAttempts = 0;  
+  
   // Check if there's a full joystick packet available
   if (INPUT_SERIAL.available() < 30)
   {
@@ -334,7 +333,6 @@ void readAndRequestJoystickData()
   controller.spareKnob4 = word(packet[17], packet[18]);
 
   // Request another joystick packet  
-  //USB_COM_PORT.println(millis()-lastJoystickRequestTime);
   lastJoystickRequestTime = millis();
   INPUT_SERIAL.write('j');  
 
