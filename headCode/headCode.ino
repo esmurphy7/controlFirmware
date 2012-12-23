@@ -23,6 +23,9 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
+// Enable serial stream writing
+template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
+
 // Variables for controlling titanoboa. Currently this data comes
 // from the joystick, but in the future it could come from an 
 // Android tablet or a PC.
@@ -61,7 +64,7 @@ void setup()
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-  USB_COM_PORT.println("Hi I'm the Titanoboa Head!\n");
+  USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
 
   // Load saved settings
   numberOfModules = EEPROM.read(0);
@@ -117,13 +120,71 @@ void setup()
 **************************************************************************/
 void loop()
 {
+  // Get the status of each knob and switch on the joystick
   readAndRequestJoystickData();
-  sendSetpointsAndSettings();
-  delay(40);
   
+  // Send new settings to each module
+  updateSetpoints();  
+  sendSetpointsAndSettings();
+
+  // Tell the modules to run their PID loops
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write('p');
+  waitForModuleAcknowledgments("pid", 40);
+ 
   if (controller.calibrate)
   {
+    // Find out how many modules are connected
     countNumberOfModules();
+
+    // Calibrate the sensors    
+    runSensorCalibration();
+  }
+}
+
+/**************************************************************************************
+  waitForModuleAcknowledgments(): Waits for each module to report back it's module number.
+ *************************************************************************************/
+void waitForModuleAcknowledgments(char* commandName, short timeout)
+{
+  // Only wait so long for acknowledgments
+  TAIL_SERIAL.setTimeout(timeout);
+  
+  // Wait for acknowledgments
+  char acks[6];  
+  byte acksRecieved = TAIL_SERIAL.readBytes(acks, numberOfModules);
+  if (acksRecieved < numberOfModules)
+  {
+    USB_COM_PORT << "ERROR: Only " << acksRecieved << " of " << numberOfModules << 
+      " modules acknowledged " << commandName << " command within " << timeout << "ms\n";
+    return;
+  }
+  
+  // Makes sure they are all a's
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    if (acks[i] != i + 1)
+    {
+      USB_COM_PORT << "ERROR: Recieved bad acknowledgement from module # " << i + 1 << "\n";
+    }
+  }
+}
+
+/**************************************************************************************
+  runSensorCalibration(): Calibrates the vertical and horizontal sensors on the actuators
+ *************************************************************************************/
+void runSensorCalibration()
+{
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write('c');
+  waitForModuleAcknowledgments("calibrate", 15000); 
+  
+  // Deinitalized all actuator setpoints. The snake is striaght and will
+  // need to start slithering from scratch.
+  for (int i = 0; i < 30; ++i)
+  {
+    horzSetpoints[i] = '3';
+    vertSetpoints[i] = '3';    
   }
 }
 
@@ -153,10 +214,8 @@ void countNumberOfModules()
  *************************************************************************************/
 void sendSetpointsAndSettings()
 {
+  clearSerialBuffer(TAIL_SERIAL);
   byte settings[125];
-  
-  // Update setpoints by propagation
-  updateSetpoints();
   
   // Copy in setpoints
   for (int i = 0; i < 30; ++i)
@@ -185,6 +244,9 @@ void sendSetpointsAndSettings()
   // Send settings
   TAIL_SERIAL.write('s');
   TAIL_SERIAL.write(settings, 125);
+  
+  // Wait for ack
+  waitForModuleAcknowledgments("settings", 40);
 }
 
 unsigned long lastUpdateTime = 0;

@@ -21,6 +21,9 @@
 #define XBEE_SERIAL Serial3
 #define USB_COM_PORT Serial
 
+// Enable serial stream writing
+template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
+
 // Joystick pins
 #define JOYSTICK_LEFT_PIN   41
 #define JOYSTICK_RIGHT_PIN  45
@@ -130,7 +133,7 @@ void processSwitchAndKnobRequest()
   boolean straightenVertOnTheFly = (spareKnob0 > 512);
   
   unsigned short spareKnob2 = analogRead(RSVD_2_PIN);
-  unsigned short spareKnob4 = analogRead(RSVD_4_PIN); 
+  unsigned short spareKnob4 = analogRead(RSVD_4_PIN);
     
   // Transmit
   byte packet[30];  
