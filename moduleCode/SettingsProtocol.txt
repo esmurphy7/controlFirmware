@@ -33,7 +33,7 @@ Byte67 - Spare
 Byte68 - Spare
 Byte69 - Spare
 Byte70 - Boolean Settings [8-bit]
-    70.0 - Kill Switch [1-bit]
+    70.0 - Kill Switch Pressed [1-bit]
     70.1 - Spare
     70.2 - Spare
     70.3 - Spare

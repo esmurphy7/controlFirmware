@@ -83,11 +83,22 @@ void loop()
       default:
         USB_COM_PORT.print("invalid command recieved = ");
         USB_COM_PORT.println(command);
-        XBEE_SERIAL.flush();
+        clearSerialBuffer(XBEE_SERIAL);        
     }
   }    
 }//end loop()
 
+/**************************************************************************************
+  clearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
+                       http://arduino.cc/en/Serial/Flush
+ *************************************************************************************/
+void clearSerialBuffer(HardwareSerial &serial)
+{
+  while (serial.available() > 0)
+  {
+    serial.read();
+  }
+}
 
 /*************************************************************************
  * processSwitchAndKnobRequest(): Sends the status of all switches and knobs
@@ -144,10 +155,7 @@ void processSwitchAndKnobRequest()
   packet[18] = lowByte(spareKnob4);
   packet[19] = 0; // Lots more spares 19 to 29
   
-  for (int i = 0; i < 30; ++i)
-  {
-    XBEE_SERIAL.write(packet[i]);
-  }
+  XBEE_SERIAL.write(packet, 30);
   USB_COM_PORT.println("Done!");
 }
 

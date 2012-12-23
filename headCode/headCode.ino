@@ -44,6 +44,11 @@ class ControllerData
   unsigned short spareKnob4;
 } controller;
 
+// Setpoints for all 30 vertibrae in the snake
+byte vertSetpoints[30];
+byte horzSetpoints[30];
+boolean lights[30];
+
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
 **************************************************************************/
@@ -54,6 +59,14 @@ void setup()
   INPUT_SERIAL.begin(115200);
   USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
 
+  // Initialize all the vertibrae setpoints
+  for (int i = 0; i < 30; ++i)
+  {
+    horzSetpoints[i] = '3';
+    vertSetpoints[i] = '3';    
+    lights[i] = false;    
+  }
+  
   // LED Outputs
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
@@ -90,68 +103,99 @@ void setup()
 }
 
 /*************************************************************************
- loop(): Titanoboa's main thought process. It tells the whole snake what to do!
+ loop(): Titanoboa's main thought process. It tells the whole snake 
+         what to do!
 **************************************************************************/
 void loop()
 {
-  char message;
-
-  // Check for command from USB serial to enter manual control
-  if (USB_COM_PORT.available() > 0)
-  {
-    if (USB_COM_PORT.read() == 'M')
-    {
-      manualControl();
-    }
-  }
-  
-  // Ask the joystick for data
-  RequestJoystickData();
-  
   delay(500);
-  // Send new settings and setpoints to the modules. (Estimate 10ms)
-      // Wait for acknowledgement
-      // Timeout if missing an acknowledgement. (and log error)
+  requestJoystickData();
+  sendSetpointsAndSettings();
+  readJoystickData();
+}
+
+
+void sendSetpointsAndSettings()
+{
+  byte settings[125];
   
-  // Run PID loop on modules (Estimate 5ms)
-      // Wait for acknowledgement 
-      // Timeout if missing an acknowledgement. (and log error)
+  // Update setpoints by propagation
+  updateSetpoints();
   
-  // Request some diagnostic info from modules (Estimate 25ms)
-      // Wait for all to come in, then send over Ethernet.
-      // Timeout if missing data from a module. (and log error)
-  
-  // Read the new joystick data for the next iteration
-  boolean retVal = ReadJoystickData();
-  if (retVal == false && controller.killSwitchPressed == true)
+  // Copy in setpoints
+  for (int i = 0; i < 30; ++i)
   {
-    USB_COM_PORT.println("Lost connection? Releasing the kill switch.");
-    controller.killSwitchPressed = false;
+    settings[i] = horzSetpoints[i];
+    settings[i + 30] = vertSetpoints[i];
   }
-      
+  
+  // Copy in lights
+  for (int i = 0; i < 5; ++i)
+  {
+    byte moduleLights = 0;
+    moduleLights += (byte)lights[i * 5 + 0] & B00000001;
+    moduleLights += (byte)lights[i * 5 + 1] & B00000010;
+    moduleLights += (byte)lights[i * 5 + 2] & B00000100;
+    moduleLights += (byte)lights[i * 5 + 3] & B00001000;
+    moduleLights += (byte)lights[i * 5 + 4] & B00010000;
+    settings[60 + i] = moduleLights;
+  }
+  
+  // Misc 
+  settings[70] = 0;
+  settings[70] += controller.killSwitchPressed & B00000001;
+  settings[72] = controller.motorSpeed;
+  
+  USB_COM_PORT.println(settings[72]);
+  
+  // Send settings
+  TAIL_SERIAL.write('s');
+  TAIL_SERIAL.write(settings, 125);
+}
+
+void updateSetpoints()
+{
+  static unsigned long lastUpdateTime = 0;
+  
+  // Propagate setpoints if it's time to do so.
+  if (controller.killSwitchPressed &&
+      (controller.left || controller.right) &&
+      (millis() - lastUpdateTime > controller.propagationDelay))
+  {
+    // TEMP: Test by only moving 1 actuator for now.
+    if (controller.left)
+    {
+      horzSetpoints[9] = '0';
+    }
+    else
+    {
+      horzSetpoints[9] = '1';      
+    }
+  }  
+  lastUpdateTime = millis();  
 }
 
 /**************************************************************************************
-  RequestJoystickData(): Asks the joystick for the status of each knob and switch.
+  requestJoystickData(): Asks the joystick for the status of each knob and switch.
                          On average it takes 23ms to get this data (max 37ms, min 15ms)
                          So you have time to do other operations before calling ReadJoystickData()
  *************************************************************************************/
 
-void RequestJoystickData()
+void requestJoystickData()
 {
   // Clear any lingering joystick data
   // (eg. If the joystick just turned on, we can get out of sync)
-  ClearSerialBuffer(INPUT_SERIAL);
+  clearSerialBuffer(INPUT_SERIAL);
   
   // Request data from joystick
   INPUT_SERIAL.write('j');
 }
 
 /**************************************************************************************
-  ReadJoystickData(): Reads the joystick data. Make sure you call RequestJoystickData() 
-                      first. Returns false if we didn't get any data.
+  readJoystickData(): Reads the joystick data. Make sure you call RequestJoystickData() 
+                      first.
  *************************************************************************************/
-boolean ReadJoystickData()
+void readJoystickData()
 {
   char packet[30];
 
@@ -159,8 +203,13 @@ boolean ReadJoystickData()
   INPUT_SERIAL.setTimeout(40);
   if (INPUT_SERIAL.readBytes(packet, 30) < 30)
   {
-    USB_COM_PORT.println("ERROR: Joystick data was not recieved.");  
-    return false;
+    USB_COM_PORT.println("ERROR: No joystick data. Lost connection?");  
+    if (controller.killSwitchPressed == true)
+    {
+      USB_COM_PORT.println("Releasing the kill switch.");
+      controller.killSwitchPressed = false;
+    }
+    return;
   }
   
   // Success we have the new joystick data. Now just sort it.
@@ -194,14 +243,14 @@ boolean ReadJoystickData()
   USB_COM_PORT.println(controller.spareKnob2);
   USB_COM_PORT.println(controller.spareKnob4);*/
   
-  return true;
+  return;
 }
 
 /**************************************************************************************
-  ClearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
+  clearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
                        http://arduino.cc/en/Serial/Flush
  *************************************************************************************/
-void ClearSerialBuffer(HardwareSerial &serial)
+void clearSerialBuffer(HardwareSerial &serial)
 {
   while (serial.available() > 0)
   {

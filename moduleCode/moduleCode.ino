@@ -66,14 +66,11 @@ int lowRange[] = {0, 0, 0, 0, 0};
 // Assume a linear sensor characteristic between these two points.
 int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
 int vertLowRange[]  = {0, 0, 0, 0, 0};
-              
-// Settings
-byte settings[125];
-      
+                   
 byte myModuleNumber;                    // My position in the module chain (1,2,3...)
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
-byte killSwitch = true;                 // True if no movement should be done.
-int motorSpeed = 200;                   // Analog output for pump speed when turned on
+byte killSwitchPressed = true;          // True if no movement should be done.
+byte motorSpeed = 200;                   // Analog output for pump speed when turned on
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -241,6 +238,9 @@ void setup()
     USB_COM_PORT.print('\t');
   }
   delay(1000);
+  USB_COM_PORT.println("\n");
+  clearSerialBuffer(HEAD_SERIAL);
+  clearSerialBuffer(TAIL_SERIAL);
 }
 
 
@@ -249,7 +249,7 @@ void setup()
  ***********************************************************************************/
  
 void loop()
-{
+{ 
   // Check the USB port for command to enter manual mode
   if (USB_COM_PORT.available()>0)
   {
@@ -289,8 +289,7 @@ void loop()
       default:
         USB_COM_PORT.print("Invalid command from upstream serial = ");
         USB_COM_PORT.println(command);
-        HEAD_SERIAL.flush();
-        
+        clearSerialBuffer(HEAD_SERIAL);
     }
   }
   while (TAIL_SERIAL.available() > 0)
@@ -303,21 +302,21 @@ void loop()
 /************************************************************************************
   processNewSettingsAndSetpoints(): Recieves new settings and setpoints from the head
  ***********************************************************************************/
-
 void processNewSettingsAndSetpoints()
 {
+  char settings[125];
+  
   // Get data array from upstream. Store in an array.
-  for (int i = 0; i < 125; ++i)
+  HEAD_SERIAL.setTimeout(30);
+  if (HEAD_SERIAL.readBytes(settings, 125) < 125)
   {
-    settings[i] = HEAD_SERIAL.read();
+    USB_COM_PORT.println("ERROR: Missing settings array");
+    return;
   }
   
   // Send data array downstream.
   TAIL_SERIAL.write('s');
-  for (int i = 0; i < 125; ++i)
-  {
-    TAIL_SERIAL.write(settings[i]);
-  }
+  TAIL_SERIAL.write((byte*)settings, 125);
 
   // Copy new setpoints [Setting bytes 0 to 59]
   for (int i = 0; i < 5; ++i)
@@ -340,8 +339,8 @@ void processNewSettingsAndSetpoints()
   }
 
   // Check the kill switch [Setting bit 70.0]
-  killSwitch = (settings[70] && 0b00000001) > 0;
-  if (killSwitch == true)
+  killSwitchPressed = (settings[70] & B00000001) > 0;
+  if (killSwitchPressed == false)
   {
     for(int i=0; i < 5; i++)
     {
@@ -353,8 +352,23 @@ void processNewSettingsAndSetpoints()
   
   // Copy new motor speed [Setting byte 72]
   motorSpeed = settings[72];
+  USB_COM_PORT.print(motorSpeed);
+  USB_COM_PORT.print("\t");
+  USB_COM_PORT.println(horzAngleArray[4]);
 }
- 
+
+/**************************************************************************************
+  clearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
+                       http://arduino.cc/en/Serial/Flush
+ *************************************************************************************/
+void clearSerialBuffer(HardwareSerial &serial)
+{
+  while (serial.available() > 0)
+  {
+    serial.read();
+  }
+}
+
  /************************************************************************************
   processDiagnosticsCommand(): Responds to the head's request to get diagnsotic info.
  ***********************************************************************************/
