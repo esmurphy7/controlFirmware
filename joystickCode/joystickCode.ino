@@ -78,7 +78,6 @@ void loop()
     {
       case 'j':
         processSwitchAndKnobRequest();
-        XBEE_SERIAL.flush();
         break;
         
       default:
@@ -86,7 +85,7 @@ void loop()
         USB_COM_PORT.println(command);
         XBEE_SERIAL.flush();
     }
-  }
+  }    
 }//end loop()
 
 
@@ -96,57 +95,60 @@ void loop()
  **************************************************************************/
 void processSwitchAndKnobRequest()
 {
+  USB_COM_PORT.print("Sending joystick data... ");
+  
   // Read switches
-  boolean killSwitchPressed = digitalRead(JOYSTICK_BUTTON) == HIGH;
+  boolean joystickButtonPressed = digitalRead(JOYSTICK_BUTTON) == HIGH;
   boolean joystickLeftPressed = digitalRead(JOYSTICK_LEFT_PIN) == HIGH;
   boolean joystickRightPressed = digitalRead(JOYSTICK_RIGHT_PIN) == HIGH;
   boolean joystickUpPressed =  digitalRead(JOYSTICK_UP_PIN) == HIGH;
   boolean joystickDownPressed =  digitalRead(JOYSTICK_DOWN_PIN) == HIGH;
-  boolean spareSwitch1 = false; // Need to add a circuit to the joystick for this.
-  boolean spareSwitch2 = false; // Need to add a circuit to the joystick for this.
-  boolean spareSwitch3 = false; // Need to add a circuit to the joystick for this.
   boolean jawOpenSwitchPressed = digitalRead(JAW_OPEN) == HIGH;
   boolean jawCloseSwitchPressed = digitalRead(JAW_CLOSE) == HIGH;
-  boolean straightenVertSwitchPressed = digitalRead(VERTICAL_STRAIGHTEN) == HIGH;
+  boolean vertStraightenSwitchPressed = digitalRead(VERTICAL_STRAIGHTEN) == HIGH;
   boolean calibrateButtonPressed = digitalRead(CALIBRATE_BUTTON) == LOW;
   
   // Read knobs
   unsigned short motorSpeedKnob = analogRead(MOTOR_SPEED_PIN);
-  unsigned short propagationDelayKnob = analogRead(THROTTLE_PIN);
-  unsigned short verticalOnTheFlyKnob = analogRead(RSVD_0_PIN);
-  unsigned short spareKnob1 = analogRead(RSVD_2_PIN);
-  unsigned short spareKnob2 = analogRead(RSVD_4_PIN);  
+  byte motorSpeed = map(motorSpeedKnob, 0, 1023, 0, 255);
   
+  unsigned short propagationDelayKnob = analogRead(THROTTLE_PIN);
+  unsigned short propagationDelay = map(propagationDelayKnob, 0, 1023, 1000, 250);
+  
+  unsigned short spareKnob0 = analogRead(RSVD_0_PIN);
+  boolean straightenVertOnTheFly = (spareKnob0 > 512);
+  
+  unsigned short spareKnob2 = analogRead(RSVD_2_PIN);
+  unsigned short spareKnob4 = analogRead(RSVD_4_PIN); 
+    
   // Transmit
-  byte joystickPacket[30];  
-  joystickPacket[0] = (byte)killSwitchPressed;
-  joystickPacket[1] = (byte)joystickLeftPressed;
-  joystickPacket[2] = (byte)joystickRightPressed;
-  joystickPacket[3] = (byte)joystickUpPressed;
-  joystickPacket[4] = (byte)joystickDownPressed;
-  joystickPacket[5] = (byte)jawOpenSwitchPressed;
-  joystickPacket[6] = (byte)jawCloseSwitchPressed;
-  joystickPacket[7] = (byte)straightenVertSwitchPressed;
-  joystickPacket[8] = (byte)calibrateButtonPressed;
-  joystickPacket[9] = (byte)spareSwitch1;
-  joystickPacket[10] = (byte)spareSwitch2;
-  joystickPacket[11] = (byte)spareSwitch3;
-
-  joystickPacket[12] = highByte(motorSpeedKnob);
-  joystickPacket[13] = lowByte(motorSpeedKnob);
-  joystickPacket[14] = highByte(propagationDelayKnob);
-  joystickPacket[15] = lowByte(propagationDelayKnob);
-  joystickPacket[16] = highByte(verticalOnTheFlyKnob);
-  joystickPacket[17] = lowByte(verticalOnTheFlyKnob);
-  joystickPacket[18] = highByte(spareKnob1);
-  joystickPacket[19] = lowByte(spareKnob1);
-  joystickPacket[20] = highByte(spareKnob2);
-  joystickPacket[21] = lowByte(spareKnob2);
+  byte packet[30];  
+  packet[0] = (byte)joystickButtonPressed;
+  packet[1] = (byte)joystickLeftPressed;
+  packet[2] = (byte)joystickRightPressed;
+  packet[3] = (byte)joystickUpPressed;
+  packet[4] = (byte)joystickDownPressed;
+  packet[5] = (byte)jawOpenSwitchPressed;
+  packet[6] = (byte)jawCloseSwitchPressed;
+  packet[7] = (byte)vertStraightenSwitchPressed;
+  packet[8] = (byte)calibrateButtonPressed;
+  packet[9] = (byte)straightenVertOnTheFly;
+  packet[10] = 0; // Spare space for booleans
+  packet[11] = 0; // Spare space for booleans
+  packet[12] = motorSpeed;
+  packet[13] = highByte(propagationDelay);
+  packet[14] = lowByte(propagationDelay);
+  packet[15] = highByte(spareKnob2);
+  packet[16] = lowByte(spareKnob2);
+  packet[17] = highByte(spareKnob4);
+  packet[18] = lowByte(spareKnob4);
+  packet[19] = 0; // Lots more spares 19 to 29
   
   for (int i = 0; i < 30; ++i)
   {
-    XBEE_SERIAL.write(joystickPacket[i]);
+    XBEE_SERIAL.write(packet[i]);
   }
+  USB_COM_PORT.println("Done!");
 }
 
 /**************************************************************************************
@@ -156,11 +158,6 @@ void manualControl()
 {
     boolean manual = true;
     char byteIn = 'z';
-    int moduleSelect = 0;
-    int segSelect = 0;
-    boolean motor = false;
-    int actuationDelay = 200;
-    char delaySetting = 'm';
 
     displayMenu();
 
@@ -218,7 +215,7 @@ void readAllButtons()
 
     // Get the current raw value of the throttle
     buttonVal = analogRead(THROTTLE_PIN);
-    USB_COM_PORT.print("Throttle: ");
+    USB_COM_PORT.print("Prop delay: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of the motor speed
@@ -228,17 +225,17 @@ void readAllButtons()
 
     // Get the current raw value of reserved 1 knob
     buttonVal = analogRead(RSVD_0_PIN);
-    USB_COM_PORT.print("Reserved 0: ");
+    USB_COM_PORT.print("AD 0: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of reserved 2 knob
     buttonVal = analogRead(RSVD_2_PIN);
-    USB_COM_PORT.print("Reserved 2: ");
+    USB_COM_PORT.print("AD 2: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of reserved 3 knob
     buttonVal = analogRead(RSVD_4_PIN);
-    USB_COM_PORT.print("Reserved 4: ");
+    USB_COM_PORT.print("Ad 4: ");
     USB_COM_PORT.println(buttonVal);
 
     // Get the current raw value of jaw switch

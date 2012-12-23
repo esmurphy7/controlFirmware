@@ -22,14 +22,30 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
-// Propagation delay storage delays
-unsigned int currentTime;
-unsigned int lastAngleReceivedTime;
-unsigned int timeDifference;
-unsigned int throttleDelay;
+// Variables for controlling titanoboa. Currently this data comes
+// from the joystick, but in the future it could come from an 
+// Android tablet or a PC.
+class ControllerData 
+{
+  public:
+  boolean right;
+  boolean left;
+  boolean up;
+  boolean down;
+  boolean killSwitchPressed;
+  boolean openJaw;
+  boolean closeJaw;
+  boolean straightenVertical;
+  boolean straightenVertOnTheFly;
+  boolean calibrate;
+  byte motorSpeed;
+  unsigned short propagationDelay;
+  unsigned short spareKnob2;
+  unsigned short spareKnob4;
+} controller;
 
 /*************************************************************************
- setup(): Initializes serial ports, pins
+ setup(): Initializes serial ports, led and actuator pins
 **************************************************************************/
 void setup()
 {
@@ -46,10 +62,11 @@ void setup()
   pinMode(LED_5, OUTPUT);
   pinMode(LED_6, OUTPUT);  
 
-  // Initialize Actuator Controls Off
+  // We have the ability to do actuator dithering, but it's not 
+  // really that useful the way our electronics are setup
   pinMode(DITHER, OUTPUT);
-  digitalWrite(DITHER, LOW); //Have dither set as low in this case (no actuation at all)
- 
+  digitalWrite(DITHER, LOW);
+  
   // Initialize actuator PWM outputs
   for(int i=0;i<3;i++)
   {
@@ -70,15 +87,10 @@ void setup()
   {
     pinMode(HEAD_POS_SENSOR[i],INPUT);
   }
-
-  currentTime = 0;
-  lastAngleReceivedTime = 0;
-  timeDifference = 0;
 }
 
 /*************************************************************************
- loop(): main loop, checks for messages from the joystick and relays them
-         to the first module
+ loop(): Titanoboa's main thought process. It tells the whole snake what to do!
 **************************************************************************/
 void loop()
 {
@@ -92,10 +104,11 @@ void loop()
       manualControl();
     }
   }
-
-  // Request settings from joystick (Estimate 3ms)
-      // Timeout if no response. Enable kill switch. (and log error)
-      
+  
+  // Ask the joystick for data
+  RequestJoystickData();
+  
+  delay(500);
   // Send new settings and setpoints to the modules. (Estimate 10ms)
       // Wait for acknowledgement
       // Timeout if missing an acknowledgement. (and log error)
@@ -107,6 +120,93 @@ void loop()
   // Request some diagnostic info from modules (Estimate 25ms)
       // Wait for all to come in, then send over Ethernet.
       // Timeout if missing data from a module. (and log error)
+  
+  // Read the new joystick data for the next iteration
+  boolean retVal = ReadJoystickData();
+  if (retVal == false && controller.killSwitchPressed == true)
+  {
+    USB_COM_PORT.println("Lost connection? Releasing the kill switch.");
+    controller.killSwitchPressed = false;
+  }
+      
+}
+
+/**************************************************************************************
+  RequestJoystickData(): Asks the joystick for the status of each knob and switch.
+                         On average it takes 23ms to get this data (max 37ms, min 15ms)
+                         So you have time to do other operations before calling ReadJoystickData()
+ *************************************************************************************/
+
+void RequestJoystickData()
+{
+  // Clear any lingering joystick data
+  // (eg. If the joystick just turned on, we can get out of sync)
+  ClearSerialBuffer(INPUT_SERIAL);
+  
+  // Request data from joystick
+  INPUT_SERIAL.write('j');
+}
+
+/**************************************************************************************
+  ReadJoystickData(): Reads the joystick data. Make sure you call RequestJoystickData() 
+                      first. Returns false if we didn't get any data.
+ *************************************************************************************/
+boolean ReadJoystickData()
+{
+  char packet[30];
+
+  // Read in data from joystick
+  INPUT_SERIAL.setTimeout(40);
+  if (INPUT_SERIAL.readBytes(packet, 30) < 30)
+  {
+    USB_COM_PORT.println("ERROR: Joystick data was not recieved.");  
+    return false;
+  }
+  
+  // Success we have the new joystick data. Now just sort it.
+  controller.killSwitchPressed = (boolean)packet[0];
+  controller.left = (boolean)packet[1];
+  controller.right = (boolean)packet[2];
+  controller.up = (boolean)packet[3];
+  controller.down = (boolean)packet[4];
+  controller.openJaw = (boolean)packet[5];
+  controller.closeJaw = (boolean)packet[6];
+  controller.straightenVertical = (boolean)packet[7];
+  controller.calibrate = (boolean)packet[8];
+  controller.straightenVertOnTheFly = (boolean)packet[9];
+  controller.motorSpeed = packet[12];
+  controller.propagationDelay = word(packet[13], packet[14]);
+  controller.spareKnob2 = word(packet[15], packet[16]);
+  controller.spareKnob4 = word(packet[17], packet[18]);
+    
+  /*USB_COM_PORT.println(controller.killSwitchPressed);
+  USB_COM_PORT.println(controller.left);
+  USB_COM_PORT.println(controller.right);
+  USB_COM_PORT.println(controller.up);
+  USB_COM_PORT.println(controller.down);
+  USB_COM_PORT.println(controller.openJaw);
+  USB_COM_PORT.println(controller.closeJaw);
+  USB_COM_PORT.println(controller.straightenVertical);
+  USB_COM_PORT.println(controller.calibrate);
+  USB_COM_PORT.println(controller.straightenVertOnTheFly);
+  USB_COM_PORT.println(controller.motorSpeed);
+  USB_COM_PORT.println(controller.propagationDelay);
+  USB_COM_PORT.println(controller.spareKnob2);
+  USB_COM_PORT.println(controller.spareKnob4);*/
+  
+  return true;
+}
+
+/**************************************************************************************
+  ClearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
+                       http://arduino.cc/en/Serial/Flush
+ *************************************************************************************/
+void ClearSerialBuffer(HardwareSerial &serial)
+{
+  while (serial.available() > 0)
+  {
+    serial.read();
+  }
 }
 
 /**************************************************************************************
