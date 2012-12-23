@@ -267,16 +267,19 @@ void loop()
     switch (command)
     {
       case 'p':
-        move();
+        processRunPIDCommand();
+        acknowledgeCommand();
         break;
       case 's':
         processNewSettingsAndSetpoints();
+        acknowledgeCommand();
         break;
       case 'n':
         processCountModulesCommand();
         break;
       case 'c':
         processCalibrateCommand();
+        acknowledgeCommand();
         break;
       case 'h':
         processLongMotorPulseCommand();
@@ -298,6 +301,28 @@ void loop()
   }
 
 }//end loop()
+
+/************************************************************************************
+  acknowledgeCommand(): Tells the head the command is finished on this module.
+                        Only send acknowledgements if the head is programmed to wait
+                        for them after that command.
+ ***********************************************************************************/
+void acknowledgeCommand()
+{
+  HEAD_SERIAL.write(myModuleNumber);
+}
+
+/************************************************************************************
+  processRunPIDCommand(): Runs the PID loop if the kill switch is still pressed.
+ ***********************************************************************************/
+void processRunPIDCommand()
+{
+  if (killSwitchPressed)
+  {
+    TAIL_SERIAL.write('p');
+  }
+  move(); 
+}
 
 /************************************************************************************
   processCountModulesCommand(): Tells the head this modules exists, records myModuleNumber.
@@ -535,27 +560,12 @@ void move()
  ***********************************************************************************/
 void processCalibrateCommand()
 {
-  // Determine my modules number
-  USB_COM_PORT.println("Calibrate command received");
-  while (HEAD_SERIAL.available() < 1);
-  myModuleNumber = HEAD_SERIAL.read();
-
-  // Tell next module to also calibrate
-  TAIL_SERIAL.write('c');
-  TAIL_SERIAL.write(myModuleNumber + 1);
-
   //calibrate horizontal position and reset everything
   calibrateHorizontal();
-  HEAD_SERIAL.flush();
-  TAIL_SERIAL.flush();
-
   delay(100);
   
   //calibrate vertical position and reset everything
   //calibrateVertical();
-  HEAD_SERIAL.flush();
-  TAIL_SERIAL.flush();
-
   delay(100);
 
 } //end processCalibrateCommand()
