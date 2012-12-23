@@ -17,6 +17,7 @@
 */
 
 #include "titanoboa_headboard_pins.h"
+#include "EEPROM.h"
 
 #define INPUT_SERIAL Serial3            // Xbee
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
@@ -49,6 +50,9 @@ byte vertSetpoints[30];
 byte horzSetpoints[30];
 boolean lights[30];
 
+// Other data
+byte numberOfModules = 0;
+
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
 **************************************************************************/
@@ -57,7 +61,12 @@ void setup()
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-  USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
+  USB_COM_PORT.println("Hi I'm the Titanoboa Head!\n");
+
+  // Load saved settings
+  numberOfModules = EEPROM.read(0);
+  USB_COM_PORT.print("Number of modules: ");
+  USB_COM_PORT.println(numberOfModules);
 
   // Initialize all the vertibrae setpoints
   for (int i = 0; i < 30; ++i)
@@ -108,13 +117,40 @@ void setup()
 **************************************************************************/
 void loop()
 {
-  delay(500);
-  requestJoystickData();
+  readAndRequestJoystickData();
   sendSetpointsAndSettings();
-  readJoystickData();
+  delay(40);
+  
+  if (controller.calibrate)
+  {
+    countNumberOfModules();
+  }
 }
 
+/**************************************************************************************
+  countNumberOfModules(): Counts the number of modules connected to the head.
+ *************************************************************************************/
+void countNumberOfModules()
+{
+  USB_COM_PORT.print("Counting modules... ");
+  TAIL_SERIAL.write('n');
+  
+  // Tell the first module it's module number 1
+  TAIL_SERIAL.write(1);
+  delay(500);
+  
+  // Record number of modules that responded
+  numberOfModules = TAIL_SERIAL.available();
+  EEPROM.write(0, numberOfModules);  
+  
+  clearSerialBuffer(TAIL_SERIAL);  
+  USB_COM_PORT.print("Found ");
+  USB_COM_PORT.println(numberOfModules);
+}
 
+/**************************************************************************************
+  sendSetpointsAndSettings(): Sends the settings down to every module.
+ *************************************************************************************/
 void sendSetpointsAndSettings()
 {
   byte settings[125];
@@ -146,17 +182,18 @@ void sendSetpointsAndSettings()
   settings[70] += controller.killSwitchPressed & B00000001;
   settings[72] = controller.motorSpeed;
   
-  USB_COM_PORT.println(settings[72]);
-  
   // Send settings
   TAIL_SERIAL.write('s');
   TAIL_SERIAL.write(settings, 125);
 }
 
+unsigned long lastUpdateTime = 0;
+
+/**************************************************************************************
+  updateSetpoints(): Propagates the setpoints when it it time to do so.
+ *************************************************************************************/
 void updateSetpoints()
 {
-  static unsigned long lastUpdateTime = 0;
-  
   // Propagate setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
       (controller.left || controller.right) &&
@@ -165,54 +202,60 @@ void updateSetpoints()
     // TEMP: Test by only moving 1 actuator for now.
     if (controller.left)
     {
+      USB_COM_PORT.println("Left");
       horzSetpoints[9] = '0';
     }
     else
     {
+      USB_COM_PORT.println("Right");
       horzSetpoints[9] = '1';      
     }
-  }  
-  lastUpdateTime = millis();  
+    lastUpdateTime = millis();  
+  }
 }
 
 /**************************************************************************************
-  requestJoystickData(): Asks the joystick for the status of each knob and switch.
-                         On average it takes 23ms to get this data (max 37ms, min 15ms)
-                         So you have time to do other operations before calling ReadJoystickData()
+  readAndRequestJoystickData(): Asks the joystick for data and reads its back. If the joystick hasn't
+                     responded for 300ms it retries. After 1 retry we are disconnected.
+                     It takes between 39 to 210ms for the joystick to responsed (avg: 76ms)
  *************************************************************************************/
 
-void requestJoystickData()
-{
-  // Clear any lingering joystick data
-  // (eg. If the joystick just turned on, we can get out of sync)
-  clearSerialBuffer(INPUT_SERIAL);
-  
-  // Request data from joystick
-  INPUT_SERIAL.write('j');
-}
+boolean joystickIsConnected = false;
+unsigned long lastJoystickRequestTime = 0;
+byte joystickRetryAttempts = 0;
 
-/**************************************************************************************
-  readJoystickData(): Reads the joystick data. Make sure you call RequestJoystickData() 
-                      first.
- *************************************************************************************/
-void readJoystickData()
+void readAndRequestJoystickData()
 {
-  char packet[30];
-
-  // Read in data from joystick
-  INPUT_SERIAL.setTimeout(40);
-  if (INPUT_SERIAL.readBytes(packet, 30) < 30)
+  // Check if there's a full joystick packet available
+  if (INPUT_SERIAL.available() < 30)
   {
-    USB_COM_PORT.println("ERROR: No joystick data. Lost connection?");  
-    if (controller.killSwitchPressed == true)
-    {
-      USB_COM_PORT.println("Releasing the kill switch.");
-      controller.killSwitchPressed = false;
+    // There's no joystick data. If it's been 300ms since 
+    // the last request. Try retrying the joystick request.
+    if (millis() - lastJoystickRequestTime > 300)
+    { 
+      // If we've retried already, now we know the joystick is disconnected!
+      if (joystickRetryAttempts > 0)
+      {
+        USB_COM_PORT.println("ERROR: No joystick data. It is Disconnected.");
+        joystickIsConnected = false;
+        controller.killSwitchPressed = false;
+      }
+      ++joystickRetryAttempts;
+      clearSerialBuffer(INPUT_SERIAL);
+      INPUT_SERIAL.write('j');
+      lastJoystickRequestTime = millis();       
     }
     return;
   }
+ 
+  // Success! We have new data, so we are connected to the joystick.
+  joystickIsConnected = true; 
+  joystickRetryAttempts = 0;
   
-  // Success we have the new joystick data. Now just sort it.
+  // Sort our new data.
+  char packet[30];
+  INPUT_SERIAL.readBytes(packet, 30);
+  
   controller.killSwitchPressed = (boolean)packet[0];
   controller.left = (boolean)packet[1];
   controller.right = (boolean)packet[2];
@@ -227,7 +270,12 @@ void readJoystickData()
   controller.propagationDelay = word(packet[13], packet[14]);
   controller.spareKnob2 = word(packet[15], packet[16]);
   controller.spareKnob4 = word(packet[17], packet[18]);
-    
+
+  // Request another joystick packet  
+  //USB_COM_PORT.println(millis()-lastJoystickRequestTime);
+  lastJoystickRequestTime = millis();
+  INPUT_SERIAL.write('j');  
+
   /*USB_COM_PORT.println(controller.killSwitchPressed);
   USB_COM_PORT.println(controller.left);
   USB_COM_PORT.println(controller.right);
