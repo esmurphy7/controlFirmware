@@ -8,20 +8,16 @@
   Decription: This code runs on an Arduino MEGA with a BoaShield to
   the control 5 vertical and 5 horizontal actuators of a 
   5 vertebrae module. Titanaboa moves by pushing a sequence of
-  angles from head to tail at an interval initiated by an external 
-  controller.
+  angles from head to tail at an interval initiated by the head board.
   
   Vertebrae angles are controlled by a hydrualic system in a PID
   loop with angular position sensors. Communication between the 
-  modules is done over a serial daisy chain.  
-
+  modules is done over a serial daisy chain. 
 */
 
 #include "EEPROM.h"
 #include "titanoboa_pins.h"
 #include "PIDcontrol.h"
-#include "Lights.h"
-
 
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
@@ -93,10 +89,6 @@ PIDcontrol PIDcontrollerVertical[] = {
   PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3], even),
   PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4], !even),
 };
-
-// lights object for cotrolling lights
-Lights myLights = Lights();  //default is off
-
 
 /****************************************************************************
  setup(): Initializes serial ports, pins and loads EEPROM calibration
