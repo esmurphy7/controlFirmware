@@ -267,21 +267,39 @@ void updateSetpoints()
 {
   static unsigned long lastUpdateTime = 0;
 
-  // Propagate setpoints if it's time to do so.
+  // Disable vertical actuation. If (1) the straighten vertical switch is
+  // pressed or (2) vertical straighten on the fly is enabled, set all
+  // verticals to straight.
+  byte allVertSetpoints = '3';
+  if (controller.killSwitchPressed &&
+      (controller.straightenVertOnTheFly || controller.straightenVertical))
+  {
+      USB_COM_PORT.println(millis());
+      allVertSetpoints = '2';
+  }
+  for (int i = 0; i < 30; ++i)
+  {
+    vertSetpoints[i] = allVertSetpoints;
+  }
+
+  // Propagate horizontal setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
       (controller.left || controller.right) &&
       (millis() - lastUpdateTime > controller.propagationDelay))
   {
-    // TEMP: Test by only moving 1 actuator for now.
+    for (int i = 29; i > 0; --i)
+    {
+      horzSetpoints[i] = horzSetpoints[i - 1];
+    }
+    
+    // The first actuator gets the new setpoint
+    if (controller.right)
+    {
+      horzSetpoints[0] = '1';
+    }
     if (controller.left)
     {
-      USB_COM_PORT.println("Left");
-      horzSetpoints[9] = '0';
-    }
-    else
-    {
-      USB_COM_PORT.println("Right");
-      horzSetpoints[9] = '1';      
+      horzSetpoints[0] = '0';
     }
     lastUpdateTime = millis();  
   }
