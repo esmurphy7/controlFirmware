@@ -69,8 +69,8 @@ int vertLowRange[]  = {0, 0, 0, 0, 0};
                    
 byte myModuleNumber;                    // My position in the module chain (1,2,3...)
 byte endModuleNumber;                   // ? TODO:Not sure why we would need this
-byte killSwitchPressed = true;          // True if no movement should be done.
-byte motorSpeed = 200;                   // Analog output for pump speed when turned on
+byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
+byte motorSpeed = 200;                  // Analog output for pump speed when turned on
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -317,11 +317,11 @@ void acknowledgeCommand()
  ***********************************************************************************/
 void processRunPIDCommand()
 {
+  TAIL_SERIAL.write('p');   
   if (killSwitchPressed)
-  {
-    TAIL_SERIAL.write('p');
+  {     
+    move(); 
   }
-  move(); 
 }
 
 /************************************************************************************
@@ -496,32 +496,37 @@ void move()
     else
     {
       analogWrite(HORZ_ACTUATOR[i],0);
-      continue;
+      goal = -1;
     }
 
-    PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
-    currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
-    
-    // If we are have not reached the deadzone and haven't timed out
-    if ((abs(currentAngle-goal)>DEAD_ZONE) &&
-       (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
+    if (goal >= 0)
     {
-      // Update the acutator PID output
-      analogWrite(MOTOR_CONTROL, motorSpeed);
-      PIDcontrollerHorizontal[i].updateOutput();
-      moved = true;
-    }
-    // We are in the deadzone or we took too long to get there    
-    else
-    {
-      analogWrite(HORZ_ACTUATOR[i],0);
+      PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
+      currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
+      
+      // If we are have not reached the deadzone and haven't timed out
+      if ((abs(currentAngle-goal)>DEAD_ZONE) &&
+         (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
+      {
+        // Update the acutator PID output
+        analogWrite(MOTOR_CONTROL, motorSpeed);
+        PIDcontrollerHorizontal[i].updateOutput();
+        moved = true;
+      }
+      // We are in the deadzone or we took too long to get there    
+      else
+      {
+        analogWrite(HORZ_ACTUATOR[i],0);
+      }
     }
     
     ////// VERTICAL ////////
+
     
     // Currently the vertical actuators only know how to straighten
     if (vertAngleArray[i] == '2')
     {
+      USB_COM_PORT.println(millis());      
       PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
       currentAngle = analogRead(VERT_POS_SENSOR[i]);
       
