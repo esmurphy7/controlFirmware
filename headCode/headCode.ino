@@ -138,16 +138,16 @@ void loop()
   sendSetpointsAndSettings();
 
   // Tell the modules to run their PID loops
-  clearSerialBuffer(TAIL_SERIAL);
-  TAIL_SERIAL.write('p');
-  waitForModuleAcknowledgments("pid", 40);
+  runPIDLoops();
+  
  
+  // If the calibrate button is pressed
   if (controller.calibrate)
   {
     // Find out how many modules are connected
     countNumberOfModules();
 
-    // Calibrate the sensors    
+    // Calibrate all sensors    
     runSensorCalibration();
   }
 }
@@ -197,6 +197,16 @@ void runSensorCalibration()
     horzSetpoints[i] = '3';
     vertSetpoints[i] = '3';    
   }
+}
+
+/**************************************************************************************
+  runPIDLoops(): Tells each module to execute their PID loops
+ *************************************************************************************/
+void runPIDLoops()
+{
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write('p');
+  waitForModuleAcknowledgments("pid", 40);
 }
 
 /**************************************************************************************
@@ -274,7 +284,6 @@ void updateSetpoints()
   if (controller.killSwitchPressed &&
       (controller.straightenVertOnTheFly || controller.straightenVertical))
   {
-      USB_COM_PORT.println(millis());
       allVertSetpoints = '2';
   }
   for (int i = 0; i < 30; ++i)
@@ -319,7 +328,7 @@ void readAndRequestJoystickData()
   if (INPUT_SERIAL.available() < 30)
   {
     // There's no joystick data. If it's been 300ms since 
-    // the last request. Try retrying the joystick request.
+    // the last request. Retry: Ask the joystick for data again.
     if (millis() - lastJoystickRequestTime > 300)
     { 
       // If we've retried already, now we know the joystick is disconnected!
