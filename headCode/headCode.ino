@@ -17,6 +17,9 @@
 */
 
 #include "titanoboa_headboard_pins.h"
+#include <SPI.h>
+#include <Ethernet.h>
+#include <EthernetUdp.h>
 #include "EEPROM.h"
 
 #define INPUT_SERIAL Serial3            // Xbee
@@ -48,6 +51,14 @@ class ControllerData
   unsigned short spareKnob4;
 } controller;
 
+// Ethernet/Wi-Fi variables
+EthernetUDP Udp;
+byte macAddress[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; 
+byte localIP[] = { 192, 168, 1, 2 };
+byte broadcastIP[] = { 192, 168, 1, 255 };
+unsigned int broadcastPort = 12345;
+unsigned int localPort = 12345;
+
 // Setpoints for all 30 vertibrae in the snake
 byte vertSetpoints[30];
 byte horzSetpoints[30];
@@ -62,13 +73,18 @@ boolean joystickIsConnected = false;
 **************************************************************************/
 void setup()
 {
+  // Initialize serial ports
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
-  USB_COM_PORT.println("Hi I'm the Titanoboa Head!");
-
+  
+  // Initialize Ethernet Board
+  Ethernet.begin(macAddress, localIP);
+  Udp.begin(localPort);  
+  
   // Load saved settings
   numberOfModules = EEPROM.read(0);
+  USB_COM_PORT.println("Hi I'm the Titanoboa Head!");  
   USB_COM_PORT.print("Number of modules: ");
   USB_COM_PORT.println(numberOfModules);
 
@@ -121,6 +137,8 @@ void setup()
 **************************************************************************/
 void loop()
 {
+  unsigned long loopStartTime = millis();
+  
   // Check USB serial for command to enter manaul mode  
   if (USB_COM_PORT.available() > 0)
   {
@@ -140,16 +158,102 @@ void loop()
   // Tell the modules to run their PID loops
   runPIDLoops();
   
- 
+  // Send diagnostic data
+  getAndSendDiagnostics();
+  
   // If the calibrate button is pressed
-  if (controller.calibrate)
+  
+  // TODO: This is a hack to ignore a calibrate command immediately
+  // following a calirate. Find a better way to fix this.
+  static boolean calibrateButtonMemory = false;
+  
+  if (controller.calibrate && 
+      calibrateButtonMemory == false && 
+      controller.killSwitchPressed)
   {
+    calibrateButtonMemory = true;
+    
     // Find out how many modules are connected
     countNumberOfModules();
-
+   
     // Calibrate all sensors    
     runSensorCalibration();
   }
+  else
+  {
+    calibrateButtonMemory = false;
+  }
+  
+  int loopTime = millis() - loopStartTime;
+  if (loopTime < 50)
+  {
+    delay(50 - loopTime);    
+  }
+}
+
+/**************************************************************************************
+  getAndSendDiagnostics(): Gets information from the modules and sends it over WiFi
+ *************************************************************************************/
+void getAndSendDiagnostics()
+{
+  // Clear the packet data array
+  static byte packet[125];
+  for (int i = 0; i < 125; ++i)
+  {
+    packet[i] = 0;
+  }
+  
+  // What type of diagnostics packet should we send?
+  TAIL_SERIAL.write('d');
+  
+  if (getHeadAndModuleDiagnostics(packet) == false)
+  {
+    return; 
+  }
+  
+  // Send the diagnostics packet
+  Udp.beginPacket(broadcastIP, broadcastPort);  
+  for (int i = 0; i < 125; ++i)
+  {
+    Udp.write(packet[i]);
+  }
+  Udp.endPacket();
+}
+
+/**************************************************************************************
+  getHeadAndModuleDiagnostics(): Fills the provided buffer with head and module information.
+                                 Note: The buffer must be at least 125 bytes!!
+ *************************************************************************************/
+boolean getHeadAndModuleDiagnostics(byte* packet)
+{
+  // Fill in head information
+  int headBattery = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
+  packet[0] = 1;
+  packet[1] = numberOfModules;
+  packet[2] = highByte(headBattery);
+  packet[3] = lowByte(headBattery);
+
+  // Tell modules the packet type
+  TAIL_SERIAL.write(1);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char moduleData[6];  
+    if (TAIL_SERIAL.readBytes(moduleData, 6) < 6)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve full packet from module " << i + 1 << "\n";
+      return false;
+    }
+    packet[i * 6 + 0 + 4] = moduleData[0];
+    packet[i * 6 + 1 + 4] = moduleData[1];
+    packet[i * 6 + 2 + 4] = moduleData[2];
+    packet[i * 6 + 3 + 4] = moduleData[3];
+    packet[i * 6 + 4 + 4] = moduleData[4];
+    packet[i * 6 + 5 + 4] = moduleData[5];
+  }
+  return true;
 }
 
 /**************************************************************************************
@@ -190,7 +294,7 @@ void runSensorCalibration()
   TAIL_SERIAL.write('c');
   waitForModuleAcknowledgments("calibrate", 15000); 
   
-  // Deinitalized all actuator setpoints. The snake is striaght and will
+  // Deinitialize all actuator setpoints. The snake is straight and will
   // need to start slithering from scratch.
   for (int i = 0; i < 30; ++i)
   {

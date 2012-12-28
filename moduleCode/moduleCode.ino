@@ -269,6 +269,9 @@ void loop()
       case 'n':
         processCountModulesCommand();
         break;
+      case 'd':
+        processDiagnosticsCommand();
+        break;
       case 'c':
         processCalibrateCommand();
         acknowledgeCommand();
@@ -414,9 +417,57 @@ void clearSerialBuffer(HardwareSerial &serial)
 
 void processDiagnosticsCommand()
 {
- 
+  char packetType[1];
+
+  // Get data array from upstream. Store in an array.
+  HEAD_SERIAL.setTimeout(30);
+  if (HEAD_SERIAL.readBytes(packetType, 1) < 1)
+  {
+    USB_COM_PORT.println("ERROR: Missing diagnostics packet type");
+    return;
+  }
+
+  switch (packetType[0])
+  {
+  case 1:
+    sendHeadAndModuleDiagnostics();
+    break;
+  case 2:
+    break;
+  case 3:
+    break;
+  case 4:
+    break;
+  case 5:
+  default:
+    USB_COM_PORT.println("ERROR: Invalid diagnostics packet type");
+    return;
+  }
+
+  // Tell next module to send diagnostics
+  TAIL_SERIAL.write('d'); 
+  TAIL_SERIAL.write(packetType[0]);
 }
- 
+
+/************************************************************************************
+ * sendHeadAndModuleDiagnostics(): Sends general information about the module. Not vertibrae.
+ ***********************************************************************************/
+void sendHeadAndModuleDiagnostics()
+{
+  int batteryVoltage = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
+
+  byte moduleData[6];
+  moduleData[0] = highByte(batteryVoltage);
+  moduleData[1] = lowByte(batteryVoltage);
+  moduleData[2] = highByte(0);
+  moduleData[3] = lowByte(0);
+  moduleData[4] = highByte(0);
+  moduleData[5] = lowByte(0);
+
+  HEAD_SERIAL.write(moduleData, 6);
+}
+
+
 /************************************************************************************
   processLongMotorPulseCommand(): Pulses the first module motor on and off. Used for 
                                   jaw and head lift actuation.
@@ -557,6 +608,16 @@ void move()
  ***********************************************************************************/
 void processCalibrateCommand()
 {
+  TAIL_SERIAL.write('c');
+
+  // Stop any current motion
+  for(int i=0; i < 5; i++)
+  {
+    analogWrite(VERT_ACTUATOR[i], 0);
+    analogWrite(HORZ_ACTUATOR[i], 0);
+  }
+  analogWrite(MOTOR_CONTROL, 0);
+
   //calibrate horizontal position and reset everything
   calibrateHorizontal();
   delay(100);
