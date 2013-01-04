@@ -112,16 +112,16 @@ void setup()
   // Initialize actuator PWM outputs
   for(int i=0;i<3;i++)
   {
-    pinMode(HEAD_ACTUATOR[i],OUTPUT);
-    analogWrite(HEAD_ACTUATOR[i],0);
+    pinMode(HEAD_ACTUATORS[i],OUTPUT);
+    analogWrite(HEAD_ACTUATORS[i],0);
   }
   
   // Initialize actuator control outputs
   // Setting control outputs to zero selects odd pairs (1,3,5 as opposed to 2,4,6)  
   for(int i=0;i<3;i++)
   {
-    pinMode(HEAD_ACTUATOR_CTRL[i], OUTPUT);
-    digitalWrite(HEAD_ACTUATOR_CTRL[i], LOW);
+    pinMode(HEAD_ACTUATOR_CTRLS[i], OUTPUT);
+    digitalWrite(HEAD_ACTUATOR_CTRLS[i], LOW);
   }
 
   // Initialize position sensor inputs.
@@ -137,58 +137,50 @@ void setup()
 **************************************************************************/
 void loop()
 {
-  unsigned long loopStartTime = millis();
+  ////////////////////////////////////////////////////////////////////
+  // This block of code runs the core functionality of Titanoboa 
   
-  // Check USB serial for command to enter manaul mode  
-  if (USB_COM_PORT.available() > 0)
-  {
-    if (USB_COM_PORT.read() == 'M')
-    {
-      manualControl(); 
-    }    
-  }
-  
-  // Get the status of each knob and switch on the joystick
   readAndRequestJoystickData();
-  
-  // Send new settings to each module
   updateSetpoints();  
   sendSetpointsAndSettings();
-
-  // Tell the modules to run their PID loops
   runPIDLoops();
-  
-  // Send diagnostic data
   getAndSendDiagnostics();
   
-  // If the calibrate button is pressed
+  ////////////////////////////////////////////////////////////////////
+  // The following functions don't run on a regular basis.
+  // When they do run, they take a long time.
   
-  // TODO: This is a hack to ignore a calibrate command immediately
-  // following a calirate. Find a better way to fix this.
-  static boolean calibrateButtonMemory = false;
-  
-  if (controller.calibrate && 
-      calibrateButtonMemory == false && 
-      controller.killSwitchPressed)
+  // Should we calibrate?
+  if (controller.calibrate && controller.killSwitchPressed)
   {
-    calibrateButtonMemory = true;
-    
-    // Find out how many modules are connected
     countNumberOfModules();
-   
-    // Calibrate all sensors    
     runSensorCalibration();
-  }
-  else
-  {
-    calibrateButtonMemory = false;
+    synchronizeWithJoystick();
+    return;
   }
   
-  int loopTime = millis() - loopStartTime;
-  if (loopTime < 50)
+  // Should be open the jaw?
+  if (controller.openJaw && controller.killSwitchPressed)
   {
-    delay(50 - loopTime);    
+    openTheJaw();
+    synchronizeWithJoystick();  
+    return;
   }
+
+  // Should we close the jaw?
+  if (controller.closeJaw && controller.killSwitchPressed)
+  {
+    closeTheJaw();
+    synchronizeWithJoystick(); 
+    return;
+  }
+  
+  // Should we enter manual mode?
+  if (USB_COM_PORT.available() > 0 && USB_COM_PORT.read() == 'M')
+  {
+    manualControl();
+    synchronizeWithJoystick();
+  }  
 }
 
 /**************************************************************************************
@@ -644,6 +636,23 @@ void readAndRequestJoystickData()
 }
 
 /**************************************************************************************
+  synchronizeWithJoystick(): Clears away any previous data from the joystick and makes sure
+                             a fresh set is available. It's important to do this if we just
+                             executed a command like calibrate where the joystick data wasn't
+                             updating.
+ *************************************************************************************/
+void synchronizeWithJoystick()
+{
+  do
+  {
+    clearSerialBuffer(INPUT_SERIAL);
+    INPUT_SERIAL.write('j');
+    delay(500);
+  } 
+  while (INPUT_SERIAL.available() != 30);
+}
+
+/**************************************************************************************
   clearSerialBuffer(): In Arduino 1.0, Serial.flush() no longer does what we want!
                        http://arduino.cc/en/Serial/Flush
  *************************************************************************************/
@@ -656,98 +665,57 @@ void clearSerialBuffer(HardwareSerial &serial)
 }
 
 /**************************************************************************************
-  processHeadJawMessage(): Uses joystick commands to open the mouth or close the jaw 
+  openTheJaw(): Opens the jaw.
  *************************************************************************************/
-void processHeadJawMessage()
+void openTheJaw()
 {
-  int actuator;
-  char headjawmessage;  
+  USB_COM_PORT << "Opening this jaw... ";
   
-  while(INPUT_SERIAL.available() < 1)
-  {
-    delay(1);
-  }
-  
+  // Tell the first module to turn on the motor for a bit
   TAIL_SERIAL.write("h");
   
-  headjawmessage = INPUT_SERIAL.read();
-  USB_COM_PORT.print("received jaw message: ");
-  USB_COM_PORT.println(headjawmessage);
-  
-  if(headjawmessage == '0')
+  // Slowly open and close to jaw opening valve
+  digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);  
+  for(int i=100; i<=255; i++)
   {
-    actuator = -1;
-    digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-      
-    for(int i=100; i<=255; i++)
-    {
-      analogWrite(JAW_OPEN, i);
-      delay(10);
-    }
-    for(int i=255; i>=50; i--)
-    {
-      analogWrite(JAW_OPEN, i);
-      delay(6);
-    }
-    analogWrite(JAW_OPEN, 0);
-		
+    analogWrite(JAW_ACTUATOR, i);
+    delay(10);
   }
-  else if(headjawmessage == '1')
+  for(int i=255; i>=50; i--)
   {
-    actuator = -1;
-    digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
+    analogWrite(JAW_ACTUATOR, i);
+    delay(6);
+  }
+  analogWrite(JAW_ACTUATOR, 0);
+  
+  USB_COM_PORT << "Done\n";   
+}
 
-    for(int i=0; i<=255; i++)
-    {
-      analogWrite(JAW_CLOSE, i);
-      delay(4);
-    }
-    for(int i=255; i>=0; i--)
-    {
-      analogWrite(JAW_CLOSE, i);
-      delay(4);
-    }
-  }
-  else if(headjawmessage == '2')
-  {
-    actuator = HEAD_RAISE;
-    digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
-  }
-  else if(headjawmessage == '3')
-  {
-    actuator = HEAD_LOWER;
-    digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
-  }
-  else if(headjawmessage == '4')
-  {
-    actuator = AUX_EXTEND;
-    digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
-  }
-    else if(headjawmessage == '5')
-  {
-    actuator = AUX_RETRACT;
-    digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
-  }
-  else
-  {
-    actuator = -1;
-  }
+/**************************************************************************************
+  closeTheJaw(): Closes the jaw.
+ *************************************************************************************/
+void closeTheJaw()
+{
+  USB_COM_PORT << "Closing this jaw... ";
   
-  if(actuator != -1) //If we've not attempted to select an invalid actuator...
+  // Tell the first module to turn on the motor for a bit
+  TAIL_SERIAL.write("h");
+  
+  // Slowly open and close to jaw closing valve
+  digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
+  for(int i=0; i<=255; i++)
   {
-    for(int i=0; i<=255; i++) //Open the valve bit by bit by ramping PWM out up
-    {
-      analogWrite(actuator, i);
-      delay(4); //TODO: This delay of 4ms may have to be tweaked
-    }
-    for(int i=255; i>=0; i--) //Close the valve by ramping pwm down
-    {
-      analogWrite(actuator, i);
-      delay(4);
-    }
+    analogWrite(JAW_ACTUATOR, i);
+    delay(4);
   }
-  INPUT_SERIAL.flush(); //This may not be the smartest action we can take
-  return; 
+  for(int i=255; i>=0; i--)
+  {
+    analogWrite(JAW_ACTUATOR, i);
+    delay(4);
+  }
+  analogWrite(JAW_ACTUATOR, 0);
+  
+  USB_COM_PORT << "Done\n";  
 }
 
 /**************************************************************************************
@@ -877,17 +845,17 @@ void manualControl()
           if (actuatorSel == 0)
           {
             digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
-            analogWrite(JAW_CLOSE, 255);
+            analogWrite(JAW_ACTUATOR, 255);
           }
           else if (actuatorSel == 1)
           {
             digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
-            analogWrite(HEAD_LOWER, 255);
+            analogWrite(HEAD_ACTUATOR, 255);
           }
           else if(actuatorSel == 2)
           {
             digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
-            analogWrite(AUX_EXTEND, 255);
+            analogWrite(AUX_ACTUATOR, 255);
           }
           delay(actuationDelay);
           StopMov();
@@ -902,17 +870,17 @@ void manualControl()
           if (actuatorSel == 0)
           {
             digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-            analogWrite(JAW_OPEN, 255);
+            analogWrite(JAW_ACTUATOR, 255);
           }
           else if (actuatorSel == 1)
           {
             digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
-            analogWrite(HEAD_RAISE, 255);
+            analogWrite(HEAD_ACTUATOR, 255);
           }
           else if(actuatorSel == 2)
           {
             digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
-            analogWrite(AUX_RETRACT, 255);
+            analogWrite(AUX_ACTUATOR, 255);
           }
           delay(actuationDelay);
           StopMov();
@@ -966,12 +934,9 @@ void displayMenu()
  *************************************************************************************/
 void StopMov()
 {
-  analogWrite(JAW_OPEN, 0);
-  analogWrite(JAW_CLOSE, 0);
-  analogWrite(HEAD_RAISE, 0);
-  analogWrite(HEAD_LOWER, 0);
-  analogWrite(AUX_EXTEND, 0);
-  analogWrite(AUX_RETRACT, 0);
+  analogWrite(JAW_ACTUATOR, 0);
+  analogWrite(HEAD_ACTUATOR, 0);
+  analogWrite(AUX_ACTUATOR, 0);
   return;
 }
 
