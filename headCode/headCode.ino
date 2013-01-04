@@ -204,11 +204,41 @@ void getAndSendDiagnostics()
   }
   
   // What type of diagnostics packet should we send?
-  TAIL_SERIAL.write('d');
-  
-  if (getHeadAndModuleDiagnostics(packet) == false)
+  // Cycle through each of the 5 packet each time this function is called.
+  static byte packetType = 0;
+  ++packetType;
+  if (packetType > 5)
   {
-    return; 
+    packetType = 1;
+  }
+
+  // Fill the packet with data
+  boolean retVal = false;
+  switch (packetType)
+  {
+    case 1:
+      retVal = getHeadAndModuleDiagnostics(packet);
+      break;
+    case 2:
+      retVal = getHorzAngleDiagnostics(packet);
+      break;
+    case 3:
+      retVal = getVertAngleDiagnostics(packet);
+      break;
+    case 4:
+      retVal = getHeadAndModuleDiagnostics(packet);
+      break;
+    case 5:
+      retVal = getHeadAndModuleDiagnostics(packet);
+      break;
+    default: 
+      USB_COM_PORT << "ERROR: Invalid packet type = " << packetType << "\n";
+      return;
+  }
+  if (retVal == false)
+  {
+    // Packet was not filled for some reason.
+    return;
   }
   
   // Send the diagnostics packet
@@ -221,37 +251,155 @@ void getAndSendDiagnostics()
 }
 
 /**************************************************************************************
-  getHeadAndModuleDiagnostics(): Fills the provided buffer with head and module information.
-                                 Note: The buffer must be at least 125 bytes!!
+  getHeadAndModuleDiagnostics(): Fills a 125 byte buffer with head and general module info
  *************************************************************************************/
-boolean getHeadAndModuleDiagnostics(byte* packet)
-{
+boolean getHeadAndModuleDiagnostics(byte* buffer)
+{ 
+  buffer[0] = 1;
+  
   // Fill in head information
   int headBattery = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
-  packet[0] = 1;
-  packet[1] = numberOfModules;
-  packet[2] = highByte(headBattery);
-  packet[3] = lowByte(headBattery);
+  buffer[1] = numberOfModules;
+  buffer[2] = highByte(headBattery);
+  buffer[3] = lowByte(headBattery);
 
-  // Tell modules the packet type
+  // Tell modules to send us this type of diagnostics
+  TAIL_SERIAL.write('d');   
   TAIL_SERIAL.write(1);
 
   // Fill in the packet with module info as it comes in
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char moduleData[6];  
-    if (TAIL_SERIAL.readBytes(moduleData, 6) < 6)
+    char data[6];  
+    if (TAIL_SERIAL.readBytes(data, 6) < 6)
     {
-      USB_COM_PORT << "ERROR: Did not recieve full packet from module " << i + 1 << "\n";
+      USB_COM_PORT << "ERROR: Did not recieve all Module info from module " << i + 1 << "\n";
       return false;
     }
-    packet[i * 6 + 0 + 4] = moduleData[0];
-    packet[i * 6 + 1 + 4] = moduleData[1];
-    packet[i * 6 + 2 + 4] = moduleData[2];
-    packet[i * 6 + 3 + 4] = moduleData[3];
-    packet[i * 6 + 4 + 4] = moduleData[4];
-    packet[i * 6 + 5 + 4] = moduleData[5];
+    buffer[i * 6 + 0 + 4] = data[0];
+    buffer[i * 6 + 1 + 4] = data[1];
+    buffer[i * 6 + 2 + 4] = data[2];
+    buffer[i * 6 + 3 + 4] = data[3];
+    buffer[i * 6 + 4 + 4] = data[4];
+    buffer[i * 6 + 5 + 4] = data[5];
+  }
+  return true;
+}
+
+/**************************************************************************************
+  getHorzAngleDiagnostics(): Fills a 125 byte buffer with horizontal angle info
+ *************************************************************************************/
+boolean getHorzAngleDiagnostics(byte* buffer)
+{
+  buffer[0] = 2;
+  
+  // Tell modules to send us this type of diagnostics
+  TAIL_SERIAL.write('d');   
+  TAIL_SERIAL.write(2);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char data[3];  
+    if (TAIL_SERIAL.readBytes(data, 3) < 3)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
+      return false;
+    }
+    buffer[i * 3 + 0 + 1] = data[0];
+    buffer[i * 3 + 1 + 1] = data[1];
+    buffer[i * 3 + 2 + 1] = data[2];
+  }
+  return true;
+}
+
+/**************************************************************************************
+  getVertAngleDiagnostics(): Fills a 125 byte buffer with vertical angle info
+ *************************************************************************************/
+boolean getVertAngleDiagnostics(byte* buffer)
+{
+  // Tell the wifi listeners what type of packet this is
+  buffer[0] = 3;
+  
+  // Tell modules to send us this type of diagnostics
+  TAIL_SERIAL.write('d');   
+  TAIL_SERIAL.write(3);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char data[3];  
+    if (TAIL_SERIAL.readBytes(data, 3) < 3)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
+      return false;
+    }
+    buffer[i * 3 + 0 + 1] = data[0];
+    buffer[i * 3 + 1 + 1] = data[1];
+    buffer[i * 3 + 2 + 1] = data[2];
+  }
+  return true;
+}
+
+/**************************************************************************************
+  getHorzCalibrationDiagnostics(): Fills a 125 byte buffer with horizontal calibration info
+ *************************************************************************************/
+boolean getHorzCalibrationDiagnostics(byte* buffer)
+{
+  // Tell the wifi listeners what type of packet this is
+  buffer[0] = 4;
+  
+  // Tell modules to send us this type of diagnostics
+  TAIL_SERIAL.write('d');   
+  TAIL_SERIAL.write(4);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char data[4];  
+    if (TAIL_SERIAL.readBytes(data, 4) < 4)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve all HorzCalibration info from module " << i + 1 << "\n";
+      return false;
+    }
+    buffer[i * 4 + 0 + 1] = data[0];
+    buffer[i * 4 + 1 + 1] = data[1];
+    buffer[i * 4 + 2 + 1] = data[2];
+    buffer[i * 4 + 3 + 1] = data[3];
+  }
+  return true;
+}
+
+/**************************************************************************************
+  getVertCalibrationDiagnostics(): Fills a 125 byte buffer with vertical calibration info
+ *************************************************************************************/
+boolean getVertCalibrationDiagnostics(byte* buffer)
+{
+  // Tell the wifi listeners what type of packet this is
+  buffer[0] = 5;
+  
+  // Tell modules to send us this type of diagnostics
+  TAIL_SERIAL.write('d');   
+  TAIL_SERIAL.write(5);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char data[4];  
+    if (TAIL_SERIAL.readBytes(data, 4) < 4)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve all VertCalibration info from module " << i + 1 << "\n";
+      return false;
+    }
+    buffer[i * 4 + 0 + 1] = data[0];
+    buffer[i * 4 + 1 + 1] = data[1];
+    buffer[i * 4 + 2 + 1] = data[2];
+    buffer[i * 4 + 3 + 1] = data[3];
   }
   return true;
 }

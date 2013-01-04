@@ -44,9 +44,8 @@ char horzAngleArray[] = {               // Current horizontal and vertical posit
 char vertAngleArray[] = {               // 0 = Bent Left, 1 = Bent Right  <-- TODO:confirm
   '3','3','3','3','3'};                 // 2 = Straight,  3 = Disabled
 
-// Array of angles we recorded as straight for the verticals
+// Array of sensor values we recorded as straight for the verticals
 int vertStraightArray[] = {0, 0, 0, 0, 0};
-
 
 unsigned long horzTimerArray[] = {      // Timer arrays used to timeout when waiting for 
   0,0,0,0,0};                           // an actuator to reach its set point
@@ -433,12 +432,16 @@ void processDiagnosticsCommand()
     sendHeadAndModuleDiagnostics();
     break;
   case 2:
+    sendHorzAngleDiagnostics();
     break;
   case 3:
+    sendVertAngleDiagnostics();
     break;
   case 4:
+    sendHorzCalibrationDiagnostics();
     break;
   case 5:
+    sendVertCalibrationDiagnostics();
   default:
     USB_COM_PORT.println("ERROR: Invalid diagnostics packet type");
     return;
@@ -456,15 +459,79 @@ void sendHeadAndModuleDiagnostics()
 {
   int batteryVoltage = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
 
-  byte moduleData[6];
-  moduleData[0] = highByte(batteryVoltage);
-  moduleData[1] = lowByte(batteryVoltage);
-  moduleData[2] = highByte(0);
-  moduleData[3] = lowByte(0);
-  moduleData[4] = highByte(0);
-  moduleData[5] = lowByte(0);
+  byte data[6];
+  data[0] = highByte(batteryVoltage);
+  data[1] = lowByte(batteryVoltage);
+  data[2] = highByte(0);
+  data[3] = lowByte(0);
+  data[4] = highByte(0);
+  data[5] = lowByte(0);
 
-  HEAD_SERIAL.write(moduleData, 6);
+  HEAD_SERIAL.write(data, 6);
+}
+
+/************************************************************************************
+ * sendHorzAngleDiagnostics(): 
+ ***********************************************************************************/
+void sendHorzAngleDiagnostics()
+{
+  byte data[15];
+  for (int i = 0; i < 5; ++i)
+  {
+    int sensorValue = analogRead(HORZ_POS_SENSOR[i]);
+    data[i * 3 + 0] = horzAngleArray[i];
+    data[i * 3 + 1] = highByte(sensorValue);
+    data[i * 3 + 2] = lowByte(sensorValue);
+  }
+  HEAD_SERIAL.write(data, 15);
+}
+
+/************************************************************************************
+ * sendVertAngleDiagnostics(): 
+ ***********************************************************************************/
+void sendVertAngleDiagnostics()
+{
+  byte data[15];
+  for (int i = 0; i < 5; ++i)
+  {
+    int sensorValue = analogRead(VERT_POS_SENSOR[i]);
+    data[i * 3 + 0] = vertAngleArray[i];
+    data[i * 3 + 1] = highByte(sensorValue);
+    data[i * 3 + 2] = lowByte(sensorValue);
+  }
+  HEAD_SERIAL.write(data, 15);
+}
+
+/************************************************************************************
+ * sendHorzCalibrationDiagnostics(): 
+ ***********************************************************************************/
+void sendHorzCalibrationDiagnostics()
+{
+  byte data[20];
+  for (int i = 0; i < 5; ++i)
+  {
+    data[i * 4 + 0] = highByte(highRange[i]);
+    data[i * 4 + 1] = lowByte(highRange[i]);
+    data[i * 4 + 2] = highByte(lowRange[i]);
+    data[i * 4 + 3] = lowByte(lowRange[i]);
+  }
+  HEAD_SERIAL.write(data, 20);
+}
+
+/************************************************************************************
+ * sendVertCalibrationDiagnostics(): 
+ ***********************************************************************************/
+void sendVertCalibrationDiagnostics()
+{
+  byte data[20];
+  for (int i = 0; i < 5; ++i)
+  {
+    data[i * 4 + 0] = highByte(vertHighRange[i]);
+    data[i * 4 + 1] = lowByte(vertHighRange[i]);
+    data[i * 4 + 2] = highByte(vertLowRange[i]);
+    data[i * 4 + 3] = lowByte(vertLowRange[i]);
+  }
+  HEAD_SERIAL.write(data, 20);
 }
 
 
