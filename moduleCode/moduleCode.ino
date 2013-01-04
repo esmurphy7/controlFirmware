@@ -289,7 +289,7 @@ void loop()
     }
   }
                                  // TEMP: \|/ We need to ground the last serial down RX
-  while (TAIL_SERIAL.available() > 0 && myModuleNumber != 2)
+  while (TAIL_SERIAL.available() > 0 && myModuleNumber != 4)
   {
     HEAD_SERIAL.write(TAIL_SERIAL.read());
   }
@@ -442,6 +442,7 @@ void processDiagnosticsCommand()
     break;
   case 5:
     sendVertCalibrationDiagnostics();
+    break;
   default:
     USB_COM_PORT.println("ERROR: Invalid diagnostics packet type");
     return;
@@ -462,10 +463,10 @@ void sendHeadAndModuleDiagnostics()
   byte data[6];
   data[0] = highByte(batteryVoltage);
   data[1] = lowByte(batteryVoltage);
-  data[2] = highByte(0);
-  data[3] = lowByte(0);
-  data[4] = highByte(0);
-  data[5] = lowByte(0);
+  data[2] = 0;
+  data[3] = motorSpeed;
+  data[4] = 0;
+  data[5] = 0;
 
   HEAD_SERIAL.write(data, 6);
 }
@@ -526,10 +527,12 @@ void sendVertCalibrationDiagnostics()
   byte data[20];
   for (int i = 0; i < 5; ++i)
   {
-    data[i * 4 + 0] = highByte(vertHighRange[i]);
-    data[i * 4 + 1] = lowByte(vertHighRange[i]);
-    data[i * 4 + 2] = highByte(vertLowRange[i]);
-    data[i * 4 + 3] = lowByte(vertLowRange[i]);
+    // Note: we're sending the straight array for now
+    // instead of the calibration. It's more useful.
+    data[i * 4 + 0] = highByte(vertStraightArray[i]);
+    data[i * 4 + 1] = lowByte(vertStraightArray[i]);
+    data[i * 4 + 2] = highByte(0);
+    data[i * 4 + 3] = lowByte(0);
   }
   HEAD_SERIAL.write(data, 20);
 }

@@ -180,7 +180,8 @@ void loop()
   {
     manualControl();
     synchronizeWithJoystick();
-  }  
+    return;
+  }
 }
 
 /**************************************************************************************
@@ -218,10 +219,10 @@ void getAndSendDiagnostics()
       retVal = getVertAngleDiagnostics(packet);
       break;
     case 4:
-      retVal = getHeadAndModuleDiagnostics(packet);
+      retVal = getHorzCalibrationDiagnostics(packet);
       break;
     case 5:
-      retVal = getHeadAndModuleDiagnostics(packet);
+      retVal = getVertCalibrationDiagnostics(packet);
       break;
     default: 
       USB_COM_PORT << "ERROR: Invalid packet type = " << packetType << "\n";
@@ -294,15 +295,16 @@ boolean getHorzAngleDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[3];  
-    if (TAIL_SERIAL.readBytes(data, 3) < 3)
+    char data[15];  
+    if (TAIL_SERIAL.readBytes(data, 15) < 15)
     {
       USB_COM_PORT << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
       return false;
     }
-    buffer[i * 3 + 0 + 1] = data[0];
-    buffer[i * 3 + 1 + 1] = data[1];
-    buffer[i * 3 + 2 + 1] = data[2];
+    for (int j = 0; j < 15; ++j)
+    {
+      buffer[i * 15 + j + 1] = data[j];    
+    }
   }
   return true;
 }
@@ -323,15 +325,16 @@ boolean getVertAngleDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[3];  
-    if (TAIL_SERIAL.readBytes(data, 3) < 3)
+    char data[15];  
+    if (TAIL_SERIAL.readBytes(data, 15) < 15)
     {
       USB_COM_PORT << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
       return false;
     }
-    buffer[i * 3 + 0 + 1] = data[0];
-    buffer[i * 3 + 1 + 1] = data[1];
-    buffer[i * 3 + 2 + 1] = data[2];
+    for (int j = 0; j < 15; ++j)
+    {
+      buffer[i * 15 + j + 1] = data[j];    
+    }
   }
   return true;
 }
@@ -352,16 +355,16 @@ boolean getHorzCalibrationDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[4];  
-    if (TAIL_SERIAL.readBytes(data, 4) < 4)
+    char data[20];  
+    if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
       USB_COM_PORT << "ERROR: Did not recieve all HorzCalibration info from module " << i + 1 << "\n";
       return false;
     }
-    buffer[i * 4 + 0 + 1] = data[0];
-    buffer[i * 4 + 1 + 1] = data[1];
-    buffer[i * 4 + 2 + 1] = data[2];
-    buffer[i * 4 + 3 + 1] = data[3];
+    for (int j = 0; j < 20; ++j)
+    {
+      buffer[i * 20 + j + 1] = data[j];    
+    }
   }
   return true;
 }
@@ -382,16 +385,16 @@ boolean getVertCalibrationDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[4];  
-    if (TAIL_SERIAL.readBytes(data, 4) < 4)
+    char data[20];  
+    if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
       USB_COM_PORT << "ERROR: Did not recieve all VertCalibration info from module " << i + 1 << "\n";
       return false;
     }
-    buffer[i * 4 + 0 + 1] = data[0];
-    buffer[i * 4 + 1 + 1] = data[1];
-    buffer[i * 4 + 2 + 1] = data[2];
-    buffer[i * 4 + 3 + 1] = data[3];
+    for (int j = 0; j < 20; ++j)
+    {
+      buffer[i * 20 + j + 1] = data[j];    
+    }
   }
   return true;
 }
