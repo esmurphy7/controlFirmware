@@ -47,7 +47,7 @@ class ControllerData
   boolean calibrate;
   byte motorSpeed;
   unsigned short propagationDelay;
-  unsigned short spareKnob2;
+  unsigned short spareKnob2; // light delay
   unsigned short spareKnob4;
 } controller;
 
@@ -141,6 +141,7 @@ void loop()
   // This block of code runs the core functionality of Titanoboa 
   
   readAndRequestJoystickData();
+  updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
   runPIDLoops();
@@ -560,6 +561,26 @@ void updateSetpoints()
     lastUpdateTime = millis();  
   }
 }
+
+/**************************************************************************************
+  updateLights(): Controls all the lights of the snake.
+ *************************************************************************************/
+ 
+void updateLights()
+{
+  static unsigned long lastUpdateTime = 0;
+  
+  if (controller.killSwitchPressed &&
+      (millis() - lastUpdateTime > controller.spareKnob2))
+  {
+    for (int i = 29; i > 0; --i)
+    {
+      lights[i] = lights[i - 1];
+    }
+    lights[0] = (boolean)random(0, 1);
+    lastUpdateTime = millis();  
+  }  
+} 
 
 /**************************************************************************************
   readAndRequestJoystickData(): Asks the joystick for data and reads its back. If the joystick hasn't

@@ -378,6 +378,14 @@ void processNewSettingsAndSetpoints()
     horzAngleArray[i] = newHorzSetpoint;
     vertAngleArray[i] = newVertSetpoint;
   }
+  
+  // Change the lights
+  int lightByte = 60 + myModuleNumber - 1;
+  digitalWrite(LED[0], settings[lightByte] & B00000001);
+  digitalWrite(LED[1], settings[lightByte] & B00000010);
+  digitalWrite(LED[2], settings[lightByte] & B00000100);
+  digitalWrite(LED[3], settings[lightByte] & B00001000);
+  digitalWrite(LED[4], settings[lightByte] & B00010000);
 
   // Check the kill switch [Setting bit 70.0]
   killSwitchPressed = (settings[70] & B00000001) > 0;
