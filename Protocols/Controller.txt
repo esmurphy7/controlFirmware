@@ -1,0 +1,36 @@
+The controller connects to the head over XBee. When the controller receives the ASCII
+character ‘j’ from the head, it must respond with this packet. If the head doesn’t
+receive it within 300ms it will send another ‘j’ to retry. If it still doesn’t receive
+a response it will stop the snake.
+
+In the future we might make this controller functionality available over WiFi.
+
+
+// Controller packet
+// Size: 30 bytes
+
+Byte0: Kill Switch [Boolean]
+Byte1: Joystick Left [Boolean]
+Byte2: Joystick Right [Boolean]
+Byte3: Joystick Up [Boolean]
+Byte4: Joystick Down [Boolean]
+Byte5: Jaw Open [Boolean]
+Byte6: Jaw Close [Boolean]
+Byte7: Vertical Straighten [Boolean]
+Byte8: Calibrate [Boolean]
+Byte9: Vertical Straighten On The Fly [Boolean]
+Byte10: Spare
+Byte11: Spare
+Byte12: Motor Speed [8-bit]
+Byte13: Propagation Delay (10-bit] (MSB)
+Byte14: Propagation Delay (10-bit]
+Byte15: Spare Knob 2 (10-bit] (MSB)
+Byte16: Spare Knob 2 (10-bit]
+Byte17: Spare Knob 4 (10-bit] (MSB)
+Byte18: Spare Knob 4 (10-bit]
+Byte19: Spare
+..
+..
+Byte29: Spare
+
+
