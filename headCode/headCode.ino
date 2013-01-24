@@ -497,11 +497,11 @@ void sendSetpointsAndSettings()
   for (int i = 0; i < 5; ++i)
   {
     byte moduleLights = 0;
-    moduleLights += (byte)lights[i * 5 + 0] & B00000001;
-    moduleLights += (byte)lights[i * 5 + 1] & B00000010;
-    moduleLights += (byte)lights[i * 5 + 2] & B00000100;
-    moduleLights += (byte)lights[i * 5 + 3] & B00001000;
-    moduleLights += (byte)lights[i * 5 + 4] & B00010000;
+    moduleLights += ((byte)lights[i * 5 + 0]) << 0;
+    moduleLights += ((byte)lights[i * 5 + 1]) << 1;
+    moduleLights += ((byte)lights[i * 5 + 2]) << 2;
+    moduleLights += ((byte)lights[i * 5 + 3]) << 3;
+    moduleLights += ((byte)lights[i * 5 + 4]) << 4;
     settings[60 + i] = moduleLights;
   }
   
@@ -577,10 +577,10 @@ void updateLights()
     {
       lights[i] = lights[i - 1];
     }
-    lights[0] = (boolean)random(0, 1);
-    lastUpdateTime = millis();  
-  }  
-} 
+    lights[0] = (boolean)random(0, 2);
+    lastUpdateTime = millis();
+  }
+}
 
 /**************************************************************************************
   readAndRequestJoystickData(): Asks the joystick for data and reads its back. If the joystick hasn't

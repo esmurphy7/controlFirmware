@@ -381,11 +381,11 @@ void processNewSettingsAndSetpoints()
   
   // Change the lights
   int lightByte = 60 + myModuleNumber - 1;
-  digitalWrite(LED[0], settings[lightByte] & B00000001);
-  digitalWrite(LED[1], settings[lightByte] & B00000010);
-  digitalWrite(LED[2], settings[lightByte] & B00000100);
-  digitalWrite(LED[3], settings[lightByte] & B00001000);
-  digitalWrite(LED[4], settings[lightByte] & B00010000);
+  digitalWrite(LED[0], (settings[lightByte] & B00000001) == B00000001);
+  digitalWrite(LED[1], (settings[lightByte] & B00000010) == B00000010);
+  digitalWrite(LED[2], (settings[lightByte] & B00000100) == B00000100);
+  digitalWrite(LED[3], (settings[lightByte] & B00001000) == B00001000);
+  digitalWrite(LED[4], (settings[lightByte] & B00010000) == B00010000);
 
   // Check the kill switch [Setting bit 70.0]
   killSwitchPressed = (settings[70] & B00000001) > 0;
@@ -1317,6 +1317,20 @@ void manualControl()
           }
           break;
 
+        case 'n':
+          for (int i=0; i<5; i++)
+          {
+              digitalWrite(LED[i], HIGH);
+          }
+          break;
+
+        case 'm':
+          for (int i=0; i<5; i++)
+          {
+              digitalWrite(LED[i], LOW);
+          }
+          break;
+
         case 's':
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
@@ -1354,6 +1368,7 @@ void displayMenu()
     USB_COM_PORT.print("          p - print raw values of position sensors\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          v - straighten verticals\n");
+    USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
