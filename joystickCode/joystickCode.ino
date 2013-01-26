@@ -132,9 +132,12 @@ void processSwitchAndKnobRequest()
   unsigned short spareKnob0 = analogRead(RSVD_0_PIN);
   boolean straightenVertOnTheFly = (spareKnob0 > 512);
   
-  unsigned short spareKnob2 = analogRead(RSVD_2_PIN);
-  unsigned short spareKnob4 = analogRead(RSVD_4_PIN);
-    
+  unsigned short ledDelayKnob = analogRead(RSVD_2_PIN);
+  unsigned short ledDelay = 1023 - ledDelayKnob;  
+  
+  unsigned short sendHeartBeatDelayKnob = analogRead(RSVD_4_PIN);
+  unsigned short sendHeartBeatDelay = 4 * (1023 - sendHeartBeatDelayKnob);
+  
   // Transmit
   byte packet[30];  
   packet[0] = (byte)joystickButtonPressed;
@@ -152,10 +155,10 @@ void processSwitchAndKnobRequest()
   packet[12] = motorSpeed;
   packet[13] = highByte(propagationDelay);
   packet[14] = lowByte(propagationDelay);
-  packet[15] = highByte(spareKnob2);
-  packet[16] = lowByte(spareKnob2);
-  packet[17] = highByte(spareKnob4);
-  packet[18] = lowByte(spareKnob4);
+  packet[15] = highByte(ledDelay);
+  packet[16] = lowByte(ledDelay);
+  packet[17] = highByte(sendHeartBeatDelay);
+  packet[18] = lowByte(sendHeartBeatDelay);
   packet[19] = 0; // Lots more spares 19 to 29
   
   XBEE_SERIAL.write(packet, 30);

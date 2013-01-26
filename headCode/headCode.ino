@@ -47,8 +47,8 @@ class ControllerData
   boolean calibrate;
   byte motorSpeed;
   unsigned short propagationDelay;
-  unsigned short spareKnob2; // light delay
-  unsigned short spareKnob4;
+  unsigned short ledDelay; // light delay
+  unsigned short sendHeartBeatDelay;
 } controller;
 
 // Ethernet/Wi-Fi variables
@@ -570,8 +570,10 @@ void updateLights()
 {
   static unsigned long lastUpdateTime = 0;
   
-  if (controller.killSwitchPressed &&
-      (millis() - lastUpdateTime > controller.spareKnob2))
+  // Propagate random pulses down the snake when we're slithering..
+  // .. like nervous signals though a nervous system.
+  if (controller.killSwitchPressed && 
+      (millis() - lastUpdateTime > controller.ledDelay))
   {
     for (int i = 29; i > 0; --i)
     {
@@ -579,6 +581,35 @@ void updateLights()
     }
     lights[0] = (boolean)random(0, 2);
     lastUpdateTime = millis();
+  }
+  
+  // Heart beats while we're stationary
+  if (!controller.killSwitchPressed)
+  {
+    static boolean firstBeatSent = false;    
+
+    // Propegate all lights
+    for (int i = 29; i > 0; --i)
+    {
+      lights[i] = lights[i - 1];
+    }
+    
+    // Default to propagating off light
+    lights[0] = false;
+    
+    // Propagate heat beats when its time
+    if (!firstBeatSent && (millis() - lastUpdateTime > (controller.sendHeartBeatDelay * 4)))
+    {
+      lights[0] = true;
+      firstBeatSent = true;
+      lastUpdateTime = millis();
+    }
+    else if (firstBeatSent && (millis() - lastUpdateTime > controller.ledDelay))
+    {
+      lights[0] = true;
+      firstBeatSent = false;
+      lastUpdateTime = millis();
+    }
   }
 }
 
@@ -634,8 +665,8 @@ void readAndRequestJoystickData()
   controller.straightenVertOnTheFly = (boolean)packet[9];
   controller.motorSpeed = packet[12];
   controller.propagationDelay = word(packet[13], packet[14]);
-  controller.spareKnob2 = word(packet[15], packet[16]);
-  controller.spareKnob4 = word(packet[17], packet[18]);
+  controller.ledDelay = word(packet[15], packet[16]);
+  controller.sendHeartBeatDelay = word(packet[17], packet[18]);
 
   // Request another joystick packet  
   lastJoystickRequestTime = millis();
@@ -653,8 +684,8 @@ void readAndRequestJoystickData()
   USB_COM_PORT.println(controller.straightenVertOnTheFly);
   USB_COM_PORT.println(controller.motorSpeed);
   USB_COM_PORT.println(controller.propagationDelay);
-  USB_COM_PORT.println(controller.spareKnob2);
-  USB_COM_PORT.println(controller.spareKnob4);*/
+  USB_COM_PORT.println(controller.ledDelay);
+  USB_COM_PORT.println(controller.sendHeartBeatDelay);*/
   
   return;
 }
