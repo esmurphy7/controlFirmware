@@ -146,6 +146,7 @@ void loop()
   sendSetpointsAndSettings();
   runPIDLoops();
   getAndSendDiagnostics();
+  runPIDLoops();
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
