@@ -699,6 +699,7 @@ void readAndRequestJoystickData()
  *************************************************************************************/
 void synchronizeWithJoystick()
 {
+  USB_COM_PORT.println("Getting back in sync with joystick. Waiting for data...");
   do
   {
     clearSerialBuffer(INPUT_SERIAL);
@@ -786,6 +787,7 @@ void manualControl()
   char delaySetting = 'm';
   int led_choice = -1;
   int sensors[6];
+  byte numberOfModulesNew;
   
   displayMenu();
   
@@ -795,7 +797,7 @@ void manualControl()
     {
       byteIn = USB_COM_PORT.read();
       
-      // characters in use: a, b, c, j, h, u, m, d, l, k, s, q
+      // characters in use: a, b, c, j, h, u, m, d, l, k, n, s, q
       switch(byteIn)
       {
         case 'a':
@@ -943,6 +945,20 @@ void manualControl()
           USB_COM_PORT.print("done, motor can turn off\n");
           break;
         
+        case 'n':
+          USB_COM_PORT << "Manually program number of modules (0-9)...\n";
+          while(USB_COM_PORT.available() < 1);
+          numberOfModulesNew = USB_COM_PORT.read() - 48;
+          if (numberOfModulesNew < 0 || numberOfModulesNew > 9)
+          {
+            USB_COM_PORT << "Invalid\n";
+            break;
+          }
+          USB_COM_PORT << "Now set to " << numberOfModulesNew << "\n";
+          EEPROM.write(0, numberOfModulesNew);
+          numberOfModules = numberOfModulesNew;
+          break;
+
         case 's':
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
@@ -980,6 +996,7 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - actuation\n");
     USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          s - stop motor\n");
+    USB_COM_PORT.print("          n - manually set numberOfModules\n");    
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
