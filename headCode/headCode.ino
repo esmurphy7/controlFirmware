@@ -29,11 +29,15 @@
 // Enable serial stream writing
 template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
 
+// Write to the USB com port only if we are in debug mode
+boolean inDebugMode = false;
+#define DEBUG_STREAM if(inDebugMode) USB_COM_PORT 
+
 // Variables for controlling titanoboa. Currently this data comes
 // from the joystick, but in the future it could come from an 
 // Android tablet or a PC.
 class ControllerData 
-{
+{  
   public:
   boolean right;
   boolean left;
@@ -227,7 +231,7 @@ void getAndSendDiagnostics()
       retVal = getVertCalibrationDiagnostics(packet);
       break;
     default: 
-      USB_COM_PORT << "ERROR: Invalid packet type = " << packetType << "\n";
+      DEBUG_STREAM << "ERROR: Invalid packet type = " << packetType << "\n";
       return;
   }
   if (retVal == false)
@@ -269,7 +273,7 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
     char data[6];  
     if (TAIL_SERIAL.readBytes(data, 6) < 6)
     {
-      USB_COM_PORT << "ERROR: Did not recieve all Module info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all Module info from module " << i + 1 << "\n";
       return false;
     }
     buffer[i * 6 + 0 + 4] = data[0];
@@ -300,7 +304,7 @@ boolean getHorzAngleDiagnostics(byte* buffer)
     char data[15];  
     if (TAIL_SERIAL.readBytes(data, 15) < 15)
     {
-      USB_COM_PORT << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 15; ++j)
@@ -330,7 +334,7 @@ boolean getVertAngleDiagnostics(byte* buffer)
     char data[15];  
     if (TAIL_SERIAL.readBytes(data, 15) < 15)
     {
-      USB_COM_PORT << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 15; ++j)
@@ -360,7 +364,7 @@ boolean getHorzCalibrationDiagnostics(byte* buffer)
     char data[20];  
     if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
-      USB_COM_PORT << "ERROR: Did not recieve all HorzCalibration info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all HorzCalibration info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 20; ++j)
@@ -390,7 +394,7 @@ boolean getVertCalibrationDiagnostics(byte* buffer)
     char data[20];  
     if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
-      USB_COM_PORT << "ERROR: Did not recieve all VertCalibration info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all VertCalibration info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 20; ++j)
@@ -414,7 +418,7 @@ void waitForModuleAcknowledgments(char* commandName, short timeout)
   byte acksRecieved = TAIL_SERIAL.readBytes(acks, numberOfModules);
   if (acksRecieved != numberOfModules)
   {
-    USB_COM_PORT << "ERROR: Only " << acksRecieved << " of " << numberOfModules << 
+    DEBUG_STREAM << "ERROR: Only " << acksRecieved << " of " << numberOfModules << 
       " modules acknowledged " << commandName << " command within " << timeout << "ms\n";
     return;
   }
@@ -425,7 +429,7 @@ void waitForModuleAcknowledgments(char* commandName, short timeout)
   {
     if (acks[i] != i + 1)
     {
-      USB_COM_PORT << "ERROR: Recieved bad acknowledgement from module # " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Recieved bad acknowledgement from module # " << i + 1 << "\n";
     }
   }
 }
@@ -634,7 +638,7 @@ void readAndRequestJoystickData()
       // If we've retried already, now we know the joystick is disconnected!
       if (joystickRetryAttempts > 0)
       {
-        USB_COM_PORT.println("ERROR: No joystick data. It is Disconnected.");
+        DEBUG_STREAM << "ERROR: No joystick data. It is Disconnected.";
         joystickIsConnected = false;
         controller.killSwitchPressed = false;
       }
@@ -963,6 +967,19 @@ void manualControl()
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
           break;
+          
+       case 'p':
+          if (inDebugMode)
+          {
+            USB_COM_PORT.println("Debug stream messages OFF");
+            inDebugMode = false;
+          }
+          else
+          {
+            USB_COM_PORT.println("Debug stream messages ON");
+            inDebugMode = true;
+          }
+          break;
 
         case 'e':
             displayMenu();
@@ -996,7 +1013,8 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - actuation\n");
     USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          s - stop motor\n");
-    USB_COM_PORT.print("          n - manually set numberOfModules\n");    
+    USB_COM_PORT.print("          n - manually set numberOfModules\n"); 
+    USB_COM_PORT.print("          p - print debug stream\n");     
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
