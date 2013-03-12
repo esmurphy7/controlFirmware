@@ -62,8 +62,8 @@ int lowRange[] = {0, 0, 0, 0, 0};
 int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
 int vertLowRange[]  = {0, 0, 0, 0, 0};
                    
-byte myModuleNumber;                    // My position in the module chain (1,2,3...)
-byte endModuleNumber;                   // ? TODO:Not sure why we would need this
+byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
+boolean iAmLastModule = false;          // ? TODO:Not sure why we would need this
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
 byte motorSpeed = 200;                  // Analog output for pump speed when turned on
 
@@ -143,7 +143,6 @@ void setup()
 
   // Load previous calibration from EEPROM
   myModuleNumber = EEPROM.read(0);
-  endModuleNumber = EEPROM.read(1);  
   for(int i=0;i<5;i++)
   { 
     highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
@@ -187,26 +186,34 @@ void setup()
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
 
+  TAIL_SERIAL.write(255);
+  delay(1);
+  if (TAIL_SERIAL.available() > 0 && TAIL_SERIAL.read() == 255)
+  {
+    iAmLastModule = true;
+    USB_COM_PORT.println("... and I'm the last module!");
+  }
+  
   USB_COM_PORT.print("\nCurrent voltage reading: ");
   USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
 
-  USB_COM_PORT.println("> Loaded Calibration and Initialized Horizontal Angle Array");
-  USB_COM_PORT.print("HIGH: ");
+  USB_COM_PORT.println("\n> Loaded Calibration and Initialized Horizontal Angle Array");
+  USB_COM_PORT.print("HIGH:     \t");
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(highRange[i]);
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nLOW: ");
+  USB_COM_PORT.print("\nLOW:     \t");
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(lowRange[i]);
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nEVEN?: "); 
+  USB_COM_PORT.print("\nEVEN?:  \t"); 
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven() ? 'T' : 'F');
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nANGLE_ARRAY: ");  
+  USB_COM_PORT.print("\nANGLE_ARRAY:\t");  
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(horzAngleArray[i]);
     USB_COM_PORT.print('\t');
@@ -220,13 +227,6 @@ void setup()
     USB_COM_PORT.print(i+1);
     USB_COM_PORT.print(" is ");
     USB_COM_PORT.println(vertStraightArray[i]);
-  }
-
-  // Print out even/odd setting for verticals
-  USB_COM_PORT.print("\nEVEN?: ");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven() ? 'T' : 'F');
-    USB_COM_PORT.print('\t');
   }
   delay(1000);
   USB_COM_PORT.println("\n");
@@ -288,8 +288,8 @@ void loop()
         clearSerialBuffer(HEAD_SERIAL);
     }
   }
-                                 // TEMP: \|/ We need to ground the last serial down RX
-  while (TAIL_SERIAL.available() > 0 && myModuleNumber != 4)
+  
+  while (iAmLastModule == false && TAIL_SERIAL.available() > 0)
   {
     HEAD_SERIAL.write(TAIL_SERIAL.read());
   }
