@@ -427,11 +427,14 @@ void waitForModuleAcknowledgments(char* commandName, short timeout)
   // Make sure this is what happened. 
   for (int i = 0; i < numberOfModules; ++i)
   {
-    if (acks[i] != i + 1)
+    byte data = acks[i];
+    if (data != i + 1)
     {
-      DEBUG_STREAM << "ERROR: Recieved bad acknowledgement from module # " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Recieved bad acknowledgement from module # " << i + 1 << " (" 
+        << data << ")\n";
     }
   }
+  clearSerialBuffer(TAIL_SERIAL);
 }
 
 /**************************************************************************************
@@ -703,7 +706,7 @@ void readAndRequestJoystickData()
  *************************************************************************************/
 void synchronizeWithJoystick()
 {
-  USB_COM_PORT.println("Getting back in sync with joystick. Waiting for data...");
+  USB_COM_PORT.print("Getting back in sync with joystick. Waiting for data... ");
   do
   {
     clearSerialBuffer(INPUT_SERIAL);
@@ -711,6 +714,7 @@ void synchronizeWithJoystick()
     delay(500);
   } 
   while (INPUT_SERIAL.available() != 30);
+  USB_COM_PORT.println("Synchronized!");
 }
 
 /**************************************************************************************
@@ -801,7 +805,7 @@ void manualControl()
     {
       byteIn = USB_COM_PORT.read();
       
-      // characters in use: a, b, c, j, h, u, m, d, l, k, n, s, q
+      // characters in use: a, b, c, j, h, u, m, d, l, k, n, t, s, q
       switch(byteIn)
       {
         case 'a':
@@ -980,6 +984,21 @@ void manualControl()
             inDebugMode = true;
           }
           break;
+        case 't':
+          // Running communication test
+          clearSerialBuffer(TAIL_SERIAL);
+          TAIL_SERIAL.write('t');
+          delay(100);
+          
+          // We should recieve modules number (1 2 3 4) followed by ASCII 't' aka ASCII 116
+          USB_COM_PORT << "Recieved: ";
+          while(TAIL_SERIAL.available() > 0)
+          {
+            byte data = TAIL_SERIAL.read();
+            USB_COM_PORT << data << " ";
+          }
+          USB_COM_PORT << "\n";
+          break;
 
         case 'e':
             displayMenu();
@@ -1015,6 +1034,7 @@ void displayMenu()
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          n - manually set numberOfModules\n"); 
     USB_COM_PORT.print("          p - print debug stream\n");     
+    USB_COM_PORT.print("          t - test communication\n");     
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }

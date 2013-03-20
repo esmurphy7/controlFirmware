@@ -24,6 +24,9 @@
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
 #define USB_COM_PORT Serial             // Serial for debugging
 
+// Enable serial stream writing
+template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
+
 // Memory locations for items stored to EEPROM
 #define MY_MODULE_NUMBER_ADDRESS  0
 #define HORIZONTAL_CALIBRATION_ADDRESS  2
@@ -186,9 +189,13 @@ void setup()
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
   USB_COM_PORT.println(myModuleNumber, DEC);
 
-  TAIL_SERIAL.write(255);
-  delay(1);
-  if (TAIL_SERIAL.available() > 0 && TAIL_SERIAL.read() == 255)
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write(200);
+  delay(10);
+  boolean avail = (TAIL_SERIAL.available() == 1);
+  int data = TAIL_SERIAL.read();
+  USB_COM_PORT.println(data);
+  if (avail && (data == 200))
   {
     iAmLastModule = true;
     USB_COM_PORT.println("... and I'm the last module!");
@@ -281,6 +288,9 @@ void loop()
       case 'g':
         processShortMotorPulseCommand();
         break;
+      case 't':
+        processCommunicationTestCommand();
+        break;
 
       default:
         USB_COM_PORT.print("Invalid command from upstream serial = ");
@@ -291,7 +301,8 @@ void loop()
   
   while (iAmLastModule == false && TAIL_SERIAL.available() > 0)
   {
-    HEAD_SERIAL.write(TAIL_SERIAL.read());
+    byte data = TAIL_SERIAL.read();
+    HEAD_SERIAL.write(data);
   }
 
 }//end loop()
@@ -304,6 +315,51 @@ void loop()
 void acknowledgeCommand()
 {
   HEAD_SERIAL.write(myModuleNumber);
+}
+
+/************************************************************************************
+  processCommmunicationTestCommand(): Tests up and down serial communication
+ ***********************************************************************************/
+void processCommunicationTestCommand()
+{
+  USB_COM_PORT << "Running communication test. Sending up myModuleNumber = " << myModuleNumber <<"\n";
+  
+  // Respond with module number so the head knows I got the message.
+  HEAD_SERIAL.write(myModuleNumber);
+  
+  // Pass on test message.
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write('t');
+  
+  // Check to see if the serial terminator is pulled into my tail.
+  delay(1);
+  if (TAIL_SERIAL.available() > 0)
+  {
+    // Yep. It's plugged in.
+    if (TAIL_SERIAL.peek() == 't')
+    {
+      USB_COM_PORT << "Looks like the serial terminator is plugged into me. Sending up 't' aka ASCII 116.\n";
+      TAIL_SERIAL.read();
+      HEAD_SERIAL.write('t');
+    }
+  }
+  else
+  {
+    USB_COM_PORT << "No serial terminator\n";
+  }
+  
+  // Take 100ms to send up any other serial data.
+  long startTime = millis();
+  while ((millis() - startTime) < 100)
+  {
+    if (TAIL_SERIAL.available() > 0)
+    {
+      byte data = TAIL_SERIAL.read();
+      USB_COM_PORT << "Recieved " << data << " on tail. Sending it up.\n";
+      HEAD_SERIAL.write(data); 
+    }
+  }
+  USB_COM_PORT << "\n";
 }
 
 /************************************************************************************
@@ -1173,6 +1229,7 @@ void manualControl()
   boolean motor = false;
   int actuationDelay = 200;
   char delaySetting = 'm';
+  byte newNum;
 
     displayMenu();
 
@@ -1335,6 +1392,21 @@ void manualControl()
           StopMov();
           USB_COM_PORT.print("STOPPED\n");
           break;
+          
+        
+        case 'u':
+          USB_COM_PORT << "Manually program myModuleNumber (0-9)...\n";
+          while(USB_COM_PORT.available() < 1);
+          newNum = USB_COM_PORT.read() - 48;
+          if (newNum < 0 || newNum > 9)
+          {
+            USB_COM_PORT << "Invalid\n";
+            break;
+          }
+          USB_COM_PORT << "Now set to " << newNum << "\n";
+          EEPROM.write(MY_MODULE_NUMBER_ADDRESS, newNum);
+          myModuleNumber = newNum;
+          break;        
 
         case 'e':
             displayMenu();
@@ -1370,6 +1442,7 @@ void displayMenu()
     USB_COM_PORT.print("          v - straighten verticals\n");
     USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          s - stop motor\n");
+    USB_COM_PORT.print("          u - manually set myModuleNumber\n");    
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
