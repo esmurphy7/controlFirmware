@@ -985,19 +985,7 @@ void manualControl()
           }
           break;
         case 't':
-          // Running communication test
-          clearSerialBuffer(TAIL_SERIAL);
-          TAIL_SERIAL.write('t');
-          delay(100);
-          
-          // We should recieve modules number (1 2 3 4) followed by ASCII 't' aka ASCII 116
-          USB_COM_PORT << "Recieved: ";
-          while(TAIL_SERIAL.available() > 0)
-          {
-            byte data = TAIL_SERIAL.read();
-            USB_COM_PORT << data << " ";
-          }
-          USB_COM_PORT << "\n";
+          runCommunicationTest();
           break;
 
         case 'e':
@@ -1017,6 +1005,92 @@ void manualControl()
   USB_COM_PORT.print("\nManual Control mode exited\n");
 }
 
+/**************************************************************************************
+  runCommunicationTest(): Makes sure all modules are responding and the last module is 
+                          terminated. Returns true if it passed the test.
+ *************************************************************************************/
+boolean runCommunicationTest()
+{
+  clearSerialBuffer(TAIL_SERIAL);
+  boolean allError = false;
+  
+  for (int i = 1; i <= 20; ++i)
+  {
+    USB_COM_PORT << "Running test " << i << " of 20.\n";
+    TAIL_SERIAL.write('t');
+    delay(100);
+    
+    // We should recieve modules number (1 2 3 4) followed by ASCII 't' aka ASCII 116
+    long startTime = millis();
+    int num = 1;
+    boolean gotLastModuleT = false;
+    boolean error = false;
+    
+    while(millis() - startTime < 150)
+    {
+      // Wait for data
+      if (!TAIL_SERIAL.available())
+      {
+        continue;
+      }
+      byte data = TAIL_SERIAL.read();
+      
+      // If we've heard from every module look for ASCII charater 't'
+      if (num > numberOfModules)
+      {
+        if (data == 't')
+        {
+          USB_COM_PORT << "Module #" << num - 1 << " knows it's the last module!\n";
+          gotLastModuleT = true;
+        }
+        else
+        {
+          USB_COM_PORT << "ERROR: Didn't recieve 't' from last module #" << num -1 << ". Recieved ASCII " << data << " instead.\n";
+          error = true;
+        }
+        break;              
+      }
+      
+      // Look for each module to respond with it's module number (in sequence)
+      if (data == num)
+      {
+        USB_COM_PORT << "Module #" << num << " is talking!\n";
+      }
+      else
+      {
+        USB_COM_PORT << "ERROR: Expected Module # '" << num << "'. Recieved '" << data << "'\n";
+        error = true;
+      }
+      ++num;
+    }
+    // If we didn't recieve data from all modules.
+    if (!error && num <= numberOfModules)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve data from all " << numberOfModules << " modules.\n";
+      error = true;     
+    }
+    // If we didn't recieve 't' from the last module.
+    if (!error && !gotLastModuleT)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve 't' from the last module. Is the serial terminator plugged in?\n";
+      error = true;
+    }
+    USB_COM_PORT << "\n";
+    
+    allError = (error) ? true : allError;
+  }
+  
+  // Give the result of the tests
+  if (allError)
+  {
+    USB_COM_PORT << "RESULT: ERROR! Some communication tests failed.\n\n";
+  }
+  else
+  {
+    USB_COM_PORT << "RESULT: SUCCESS! All communication tests passed.\n\n";
+  }
+  delay(500);
+}
 
 /**************************************************************************************
   displayMenu():
