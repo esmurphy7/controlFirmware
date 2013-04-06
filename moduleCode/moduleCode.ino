@@ -36,39 +36,41 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 #define CALIBRATE_MOTOR_SPEED  150
 #define JAW_MOTOR_SPEED        90
 
-const int VERT_DEAD_ZONE = 20;          // Vertical safety range
-
-
 // Static variables
 boolean even = false;                   // Unused, will be set in EEPROM after calibration
 
-char horzAngleArray[] = {               // Current horizontal and vertical position of 
-  '3','3','3','3','3'};                 // the actuators.
-char vertAngleArray[] = {               // 0 = Bent Left, 1 = Bent Right  <-- TODO:confirm
-  '3','3','3','3','3'};                 // 2 = Straight,  3 = Disabled
+// Target sensor values for the actuators
+// -1 means un initialized
+int horzSetpoints[] = {-1,-1,-1,-1,-1};
+int vertSetpoints[] = {-1,-1,-1,-1,-1};
 
 // Array of sensor values we recorded as straight for the verticals
-int vertStraightArray[] = {0, 0, 0, 0, 0};
+int vertStraightArray[] = {-1, -1, -1, -1, -1};
 
-unsigned long horzTimerArray[] = {      // Timer arrays used to timeout when waiting for 
-  0,0,0,0,0};                           // an actuator to reach its set point
-unsigned long vertTimerArray[] = {
-  0,0,0,0,0};  
+// Timer arrays used to timeout when waiting for an actuator to reach its set point
+unsigned long horzTimerArray[] = {0,0,0,0,0};                           
+unsigned long vertTimerArray[] = {0,0,0,0,0};  
 
-// Calibration values. The values of the horizontal position sensors at the hard limits of actuation.
+// Calibration values. The values of the position sensors at the hard limits of actuation.
 // Assume a linear sensor characteristic between these two points.
-int highRange[] = {1023, 1023, 1023, 1023, 1023};
-int lowRange[] = {0, 0, 0, 0, 0};
+int horzHighCalibration[] = {1023, 1023, 1023, 1023, 1023};
+int horzLowCalibration[] = {0, 0, 0, 0, 0};
+int vertHighCalibration[] = {1023, 1023, 1023, 1023, 1023};
+int vertLowCalibration[]  = {0, 0, 0, 0, 0};
 
-// Calibration values. The values of the vertical position sensors at the hard limits of actuation.
-// Assume a linear sensor characteristic between these two points.
-int vertHighRange[] = {1023, 1023, 1023, 1023, 1023};
-int vertLowRange[]  = {0, 0, 0, 0, 0};
-                   
+// We configure the deadbands in angle space (0-255). These arrays are a mapping of these
+// values to each sensor space. They are calculated by calling calculateDeadbands()
+int horzSensorDeadbands[] = {-1,-1,-1,-1,-1};
+int vertSensorDeadbands[] = {-1,-1,-1,-1,-1};
+
 byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
-boolean iAmLastModule = false;          // ? TODO:Not sure why we would need this
+boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
 byte motorSpeed = 200;                  // Analog output for pump speed when turned on
+byte horzAngleDeadband = 10;            // The horizontal deadband, 0 to 255 range
+byte vertAngleDeadband = 20;            // The vertical deadband, 0 to 255 range
+int horzActuatorTimeout = 3000;         // Horizontal actuators have this maybe ms to get to setpoint
+int vertActuatorTimeout = 1000;         // Vertical actuators have this maybe ms to get to setpoint
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -148,8 +150,8 @@ void setup()
   myModuleNumber = EEPROM.read(0);
   for(int i=0;i<5;i++)
   { 
-    highRange[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
-    lowRange[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
+    horzHighCalibration[i] = EEPROM.read(i*5+2) + (EEPROM.read(i*5+3) << 8);
+    horzLowCalibration[i] = EEPROM.read(i*5+4) + (EEPROM.read(i*5+5) << 8);
     PIDcontrollerHorizontal[i].setEven(EEPROM.read(i*5+6));
   }
   
@@ -169,20 +171,6 @@ void setup()
     PIDcontrollerVertical[2].setEven(even);
     PIDcontrollerVertical[3].setEven(!even);
     PIDcontrollerVertical[4].setEven(even);
-  }
-
-  // Initialize the horizontal angle array based on the current
-  // position of the pistons.
-  for(int i=0;i<5;i++)
-  {
-    int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
-    
-    if(currentAngle < 100)
-      horzAngleArray[i] = '0';
-    if(currentAngle >= 100 && currentAngle <= 154)
-      horzAngleArray[i] = '2';
-    if(currentAngle > 154)
-      horzAngleArray[i] = '1';
   }
 
   // Print out the loaded cabibration and angle array.
@@ -207,12 +195,12 @@ void setup()
   USB_COM_PORT.println("\n> Loaded Calibration and Initialized Horizontal Angle Array");
   USB_COM_PORT.print("HIGH:     \t");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(highRange[i]);
+    USB_COM_PORT.print(horzHighCalibration[i]);
     USB_COM_PORT.print('\t');
   }
   USB_COM_PORT.print("\nLOW:     \t");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(lowRange[i]);
+    USB_COM_PORT.print(horzLowCalibration[i]);
     USB_COM_PORT.print('\t');
   }
   USB_COM_PORT.print("\nEVEN?:  \t"); 
@@ -220,21 +208,13 @@ void setup()
     USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven() ? 'T' : 'F');
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nANGLE_ARRAY:\t");  
+  USB_COM_PORT.print("\nV_STRAIGHT:\t");  
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzAngleArray[i]);
+    USB_COM_PORT.print(vertStraightArray[i]);
     USB_COM_PORT.print('\t');
   }
   USB_COM_PORT.println('\n');
 
-  // Print out saved vertical straight angle array
-  for(int i=0;i<5;i++)
-  {
-    USB_COM_PORT.print("Saved vertical straight position for vertebrae ");
-    USB_COM_PORT.print(i+1);
-    USB_COM_PORT.print(" is ");
-    USB_COM_PORT.println(vertStraightArray[i]);
-  }
   delay(1000);
   USB_COM_PORT.println("\n");
   clearSerialBuffer(HEAD_SERIAL);
@@ -260,7 +240,7 @@ void loop()
   // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
-    //letters in use: p, s, c, h, g, n
+    //letters in use: p, s, c, h, g, n, v, t
     char command = HEAD_SERIAL.read();
     switch (command)
     {
@@ -279,7 +259,11 @@ void loop()
         processDiagnosticsCommand();
         break;
       case 'c':
-        processCalibrateCommand();
+        processHorzCalibrateCommand();
+        acknowledgeCommand();
+        break;
+      case 'v':
+        processVertCalibrateCommand();
         acknowledgeCommand();
         break;
       case 'h':
@@ -331,13 +315,14 @@ void processCommunicationTestCommand()
   clearSerialBuffer(TAIL_SERIAL);
   TAIL_SERIAL.write('t');
   
-  // Check to see if the serial terminator is pulled into my tail.
+  // Check to see if the serial terminator is plugged into my tail serial.
   delay(1);
   if (TAIL_SERIAL.available() > 0)
   {
     // Yep. It's plugged in.
     if (TAIL_SERIAL.peek() == 't')
     {
+      // Read out the 't' and sent it up.
       USB_COM_PORT << "Looks like the serial terminator is plugged into me. Sending up 't' aka ASCII 116.\n";
       TAIL_SERIAL.read();
       HEAD_SERIAL.write('t');
@@ -418,21 +403,23 @@ void processNewSettingsAndSetpoints()
   // Copy new setpoints [Setting bytes 0 to 59]
   for (int i = 0; i < 5; ++i)
   {
-    char newHorzSetpoint = (char)settings[(myModuleNumber-1) * 5 + i];
-    char newVertSetpoint = (char)settings[(myModuleNumber-1) * 5 + i + 30];
+    char newHorzAngle = (char)settings[(myModuleNumber-1) * 5 + i];
+    char newVertAngle = (char)settings[(myModuleNumber-1) * 5 + i + 30];
+    
+    int newHorzSetpoint = map(newHorzAngle,0,255,horzLowCalibration[i],horzHighCalibration[i]);
+    int newVertSetpoint = map(newVertAngle,0,255,vertLowCalibration[i],vertHighCalibration[i]);
     
     // If this is a new setpoint, reset the PID timout timer
-    if (newHorzSetpoint != horzAngleArray[i])
+    if (newHorzSetpoint != horzSetpoints[i])
     {
       horzTimerArray[i] = millis();
+      horzSetpoints[i] = newHorzSetpoint;      
     }
-    if (newVertSetpoint != vertAngleArray[i])
+    if (newVertSetpoint != vertSetpoints[i])
     {
       vertTimerArray[i] = millis();
-    }        
-    
-    horzAngleArray[i] = newHorzSetpoint;
-    vertAngleArray[i] = newVertSetpoint;
+      vertSetpoints[i] = newVertSetpoint;
+    }
   }
   
   // Change the lights
@@ -540,15 +527,16 @@ void sendHeadAndModuleDiagnostics()
  ***********************************************************************************/
 void sendHorzAngleDiagnostics()
 {
-  byte data[15];
+  byte data[20];
   for (int i = 0; i < 5; ++i)
   {
     int sensorValue = analogRead(HORZ_POS_SENSOR[i]);
-    data[i * 3 + 0] = horzAngleArray[i];
-    data[i * 3 + 1] = highByte(sensorValue);
-    data[i * 3 + 2] = lowByte(sensorValue);
+    data[i * 4 + 0] = lowByte(horzSetpoints[i]);
+    data[i * 4 + 1] = lowByte(horzSetpoints[i]);
+    data[i * 4 + 2] = highByte(sensorValue);
+    data[i * 4 + 3] = lowByte(sensorValue);
   }
-  HEAD_SERIAL.write(data, 15);
+  HEAD_SERIAL.write(data, 20);
 }
 
 /************************************************************************************
@@ -556,15 +544,16 @@ void sendHorzAngleDiagnostics()
  ***********************************************************************************/
 void sendVertAngleDiagnostics()
 {
-  byte data[15];
+  byte data[20];
   for (int i = 0; i < 5; ++i)
   {
     int sensorValue = analogRead(VERT_POS_SENSOR[i]);
-    data[i * 3 + 0] = vertAngleArray[i];
-    data[i * 3 + 1] = highByte(sensorValue);
-    data[i * 3 + 2] = lowByte(sensorValue);
+    data[i * 4 + 0] = lowByte(vertSetpoints[i]);
+    data[i * 4 + 1] = lowByte(vertSetpoints[i]);
+    data[i * 4 + 2] = highByte(sensorValue);
+    data[i * 4 + 3] = lowByte(sensorValue);
   }
-  HEAD_SERIAL.write(data, 15);
+  HEAD_SERIAL.write(data, 20);
 }
 
 /************************************************************************************
@@ -575,10 +564,10 @@ void sendHorzCalibrationDiagnostics()
   byte data[20];
   for (int i = 0; i < 5; ++i)
   {
-    data[i * 4 + 0] = highByte(highRange[i]);
-    data[i * 4 + 1] = lowByte(highRange[i]);
-    data[i * 4 + 2] = highByte(lowRange[i]);
-    data[i * 4 + 3] = lowByte(lowRange[i]);
+    data[i * 4 + 0] = highByte(horzHighCalibration[i]);
+    data[i * 4 + 1] = lowByte(horzHighCalibration[i]);
+    data[i * 4 + 2] = highByte(horzLowCalibration[i]);
+    data[i * 4 + 3] = lowByte(horzLowCalibration[i]);
   }
   HEAD_SERIAL.write(data, 20);
 }
@@ -639,13 +628,21 @@ void processShortMotorPulseCommand()
 }
 
 /************************************************************************************
+  calculateSensorDeadBands(): Based on the calibration, map the deadbands from angle space (0-255) to
+                              sensor space (low to high calibration)
+ ***********************************************************************************/
+void calculateSensorDeadBands()
+{
+  for (int i = 0; i < 5; ++i)
+  {
+    horzSensorDeadbands[i] = map(horzAngleDeadband, 0, 255, horzLowCalibration[i], horzHighCalibration[i]);
+    vertSensorDeadbands[i] = map(vertAngleDeadband, 0, 255, vertLowCalibration[i], vertHighCalibration[i]);
+  }
+}
+
+/************************************************************************************
   move(): Modulates the values to achieve position set points (Runs the PID)
  ***********************************************************************************/
-
-const int MAX_WAIT_TIME = 3000;  // Time to try moving actuator before giving up
-const int MAX_WAIT_TIME_VERT = 1000;
-const int DEAD_ZONE = 10;        // Safety range to not move
-int count = 0;
 
 void move()
 {
@@ -656,80 +653,63 @@ void move()
 
   for (int i=0; i < 5; i++)
   {
+    //////////////////////////
     ////// HORIZONTAL ////////
-    
-    if (horzAngleArray[i]=='0')
+    if (horzSetpoints[i] >= 0)
     {
-      goal = 10;
-    }
-    else if (horzAngleArray[i]=='1')
-    {
-      goal = 245;
-    }
-    else if (horzAngleArray[i]=='2')
-    {
-      goal = 127;
-    }
-    else
-    {
-      analogWrite(HORZ_ACTUATOR[i],0);
-      goal = -1;
-    }
-
-    if (goal >= 0)
-    {
-      PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
-      currentAngle = map(analogRead(HORZ_POS_SENSOR[i]), lowRange[i], highRange[i], 0, 255);
+      PIDcontrollerHorizontal[i].setSetPoint(horzSetpoints[i]);
+      currentAngle = analogRead(HORZ_POS_SENSOR[i]);
       
-      // If we are have not reached the deadzone and haven't timed out
-      if ((abs(currentAngle-goal)>DEAD_ZONE) &&
-         (millis()-horzTimerArray[i]) < MAX_WAIT_TIME)
+      // If we are have not reached the deadband and haven't timed out
+      if ((abs(currentAngle - horzSetpoints[i]) > horzSensorDeadbands[i]) &&
+          (millis() - horzTimerArray[i]) < horzActuatorTimeout)
       {
         // Update the acutator PID output
         analogWrite(MOTOR_CONTROL, motorSpeed);
         PIDcontrollerHorizontal[i].updateOutput();
         moved = true;
       }
-      // We are in the deadzone or we took too long to get there    
+      // We are in the deadband or we took too long to get there    
       else
       {
         analogWrite(HORZ_ACTUATOR[i],0);
       }
     }
-    
-    ////// VERTICAL ////////
-
-    
-    // Currently the vertical actuators only know how to straighten
-    if (vertAngleArray[i] == '2')
+    // Setpoint is uninitialized (-1) turn actuator off
+    else
     {
-      USB_COM_PORT.println(millis());      
-      PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
+      analogWrite(VERT_ACTUATOR[i], 0);
+    }
+
+    ///////////////////////    
+    ////// VERTICAL ///////
+    if (vertSetpoints[i] >= 0)
+    {      
+      PIDcontrollerVertical[i].setSetPoint(vertSetpoints[i]);
       currentAngle = analogRead(VERT_POS_SENSOR[i]);
       
       // If we are have not reached the deadzone and haven't timed out
-      if ((abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE) &&
-          (millis() - vertTimerArray[i]) < MAX_WAIT_TIME)
+      if ((abs(currentAngle - vertSetpoints[i]) > vertSensorDeadbands[i]) &&
+          (millis() - vertTimerArray[i]) < vertActuatorTimeout)
       {
         // Update the acutator PID output        
         analogWrite(MOTOR_CONTROL, motorSpeed);
         PIDcontrollerVertical[i].updateOutput();
         moved = true;
       }
-      // We are in the deadzone or we took too long to get there
+      // We are in the deadband or we took too long to get there
       else
       {
         analogWrite(VERT_ACTUATOR[i], 0);
       }
     }
-    
-    // If were not in straightening mode, turn actuator off.
+    // Setpoint is uninitialized (-1) turn actuator off
     else
     {
       analogWrite(VERT_ACTUATOR[i], 0);
     }
   }
-
+  
   if(moved == false)
   {
     analogWrite(MOTOR_CONTROL, 0);
@@ -737,10 +717,10 @@ void move()
 }// end move()
 
 
-/***********************************************************************************
-  processCalibrateCommand(): run horizontal and vertical calibration
- ***********************************************************************************/
-void processCalibrateCommand()
+/**************************************************************************************
+  processHorzCalibrateCommand(): Tells the next module to calibrate then calibrates this one.
+ *************************************************************************************/
+void processHorzCalibrateCommand()
 {
   TAIL_SERIAL.write('c');
 
@@ -751,22 +731,12 @@ void processCalibrateCommand()
     analogWrite(HORZ_ACTUATOR[i], 0);
   }
   analogWrite(MOTOR_CONTROL, 0);
-
-  //calibrate horizontal position and reset everything
-  calibrateHorizontal();
-  delay(100);
   
-  //calibrate vertical position and reset everything
-  //calibrateVertical();
-  delay(100);
-
-} //end processCalibrateCommand()
-
+  calibrateHorizontal();
+} // end processHorzCalibrateCommand
 
 /**************************************************************************************
-  calibrateHorizontal(): Records horizontal sensor values at the hard limits of each 
-                         vertebrae. 
-                         Saves to EEPROM.
+  calibrateHorizontal(): Records horizontal sensor values at the hard limits of each vertebrae. Saves to EEPROM.
  *************************************************************************************/
 void calibrateHorizontal()
 {
@@ -788,9 +758,8 @@ void calibrateHorizontal()
   // HIGH: Record Values
   for(int i=0;i<5;i++)
   {
-    highRange[i] = analogRead(HORZ_POS_SENSOR[i]);
+    horzHighCalibration[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
-
 
   // LOW: Move to side when the selection signal is LOW
   analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
@@ -810,53 +779,49 @@ void calibrateHorizontal()
   // LOW: Record Values
   for(int i=0;i<5;i++)
   {
-    lowRange[i] = analogRead(HORZ_POS_SENSOR[i]);
+    horzLowCalibration[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
 
   // Adjust high and low range and account for alternating actuators
   for(int i=0;i<5;i++)
   {
-    if(highRange[i]>lowRange[i])
+    if(horzHighCalibration[i]>horzLowCalibration[i])
     {
       PIDcontrollerHorizontal[i].setEven(true);
-      horzAngleArray[i] = '1';
     }
     else
     {
-      int temp = highRange[i];
-      highRange[i] = lowRange[i];
-      lowRange[i] = temp;
+      int temp = horzHighCalibration[i];
+      horzHighCalibration[i] = horzLowCalibration[i];
+      horzLowCalibration[i] = temp;
       PIDcontrollerHorizontal[i].setEven(false);
-      horzAngleArray[i] = '0';
     }
   }
   
   // Save calibration to EEPROM
   // 10-bit values must be split into two bytes for storage.
   for(int i=0;i<5;i++){ 
-    EEPROM.write(i*5+2,lowByte(highRange[i]));
-    EEPROM.write(i*5+3,highByte(highRange[i]));
-    EEPROM.write(i*5+4,lowByte(lowRange[i]));
-    EEPROM.write(i*5+5,highByte(lowRange[i]));
+    EEPROM.write(i*5+2,lowByte(horzHighCalibration[i]));
+    EEPROM.write(i*5+3,highByte(horzHighCalibration[i]));
+    EEPROM.write(i*5+4,lowByte(horzLowCalibration[i]));
+    EEPROM.write(i*5+5,highByte(horzLowCalibration[i]));
     EEPROM.write(i*5+6,PIDcontrollerHorizontal[i].getEven());
   }
-
-  straightenHorizontal();
    
   // Print out calibration
   USB_COM_PORT.println("");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(highRange[i]);
+    USB_COM_PORT.print(horzHighCalibration[i]);
     USB_COM_PORT.print(' ');
   }
   USB_COM_PORT.println("HIGH ");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(lowRange[i]);
+    USB_COM_PORT.print(horzLowCalibration[i]);
     USB_COM_PORT.print(' ');
   }
   USB_COM_PORT.println("RANGE ");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(highRange[i] - lowRange[i]);
+    USB_COM_PORT.print(horzHighCalibration[i] - horzLowCalibration[i]);
     USB_COM_PORT.print(" ");
   }
   USB_COM_PORT.println("LOW ");
@@ -867,6 +832,25 @@ void calibrateHorizontal()
   USB_COM_PORT.println("EVEN");
   
 }//end calibrateHorizontal()
+
+
+/**************************************************************************************
+  processVertCalibrateCommand(): Tells the next module to calibrate vertical then calibrates this one.
+ *************************************************************************************/
+void processVertCalibrateCommand()
+{
+  TAIL_SERIAL.write('v');
+
+  // Stop any current motion
+  for(int i=0; i < 5; i++)
+  {
+    analogWrite(VERT_ACTUATOR[i], 0);
+    analogWrite(HORZ_ACTUATOR[i], 0);
+  }
+  analogWrite(MOTOR_CONTROL, 0);
+  
+  calibrateVertical();
+} // end processVertCalibrateCommand
 
 
 /**************************************************************************************
@@ -928,7 +912,7 @@ void calibrateVertical()
   // Record 1st set of values
   for(int i=0; i<5; i++)
   {
-    vertHighRange[i] = analogRead(VERT_POS_SENSOR[i]);
+    vertHighCalibration[i] = analogRead(VERT_POS_SENSOR[i]);
   }
 
   //Now go to the other extremes
@@ -981,56 +965,52 @@ void calibrateVertical()
   // Record 2nd set of values
   for (int i=0; i<5; i++)
   {
-    vertLowRange[i] = analogRead(VERT_POS_SENSOR[i]);
+    vertLowCalibration[i] = analogRead(VERT_POS_SENSOR[i]);
   }
   
   // Adjust high and low range and account for alternating actuators
-  /*for(int i=0;i<5;i++)
+  for(int i=0;i<5;i++)
   {
-    if(vertHighRange[i]>vertLowRange[i])
+    if(vertHighCalibration[i]>vertLowCalibration[i])
     {
       PIDcontrollerVertical[i].setEven(false);
-      vertAngleArray[i] = '1';
     }
     else
     {
-      int temp = vertHighRange[i];
-      vertHighRange[i] = vertLowRange[i];
-      vertLowRange[i] = temp;
+      int temp = vertHighCalibration[i];
+      vertHighCalibration[i] = vertLowCalibration[i];
+      vertLowCalibration[i] = temp;
       PIDcontrollerVertical[i].setEven(true);
-      vertAngleArray[i] = '0';
     }
-  }*/
+  }
   
   // Save calibration to EEPROM
   // 10-bit values must be split into two bytes for storage.
-  /*for(int i=0;i<5;i++){ 
-    EEPROM.write(i*5+2, lowByte(vertHighRange[i]));
-    EEPROM.write(i*5+3, highByte(vertHighRange[i]));
-    EEPROM.write(i*5+4, lowByte(vertLowRange[i]));
-    EEPROM.write(i*5+5, highByte(vertLowRange[i]));
+  for(int i=0;i<5;i++){ 
+    EEPROM.write(i*5+2, lowByte(vertHighCalibration[i]));
+    EEPROM.write(i*5+3, highByte(vertHighCalibration[i]));
+    EEPROM.write(i*5+4, lowByte(vertLowCalibration[i]));
+    EEPROM.write(i*5+5, highByte(vertLowCalibration[i]));
     EEPROM.write(i*5+6, PIDcontrollerVertical[i].getEven());
-  }*/
-
-  straightenVertical();
+  }
    
   // Print out calibration
   USB_COM_PORT.println("");
   for (int i=0; i<5; i++)
   {
-    USB_COM_PORT.print(vertHighRange[i]);
+    USB_COM_PORT.print(vertHighCalibration[i]);
     USB_COM_PORT.print(' ');
   }
   USB_COM_PORT.println("HIGH ");
   for (int i=0; i<5; i++)
   {
-    USB_COM_PORT.print(vertLowRange[i]);
+    USB_COM_PORT.print(vertLowCalibration[i]);
     USB_COM_PORT.print(' ');
   }
   USB_COM_PORT.println("LOW ");
   for(int i=0; i<5; i++)
   {
-    USB_COM_PORT.print(vertHighRange[i] - vertLowRange[i]);
+    USB_COM_PORT.print(vertHighCalibration[i] - vertLowCalibration[i]);
     USB_COM_PORT.print(" ");
   }
   USB_COM_PORT.println("RANGE ");
@@ -1042,114 +1022,6 @@ void calibrateVertical()
   USB_COM_PORT.println("EVEN");
 
 }//end calibrateVertical()
-
-
-/**************************************************************************************
-  straightenHorizontal(): Makes Titanaboa straight as an arrow.
- *************************************************************************************/
-void straightenHorizontal()
-{
-  // Move till horzAngleArray is matched
-  boolean inPosition = false;
-
-  int goal = 127;
-  for(int i=0;i<5;i++)
-  {
-    PIDcontrollerHorizontal[i].setSetPoint(map(goal,0,255,lowRange[i],highRange[i]));
-  }
-
-  // Time limit so if stuck, goes to next
-  unsigned long startTime = millis();
-  while(inPosition == false && (millis()-startTime) < MAX_WAIT_TIME){
-    inPosition = true;
-
-    for(int i=0;i<5;i++){
-      int currentAngle = map(analogRead(HORZ_POS_SENSOR[i]),lowRange[i],highRange[i],0,255);
-
-      if(abs(currentAngle-goal)>DEAD_ZONE){
-        analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
-        PIDcontrollerHorizontal[i].updateOutput();
-        inPosition=false;
-      }
-      else{
-        analogWrite(HORZ_ACTUATOR[i],0);
-      }
-    }
-  }
-
-  //turn off motor
-  analogWrite(MOTOR_CONTROL, 0);
-  //turn off all actuators
-  //undefine angles
-  for(int i=0;i<5;i++){
-    analogWrite(HORZ_ACTUATOR[i],0);
-    horzAngleArray[i] = '2';
-  }
-} //end straightenHorizontal()
-
-
-/**************************************************************************************
-  straightenVertical(): Makes Titanaboa straight as an arrow...vertically
- *************************************************************************************/
-void straightenVertical()
-{
-  // Move till vertAngleArray is matched???
-  boolean inPosition = false;
-  
-  USB_COM_PORT.println("\nstraightening vertical");
-  for (int i=0; i<5; i++)
-  {
-    PIDcontrollerVertical[i].setSetPoint(vertStraightArray[i]);
-    USB_COM_PORT.print("current vertical position for vertebrae ");
-    USB_COM_PORT.print(i+1);
-    USB_COM_PORT.print(" is ");
-    USB_COM_PORT.print(analogRead(VERT_POS_SENSOR[i]));
-    USB_COM_PORT.print(", target is ");
-    USB_COM_PORT.println(vertStraightArray[i]);
-  }
-
-  // Time limit so if stuck, goes to next
-  unsigned long startTime = millis();
-  while (inPosition == false && (millis()-startTime) < MAX_WAIT_TIME_VERT)
-  {
-    inPosition = true;
-
-    for (int i=0; i<5; i++)
-    {
-      int currentAngle = analogRead(VERT_POS_SENSOR[i]);
-
-      if (abs(currentAngle - vertStraightArray[i]) > DEAD_ZONE)
-      {
-        analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
-        PIDcontrollerVertical[i].updateOutput();
-        inPosition = false;
-      }
-      else
-      {
-        analogWrite(VERT_ACTUATOR[i], 0);
-      }
-    }
-  }
-
-  //turn off motor
-  analogWrite(MOTOR_CONTROL, 0);
-  //turn off all actuators
-  //undefine angles
-  for (int i=0; i<5; i++)
-  {
-    analogWrite(VERT_ACTUATOR[i],0);
-    vertAngleArray[i] = '2';
-  }
-  
-  for (int i=0; i<5; i++)
-  {
-    USB_COM_PORT.print("current vertical position for vertebrae ");
-    USB_COM_PORT.print(i+1);
-    USB_COM_PORT.print(" is ");
-    USB_COM_PORT.println(analogRead(VERT_POS_SENSOR[i]));
-  }
-} //end straightenVertical()
-
 
 /**************************************************************************************
   readSensors():
@@ -1194,17 +1066,17 @@ void saveVerticalPosition()
     // Get the current raw value
     vertStraightArray[i] = analogRead(VERT_POS_SENSOR[i]);
     // Set low and high ranges as +/- 100 of current position
-    vertLowRange[i] = vertStraightArray[i] - 100;
-    vertHighRange[i] = vertStraightArray[i] + 100;
+    vertLowCalibration[i] = vertStraightArray[i] - 100;
+    vertHighCalibration[i] = vertStraightArray[i] + 100;
 
     USB_COM_PORT.print("Vertical sensor ");
     USB_COM_PORT.print(i+1);
     USB_COM_PORT.print(": current position ");
     USB_COM_PORT.print(vertStraightArray[i]);
     USB_COM_PORT.print(", low limit ");
-    USB_COM_PORT.print(vertLowRange[i]);
+    USB_COM_PORT.print(vertLowCalibration[i]);
     USB_COM_PORT.print(", high limit ");
-    USB_COM_PORT.println(vertHighRange[i]);
+    USB_COM_PORT.println(vertHighCalibration[i]);
   }
 
   // Save current vertical position to EEPROM
@@ -1241,8 +1113,12 @@ void manualControl()
       switch(byteIn)
       {
         case 'c':
-          USB_COM_PORT.print("\nRunning calibration...\n");
+          USB_COM_PORT.print("\nRunning horz calibration...\n");
           calibrateHorizontal();
+          break;
+        case 'v':
+          USB_COM_PORT.print("\nRunning vert calibration...\n");
+          calibrateVertical();
           break;
         case 'p':
           readSensors();
@@ -1250,22 +1126,6 @@ void manualControl()
         case 'r':
           USB_COM_PORT.print("\nSaving current vertical position\n");
           saveVerticalPosition();
-          break;
-        case 'v':
-          // only straighten verticals if there is a stored vertical position
-          if ((vertStraightArray[0] != 0) &&
-              (vertStraightArray[1] != 0) &&
-              (vertStraightArray[2] != 0) &&
-              (vertStraightArray[3] != 0) &&
-              (vertStraightArray[4] != 0))
-            {
-              USB_COM_PORT.print("\nStraightening verticals\n");
-              straightenVertical();
-            }
-            else
-            {
-              USB_COM_PORT.print("\nUnable to straighten as there is no stored data\n");
-            }
           break;
         case '1':
           segSelect = 0;
@@ -1439,7 +1299,7 @@ void displayMenu()
     USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          p - print raw values of position sensors\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
-    USB_COM_PORT.print("          v - straighten verticals\n");
+    USB_COM_PORT.print("          v - calibrate verticals\n");
     USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n");    
