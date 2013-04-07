@@ -64,6 +64,7 @@ unsigned int broadcastPort = 12345;
 unsigned int localPort = 12345;
 
 // Setpoints for all 30 vertibrae in the snake
+// Angles are from 0 to 254, 255 means uninitialized.
 byte vertSetpoints[30];
 byte horzSetpoints[30];
 boolean lights[30];
@@ -92,11 +93,14 @@ void setup()
   USB_COM_PORT.print("Number of modules: ");
   USB_COM_PORT.println(numberOfModules);
 
-  // Initialize all the vertibrae setpoints
+  // Initialize setponts
+  //   - Actuators are disabled.
+  //   - Lights are off
   for (int i = 0; i < 30; ++i)
   {
-    horzSetpoints[i] = '3';
-    vertSetpoints[i] = '3';    
+  
+    horzSetpoints[i] = 255;
+    vertSetpoints[i] = 255;    
     lights[i] = false;    
   }
   
@@ -160,12 +164,12 @@ void loop()
   if (controller.calibrate && controller.killSwitchPressed)
   {
     countNumberOfModules();
-    runSensorCalibration();
+    runVertSensorCalibration();
     synchronizeWithJoystick();
     return;
   }
   
-  // Should be open the jaw?
+  // Should we open the jaw?
   if (controller.openJaw && controller.killSwitchPressed)
   {
     openTheJaw();
@@ -301,15 +305,15 @@ boolean getHorzAngleDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[15];  
-    if (TAIL_SERIAL.readBytes(data, 15) < 15)
+    char data[20];  
+    if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
       DEBUG_STREAM << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
       return false;
     }
-    for (int j = 0; j < 15; ++j)
+    for (int j = 0; j < 20; ++j)
     {
-      buffer[i * 15 + j + 1] = data[j];    
+      buffer[i * 20 + j + 1] = data[j];    
     }
   }
   return true;
@@ -331,15 +335,15 @@ boolean getVertAngleDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[15];  
-    if (TAIL_SERIAL.readBytes(data, 15) < 15)
+    char data[20];  
+    if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
       DEBUG_STREAM << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
       return false;
     }
-    for (int j = 0; j < 15; ++j)
+    for (int j = 0; j < 20; ++j)
     {
-      buffer[i * 15 + j + 1] = data[j];    
+      buffer[i * 20 + j + 1] = data[j];    
     }
   }
   return true;
@@ -438,20 +442,34 @@ void waitForModuleAcknowledgments(char* commandName, short timeout)
 }
 
 /**************************************************************************************
-  runSensorCalibration(): Calibrates the vertical and horizontal sensors on the actuators
+  runHorzSensorCalibration(): Calibrates the horizontal sensors on the actuators
  *************************************************************************************/
-void runSensorCalibration()
+void runHorzSensorCalibration()
 {
   clearSerialBuffer(TAIL_SERIAL);
-  TAIL_SERIAL.write('c');
-  waitForModuleAcknowledgments("calibrate", 15000); 
+  TAIL_SERIAL.print("ch");
+  waitForModuleAcknowledgments("calibrate horz", 15000); 
   
-  // Deinitialize all actuator setpoints. The snake is straight and will
-  // need to start slithering from scratch.
+  // The snake will end up straight.
   for (int i = 0; i < 30; ++i)
   {
-    horzSetpoints[i] = '3';
-    vertSetpoints[i] = '3';    
+    horzSetpoints[i] = 127;  
+  }
+}
+
+/**************************************************************************************
+  runHorzSensorCalibration(): Calibrates the horizontal sensors on the actuators
+ *************************************************************************************/
+void runVertSensorCalibration()
+{
+  clearSerialBuffer(TAIL_SERIAL);
+  TAIL_SERIAL.write("cv");
+  waitForModuleAcknowledgments("calibrate vert", 15000); 
+  
+  // The snake will end up straight.
+  for (int i = 0; i < 30; ++i)
+  {
+    vertSetpoints[i] = 127;  
   }
 }
 
@@ -536,11 +554,11 @@ void updateSetpoints()
   // Disable vertical actuation. If (1) the straighten vertical switch is
   // pressed or (2) vertical straighten on the fly is enabled, set all
   // verticals to straight.
-  byte allVertSetpoints = '3';
+  byte allVertSetpoints = 255;
   if (controller.killSwitchPressed &&
       (controller.straightenVertOnTheFly || controller.straightenVertical))
   {
-      allVertSetpoints = '2';
+      allVertSetpoints = 127;
   }
   for (int i = 0; i < 30; ++i)
   {
@@ -560,11 +578,11 @@ void updateSetpoints()
     // The first actuator gets the new setpoint
     if (controller.right)
     {
-      horzSetpoints[0] = '1';
+      horzSetpoints[0] = 245;
     }
     if (controller.left)
     {
-      horzSetpoints[0] = '0';
+      horzSetpoints[0] = 10;
     }
     lastUpdateTime = millis();  
   }
@@ -805,9 +823,25 @@ void manualControl()
     {
       byteIn = USB_COM_PORT.read();
       
-      // characters in use: a, b, c, j, h, u, m, d, l, k, n, t, s, q
+      // characters in use: a, b, c, j, h, u, m, d, l, k, n, t, s, q, y, u, i
       switch(byteIn)
       {
+        case 'y':
+          USB_COM_PORT << "\nCalibrating horizontals... ";
+          runHorzSensorCalibration();
+          USB_COM_PORT << "Done\n";
+          break;
+          
+        case 'i':
+          USB_COM_PORT << "\nCalibrating verticals... ";
+          runVertSensorCalibration();
+          USB_COM_PORT << "Done\n";
+          break;
+          
+        case 'm':
+          countNumberOfModules();
+          break;
+          
         case 'a':
           while(USB_COM_PORT.available() < 1)
           {
@@ -1107,8 +1141,11 @@ void displayMenu()
     USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          n - manually set numberOfModules\n"); 
+    USB_COM_PORT.print("          m - auto calibrate numberOfModules\n"); 
     USB_COM_PORT.print("          p - print debug stream\n");     
     USB_COM_PORT.print("          t - test communication\n");     
+    USB_COM_PORT.print("          y - calibrate horizontal\n");     
+    USB_COM_PORT.print("          i - calibrate vertical\n");     
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
