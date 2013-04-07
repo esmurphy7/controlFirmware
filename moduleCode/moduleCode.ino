@@ -36,9 +36,6 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 #define CALIBRATE_MOTOR_SPEED  150
 #define JAW_MOTOR_SPEED        90
 
-// Static variables
-boolean even = false;                   // Unused, will be set in EEPROM after calibration
-
 // Target sensor values for the actuators
 // -1 means un initialized
 int horzSetpoints[] = {-1,-1,-1,-1,-1};
@@ -76,22 +73,22 @@ int vertActuatorTimeout = 1000;         // Vertical actuators have this many ms 
 // Declaration of horizontal PID controllers, default even and odd values applied here
 // but get updated during calibration
 PIDcontrol PIDcontrollerHorizontal[] = {
-  PIDcontrol(HORZ_POS_SENSOR[0], HORZ_ACTUATOR_CTRL[0], HORZ_ACTUATOR[0], even),
-  PIDcontrol(HORZ_POS_SENSOR[1], HORZ_ACTUATOR_CTRL[1], HORZ_ACTUATOR[1], !even),
-  PIDcontrol(HORZ_POS_SENSOR[2], HORZ_ACTUATOR_CTRL[2], HORZ_ACTUATOR[2], even),
-  PIDcontrol(HORZ_POS_SENSOR[3], HORZ_ACTUATOR_CTRL[3], HORZ_ACTUATOR[3], !even),
-  PIDcontrol(HORZ_POS_SENSOR[4], HORZ_ACTUATOR_CTRL[4], HORZ_ACTUATOR[4], even),
+  PIDcontrol(HORZ_POS_SENSOR[0], HORZ_ACTUATOR_CTRL[0], HORZ_ACTUATOR[0]),
+  PIDcontrol(HORZ_POS_SENSOR[1], HORZ_ACTUATOR_CTRL[1], HORZ_ACTUATOR[1]),
+  PIDcontrol(HORZ_POS_SENSOR[2], HORZ_ACTUATOR_CTRL[2], HORZ_ACTUATOR[2]),
+  PIDcontrol(HORZ_POS_SENSOR[3], HORZ_ACTUATOR_CTRL[3], HORZ_ACTUATOR[3]),
+  PIDcontrol(HORZ_POS_SENSOR[4], HORZ_ACTUATOR_CTRL[4], HORZ_ACTUATOR[4]),
 };
 
 // PID Controllers for the vertical actuators
 // Declaration of vertical PID controllers, default even and odd values only apply to
 // odd numbered modules
 PIDcontrol PIDcontrollerVertical[] = {
-  PIDcontrol(VERT_POS_SENSOR[0], VERT_ACTUATOR_CTRL[0], VERT_ACTUATOR[0], !even),
-  PIDcontrol(VERT_POS_SENSOR[1], VERT_ACTUATOR_CTRL[1], VERT_ACTUATOR[1], even),
-  PIDcontrol(VERT_POS_SENSOR[2], VERT_ACTUATOR_CTRL[2], VERT_ACTUATOR[2], !even),
-  PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3], even),
-  PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4], !even),
+  PIDcontrol(VERT_POS_SENSOR[0], VERT_ACTUATOR_CTRL[0], VERT_ACTUATOR[0]),
+  PIDcontrol(VERT_POS_SENSOR[1], VERT_ACTUATOR_CTRL[1], VERT_ACTUATOR[1]),
+  PIDcontrol(VERT_POS_SENSOR[2], VERT_ACTUATOR_CTRL[2], VERT_ACTUATOR[2]),
+  PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3]),
+  PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4]),
 };
 
 /****************************************************************************
@@ -135,7 +132,8 @@ void setup()
   }
 
   //initialize LED Pins
-  for(int i=0;i<8;i++){
+  for(int i=0;i<8;i++)
+  {
     pinMode(LED[i],OUTPUT);
   }
   
@@ -154,10 +152,9 @@ void setup()
                             (EEPROM.read(i*5 + HORIZONTAL_CALIBRATION_ADDRESS + 1) << 8);
     horzLowCalibration[i] =  EEPROM.read(i*5 + HORIZONTAL_CALIBRATION_ADDRESS + 2) +
                             (EEPROM.read(i*5 + HORIZONTAL_CALIBRATION_ADDRESS + 3) << 8);
-    PIDcontrollerHorizontal[i].setEven(EEPROM.read(i*5 + HORIZONTAL_CALIBRATION_ADDRESS + 4));
 
-    vertStraightArray[i] = EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS)
-                           + (EEPROM.read(i*5+VERTICAL_STRAIGHT_ADDRESS+1) << 8);
+    vertStraightArray[i] = EEPROM.read(i*5 + VERTICAL_STRAIGHT_ADDRESS)
+                           + (EEPROM.read(i*5 + VERTICAL_STRAIGHT_ADDRESS+1) << 8);
                            
     vertHighCalibration[i] = EEPROM.read(i*5 + VERTICAL_CALIBRATION_ADDRESS) + 
                             (EEPROM.read(i*5 + VERTICAL_CALIBRATION_ADDRESS + 1) << 8);
@@ -167,15 +164,34 @@ void setup()
   
   calculateSensorDeadbands();
 
-  // setup even/odd for even modules, default values applied at declaration only apply to
-  // odd numbered modules
+  // setup even/odd for even modules
   if (myModuleNumber%2 == 0)
+  {  
+    PIDcontrollerVertical[0].setEven(false);
+    PIDcontrollerVertical[1].setEven(true);
+    PIDcontrollerVertical[2].setEven(false);
+    PIDcontrollerVertical[3].setEven(true);
+    PIDcontrollerVertical[4].setEven(false);
+    
+    PIDcontrollerHorizontal[0].setEven(false);
+    PIDcontrollerHorizontal[1].setEven(true);
+    PIDcontrollerHorizontal[2].setEven(false);
+    PIDcontrollerHorizontal[3].setEven(true);
+    PIDcontrollerHorizontal[4].setEven(false);
+  }
+  else
   {
-    PIDcontrollerVertical[0].setEven(even);
-    PIDcontrollerVertical[1].setEven(!even);
-    PIDcontrollerVertical[2].setEven(even);
-    PIDcontrollerVertical[3].setEven(!even);
-    PIDcontrollerVertical[4].setEven(even);
+    PIDcontrollerVertical[0].setEven(true);
+    PIDcontrollerVertical[1].setEven(false);
+    PIDcontrollerVertical[2].setEven(true);
+    PIDcontrollerVertical[3].setEven(false);
+    PIDcontrollerVertical[4].setEven(true);
+    
+    PIDcontrollerHorizontal[0].setEven(true);
+    PIDcontrollerHorizontal[1].setEven(false);
+    PIDcontrollerHorizontal[2].setEven(true);
+    PIDcontrollerHorizontal[3].setEven(false);
+    PIDcontrollerHorizontal[4].setEven(true);  
   }
 
   // Print out the initialization information
@@ -191,11 +207,11 @@ void setup()
   if (avail && (data == 200))
   {
     iAmLastModule = true;
-    USB_COM_PORT << "... and I'm the last module! (" << data << ")";
+    USB_COM_PORT << "... and I'm the last module! (" << data << ")\n";
   }
   else
   {
-    USB_COM_PORT << "Not last. (" << data << ")";    
+    USB_COM_PORT << "Not last. (" << data << ")\n";    
   }
   
   // Print out the calibration 
@@ -203,19 +219,24 @@ void setup()
   USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
 
   USB_COM_PORT.println("\n> Loaded Calibration and Initialized Horizontal Angle Array");
-  USB_COM_PORT.print("HIGH:     \t");
+  USB_COM_PORT.print("H_HIGH:   \t");
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(horzHighCalibration[i]);
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nLOW:     \t");
+  USB_COM_PORT.print("\nH_LOW:   \t");
   for(int i=0;i<5;i++){
     USB_COM_PORT.print(horzLowCalibration[i]);
     USB_COM_PORT.print('\t');
   }
-  USB_COM_PORT.print("\nEVEN?:  \t"); 
+  USB_COM_PORT.print("\nV_HIGH:   \t");
   for(int i=0;i<5;i++){
-    USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven() ? 'T' : 'F');
+    USB_COM_PORT.print(vertHighCalibration[i]);
+    USB_COM_PORT.print('\t');
+  }
+  USB_COM_PORT.print("\nV_LOW:     \t");
+  for(int i=0;i<5;i++){
+    USB_COM_PORT.print(vertLowCalibration[i]);
     USB_COM_PORT.print('\t');
   }
   USB_COM_PORT.print("\nV_STRAIGHT:\t");  
@@ -864,14 +885,12 @@ void calibrateHorizontal()
   {
     if(horzHighCalibration[i]>horzLowCalibration[i])
     {
-      PIDcontrollerHorizontal[i].setEven(true);
     }
     else
     {
       int temp = horzHighCalibration[i];
       horzHighCalibration[i] = horzLowCalibration[i];
       horzLowCalibration[i] = temp;
-      PIDcontrollerHorizontal[i].setEven(false);
     }
   }
   
@@ -882,7 +901,6 @@ void calibrateHorizontal()
     EEPROM.write(i*5+3,highByte(horzHighCalibration[i]));
     EEPROM.write(i*5+4,lowByte(horzLowCalibration[i]));
     EEPROM.write(i*5+5,highByte(horzLowCalibration[i]));
-    EEPROM.write(i*5+6,PIDcontrollerHorizontal[i].getEven());
   }
    
   // Print out calibration
@@ -902,11 +920,6 @@ void calibrateHorizontal()
     USB_COM_PORT.print(" ");
   }
   USB_COM_PORT.println("LOW ");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(PIDcontrollerHorizontal[i].getEven(),BIN);
-    USB_COM_PORT.print("    ");
-  }
-  USB_COM_PORT.println("EVEN");
   
   calculateSensorDeadbands();
   // Make titanoboa straight
@@ -933,15 +946,13 @@ void calibrateVertical()
       //even numbered module
       if (i%2 == 0)
       {
-        //even numbered actuators
-      PIDcontrollerVertical[i].setEven(true);        
+        //even numbered actuators       
         digitalWrite(VERT_ACTUATOR_CTRL[i], HIGH);
         analogWrite(VERT_ACTUATOR[i],255);
       }
       else
       {
         //odd numbered actuators
-        PIDcontrollerVertical[i].setEven(false);
         digitalWrite(VERT_ACTUATOR_CTRL[i], LOW);
         analogWrite(VERT_ACTUATOR[i],255);
       }
@@ -952,14 +963,12 @@ void calibrateVertical()
       if (i%2 == 0)
       {
         //even numbered actuators
-        PIDcontrollerVertical[i].setEven(true);
         digitalWrite(VERT_ACTUATOR_CTRL[i], LOW);
         analogWrite(VERT_ACTUATOR[i],255);
       }
       else
       {
         //odd numbered actuators
-        PIDcontrollerVertical[i].setEven(false);
         digitalWrite(VERT_ACTUATOR_CTRL[i], HIGH);
         analogWrite(VERT_ACTUATOR[i],255);
       }
@@ -1039,14 +1048,12 @@ void calibrateVertical()
   {
     if(vertHighCalibration[i]>vertLowCalibration[i])
     {
-      //PIDcontrollerVertical[i].setEven(false);
     }
     else
     {
       int temp = vertHighCalibration[i];
       vertHighCalibration[i] = vertLowCalibration[i];
       vertLowCalibration[i] = temp;
-      //PIDcontrollerVertical[i].setEven(true);
     }
   }
   
@@ -1058,7 +1065,6 @@ void calibrateVertical()
     EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 1, highByte(vertHighCalibration[i]));
     EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 2, lowByte(vertLowCalibration[i]));
     EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 3, highByte(vertLowCalibration[i]));
-    EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 4, PIDcontrollerVertical[i].getEven());
   }
    
   // Print out calibration
@@ -1081,12 +1087,6 @@ void calibrateVertical()
     USB_COM_PORT.print(" ");
   }
   USB_COM_PORT.println("RANGE ");
-  for (int i=0; i<5; i++)
-  {
-    USB_COM_PORT.print(PIDcontrollerVertical[i].getEven(), BIN);
-    USB_COM_PORT.print("    ");
-  }
-  USB_COM_PORT.println("EVEN");
 
   calculateSensorDeadbands();
   // Make titanoboa straight

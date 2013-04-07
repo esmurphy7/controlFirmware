@@ -51,8 +51,8 @@ class ControllerData
   boolean calibrate;
   byte motorSpeed;
   unsigned short propagationDelay;
-  unsigned short ledDelay; // light delay
-  unsigned short sendHeartBeatDelay;
+  unsigned short unlabelledRightKnob;
+  unsigned short unlabelledLeftKnob;
 } controller;
 
 // Ethernet/Wi-Fi variables
@@ -72,6 +72,9 @@ boolean lights[30];
 // Other data
 byte numberOfModules = 0;
 boolean joystickIsConnected = false;
+int longDelayBetweenHeartBeats = 1100;
+int shortDelayBetweenHeartBeats = 250;
+int ledDelayWhenRunning = 30;
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -164,7 +167,7 @@ void loop()
   if (controller.calibrate && controller.killSwitchPressed)
   {
     countNumberOfModules();
-    runVertSensorCalibration();
+    runHorzSensorCalibration();
     synchronizeWithJoystick();
     return;
   }
@@ -599,7 +602,7 @@ void updateLights()
   // Propagate random pulses down the snake when we're slithering..
   // .. like nervous signals though a nervous system.
   if (controller.killSwitchPressed && 
-      (millis() - lastUpdateTime > controller.ledDelay))
+      (millis() - lastUpdateTime > ledDelayWhenRunning))
   {
     for (int i = 29; i > 0; --i)
     {
@@ -624,13 +627,13 @@ void updateLights()
     lights[0] = false;
     
     // Propagate heat beats when its time
-    if (!firstBeatSent && (millis() - lastUpdateTime > (controller.sendHeartBeatDelay * 4)))
+    if (!firstBeatSent && (millis() - lastUpdateTime > longDelayBetweenHeartBeats))
     {
       lights[0] = true;
       firstBeatSent = true;
       lastUpdateTime = millis();
     }
-    else if (firstBeatSent && (millis() - lastUpdateTime > controller.ledDelay))
+    else if (firstBeatSent && (millis() - lastUpdateTime > shortDelayBetweenHeartBeats))
     {
       lights[0] = true;
       firstBeatSent = false;
@@ -691,8 +694,8 @@ void readAndRequestJoystickData()
   controller.straightenVertOnTheFly = (boolean)packet[9];
   controller.motorSpeed = packet[12];
   controller.propagationDelay = word(packet[13], packet[14]);
-  controller.ledDelay = word(packet[15], packet[16]);
-  controller.sendHeartBeatDelay = word(packet[17], packet[18]);
+  controller.unlabelledRightKnob = word(packet[15], packet[16]);
+  controller.unlabelledLeftKnob = word(packet[17], packet[18]);
 
   // Request another joystick packet  
   lastJoystickRequestTime = millis();

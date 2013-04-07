@@ -35,11 +35,10 @@ private:
   
 public:
   //constructor
-  PIDcontrol(int newSensorPin,int newActuatorDirectionPin,int newActuatorSpeedPin, boolean newEven){
+  PIDcontrol(int newSensorPin,int newActuatorDirectionPin,int newActuatorSpeedPin){
     sensorPin = newSensorPin;
     actuatorSpeedPin = newActuatorSpeedPin;
     actuatorDirectionPin = newActuatorDirectionPin;
-    even = newEven;
     
     kp = 0;
     kd = 0;
