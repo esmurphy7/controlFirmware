@@ -15,6 +15,14 @@
   modules is done over a serial daisy chain. 
 */
 
+// We are using an interrupt for the PID. this interrupt could come in any time, possibly in the middle
+// of communication. To ensure that we don't lose data, make the serial buffer size larger than the packets.
+#include "HardwareSerial.cpp"
+#ifndef SERIAL_BUFFER_SIZE
+  #error "ERROR: Serial buffer must be 128 bytes. Please modify your arduino program files."
+  // Arduino Folder\hardware\arduino\cores\arduino
+#endif 
+
 #include "EEPROM.h"
 #include "titanoboa_pins.h"
 #include "PIDcontrol.h"
@@ -66,8 +74,10 @@ byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don
 byte motorSpeed = 200;                  // Analog output for pump speed when turned on
 byte horzAngleDeadband = 10;            // The horizontal deadband, 0 to 254 range
 byte vertAngleDeadband = 20;            // The vertical deadband, 0 to 254 range
-int horzActuatorTimeout = 3000;         // Horizontal actuators have this many ms to get to setpoint
-int vertActuatorTimeout = 1000;         // Vertical actuators have this many ms to get to setpoint
+const int horzActuatorTimeout = 3000;   // Horizontal actuators have this many ms to get to setpoint
+const int vertActuatorTimeout = 1000;   // Vertical actuators have this many ms to get to setpoint
+const int pidLoopTime = 25;             // We execute the pid loop on this interval (ms)
+
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -90,6 +100,7 @@ PIDcontrol PIDcontrollerVertical[] = {
   PIDcontrol(VERT_POS_SENSOR[3], VERT_ACTUATOR_CTRL[3], VERT_ACTUATOR[3]),
   PIDcontrol(VERT_POS_SENSOR[4], VERT_ACTUATOR_CTRL[4], VERT_ACTUATOR[4]),
 };
+
 
 /****************************************************************************
  setup(): Initializes serial ports, pins and loads EEPROM calibration
@@ -245,13 +256,13 @@ void setup()
     USB_COM_PORT.print('\t');
   }
   USB_COM_PORT.println('\n');
-
-  delay(1000);
   USB_COM_PORT.println("\n");
   clearSerialBuffer(HEAD_SERIAL);
   clearSerialBuffer(TAIL_SERIAL);
+  
+  // AVR code to enable overflow interrupt on timer 1
+  TIMSK1 |= _BV(TOIE1);  
 }
-
 
 /***********************************************************************************
   loop(): Checks for Upstream Serial or USB Serial commands. Executes them.
@@ -275,10 +286,6 @@ void loop()
     char command = HEAD_SERIAL.read();
     switch (command)
     {
-      case 'p':
-        processRunPIDCommand();
-        acknowledgeCommand();
-        break;
       case 's':
         processNewSettingsAndSetpoints();
         acknowledgeCommand();
@@ -372,18 +379,6 @@ void processCommunicationTestCommand()
     }
   }
   USB_COM_PORT << "\n";
-}
-
-/************************************************************************************
-  processRunPIDCommand(): Runs the PID loop if the kill switch is still pressed.
- ***********************************************************************************/
-void processRunPIDCommand()
-{
-  TAIL_SERIAL.write('p');   
-  if (killSwitchPressed)
-  {     
-    move(); 
-  }
 }
 
 /************************************************************************************
@@ -673,6 +668,29 @@ void calculateSensorDeadbands()
   {
     horzSensorDeadbands[i] = map(horzAngleDeadband, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorDeadbands[i] = map(vertAngleDeadband, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+  }
+}
+
+
+/************************************************************************************
+  This is an AVR interrupt. On the Arduino MEGA 2560 it triggers every 2ms (different on other Arduinos)
+  We are using this interrupt to the run pid loop on a fixed, consistant interval. 
+ ***********************************************************************************/
+ 
+ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
+{
+  static int count = 0;
+  ++count;
+  
+  // Wait for "pidLoopTime" milliseconds to occur
+  if (count > pidLoopTime / 2) // 2 means 2ms
+  {
+    if (killSwitchPressed)
+      move(); 
+    else
+      StopMov();
+      
+    count = 0;
   }
 }
 

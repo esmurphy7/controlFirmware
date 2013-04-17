@@ -155,9 +155,7 @@ void loop()
   updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
-  runPIDLoops();
   getAndSendDiagnostics();
-  runPIDLoops();
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
@@ -474,16 +472,6 @@ void runVertSensorCalibration()
   {
     vertSetpoints[i] = 127;  
   }
-}
-
-/**************************************************************************************
-  runPIDLoops(): Tells each module to execute their PID loops
- *************************************************************************************/
-void runPIDLoops()
-{
-  clearSerialBuffer(TAIL_SERIAL);
-  TAIL_SERIAL.write('p');
-  waitForModuleAcknowledgments("pid", 40);
 }
 
 /**************************************************************************************
