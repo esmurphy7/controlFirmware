@@ -33,9 +33,6 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 #define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
 
-#define CALIBRATE_MOTOR_SPEED  150
-#define JAW_MOTOR_SPEED        90
-
 // Target sensor values for the actuators
 // -1 means un initialized
 int horzSetpoints[] = {-1,-1,-1,-1,-1};
@@ -63,11 +60,14 @@ int vertSensorDeadbands[] = {-1,-1,-1,-1,-1};
 byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
-byte motorSpeed = 200;                  // Analog output for pump speed when turned on
-byte horzAngleDeadband = 10;            // The horizontal deadband, 0 to 254 range
-byte vertAngleDeadband = 20;            // The vertical deadband, 0 to 254 range
-int horzActuatorTimeout = 3000;         // Horizontal actuators have this many ms to get to setpoint
-int vertActuatorTimeout = 1000;         // Vertical actuators have this many ms to get to setpoint
+byte motorSpeed = 200;                  // Motor speed for runtime. The analog output to the motor.
+const byte horzAngleDeadband = 10;      // The horizontal deadband, 0 to 254 range
+const byte vertAngleDeadband = 20;      // The vertical deadband, 0 to 254 range
+const int horzActuatorTimeout = 3000;   // Horizontal actuators have this many ms to get to setpoint
+const int vertActuatorTimeout = 1000;   // Vertical actuators have this many ms to get to setpoint
+const byte calibrateMotorSpeed = 150;   // For vertical and horz calibration.
+const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
+const byte pulseMotorSpeed = 200;       // Motor speed for jaw/head manual mode. (the jaw uses the module 1 motor)
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -639,7 +639,7 @@ void processLongMotorPulseCommand()
     return;
     
   USB_COM_PORT.print("Turning motor on for 2500ms\n");
-  analogWrite(MOTOR_CONTROL, JAW_MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, jawMotorSpeed);
   delay(2500);
   analogWrite(MOTOR_CONTROL, 0);
   USB_COM_PORT.print("Turning motor off\n");  
@@ -657,7 +657,7 @@ void processShortMotorPulseCommand()
     return;
     
   USB_COM_PORT.print("Turning motor on for 200ms\n");
-  analogWrite(MOTOR_CONTROL, motorSpeed);
+  analogWrite(MOTOR_CONTROL, pulseMotorSpeed);
   delay(200);
   analogWrite(MOTOR_CONTROL, 0);
   USB_COM_PORT.print("Turning motor off\n");  
@@ -839,7 +839,7 @@ void processCalibrateCommand()
 void calibrateHorizontal()
 {
   // HIGH: Move to side when the solenoid selection signal is HIGH
-  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
   for (int i = 0; i < 5; i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
@@ -860,7 +860,7 @@ void calibrateHorizontal()
   }
 
   // LOW: Move to side when the selection signal is LOW
-  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
   for(int i=0;i<5;i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], LOW);
@@ -935,7 +935,7 @@ void calibrateHorizontal()
  *************************************************************************************/
 void calibrateVertical()
 {
-  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
 
   // for vertical calibration don't run actuators to their extremes all in the same 
   // direction otherwise will end up with a giant U that will tip over
@@ -991,7 +991,7 @@ void calibrateVertical()
   }
 
   //Now go to the other extremes
-  analogWrite(MOTOR_CONTROL, CALIBRATE_MOTOR_SPEED);
+  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
   for (int i=0; i<5; i++)
   {
     if (myModuleNumber%2 == 0)
