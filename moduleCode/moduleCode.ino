@@ -24,7 +24,7 @@
 #endif 
 
 #include "EEPROM.h"
-#include "titanoboa_pins.h"
+#include "titanoboaPins.h"
 #include "PIDcontrol.h"
 
 // Defines and constants

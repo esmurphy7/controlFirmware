@@ -16,11 +16,11 @@
   - Requests diagnostic data and sets it out over wifi.
 */
 
-#include "titanoboa_headboard_pins.h"
+#include "headPins.h"
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
-#include "EEPROM.h"
+#include <EEPROM.h>
 
 #define INPUT_SERIAL Serial3            // Xbee
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
