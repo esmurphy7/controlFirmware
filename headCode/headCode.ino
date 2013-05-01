@@ -6,13 +6,12 @@
   Part of the titanaboa.ca project
   
   Decription: This code runs on an Arduino MEGA to control the entire
-  Titanoboa snake. It is the brain of the operation and it schdeules all
+  Titanoboa snake. It is the brain of the operation and it schedules all
   communication. 
 
   Task list:
   - Requests status of switches and knobs from the joystick
   - Sets new settings and setpoints to every module
-  - Tells every modules to execute PID loops on their actuators
   - Requests diagnostic data and sets it out over wifi.
 */
 

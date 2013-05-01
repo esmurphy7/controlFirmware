@@ -1,17 +1,23 @@
-//////////////////////////////////////////////////////////////////////////
-//
-// Filename: BoaShield_pins.h
-//
-// Description: all the pin defines for the Titanoboa BoaShield on the
-//              Arduino
-//
-//////////////////////////////////////////////////////////////////////////
+/*
+
+  OneWireNXP.h - Communication with NXP One Wire devices 
+  
+  Created: April 30, 2013 
+  Part of the titanaboa.ca project
+  
+  Decription: This code was built to communicate with an NXP
+  KMA210 programmable angle sensor but it might work with
+  other devices from NXP with a One-Wire Interface. Please note 
+  that the One-Wire Interface spec from NXP is incompatible with 
+  the popular 1-Wire spec from Maxim.
+
+*/
 
 
 /************************** Arduino Defines **********************************/
 
-#ifndef _BOA_SHIELD_PINS_H_
-#define _BOA_SHIELD_PINS_H_
+#ifndef _MODULE_PINS_H_
+#define _MODULE_PINS_H_
 
 #include <Arduino.h>
 
@@ -275,5 +281,5 @@ const int LED[] = {
   LED_8  
 };
 
-#endif _BOA_SHIELD_PINS_H_
+#endif _MODULE_PINS_H_
 

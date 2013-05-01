@@ -1,10 +1,20 @@
 /*
-PID control library
-calculates the PID output
-and writes to output pin
+
+  OneWireNXP.h - Communication with NXP One Wire devices 
+  
+  Created: April 30, 2013 
+  Part of the titanaboa.ca project
+  
+  Decription: This code was built to communicate with an NXP
+  KMA210 programmable angle sensor but it might work with
+  other devices from NXP with a One-Wire Interface. Please note 
+  that the One-Wire Interface spec from NXP is incompatible with 
+  the popular 1-Wire spec from Maxim.
+
 */
-#ifndef PIDcontrol_h
-#define PIDcontrol_h
+
+#ifndef _PID_CONTROL_H_
+#define _PID_CONTROL_H_
 
 #include <Arduino.h>
 
@@ -145,4 +155,4 @@ public:
   
 };
 
-#endif
+#endif _PID_CONTROL_H_

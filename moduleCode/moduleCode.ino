@@ -18,14 +18,15 @@
 // We are using an interrupt for the PID. this interrupt could come in any time, possibly in the middle
 // of communication. To ensure that we don't lose data, make the serial buffer size larger than the packets.
 #include "HardwareSerial.cpp"
-#ifndef SERIAL_BUFFER_SIZE
+#if SERIAL_BUFFER_SIZE != 128
   #error "ERROR: Serial buffer must be 128 bytes. Please modify your arduino program files."
   // Arduino Folder\hardware\arduino\cores\arduino
 #endif 
 
-#include "EEPROM.h"
-#include "titanoboaPins.h"
+#include  <EEPROM.h>
+#include "modulePins.h"
 #include "PIDcontrol.h"
+#include "OneWireNXP.h"
 
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
