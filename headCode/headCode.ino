@@ -53,6 +53,7 @@ class ControllerData
   unsigned short propagationDelay;
   unsigned short unlabelledRightKnob;
   unsigned short unlabelledLeftKnob;
+  boolean wagTail;
 } controller;
 
 // Ethernet/Wi-Fi variables
@@ -568,8 +569,30 @@ void updateSetpoints()
     vertSetpoints[i] = allVertSetpoints;
   }
 
+  // Wag the tail
+  if (controller.killSwitchPressed &&
+      (controller.wagTail) &&
+      (controller.left || controller.right) &&
+      (millis() - lastUpdateTime > controller.propagationDelay))
+  {
+    // Set the last module, last vertebrae vertical up slightly
+    vertSetpoints[(numberOfModules * 5) - 1] = 50;
+
+    // The last actuator gets the new setpoint
+    if (controller.right)
+    {
+      horzSetpoints[(numberOfModules * 5) - 1] = 10;
+    }
+    if (controller.left)
+    {
+      horzSetpoints[(numberOfModules * 5) - 1] = 245;
+    }
+    lastUpdateTime = millis();
+  }
+
   // Propagate horizontal setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
+      (!controller.wagTail) &&
       (controller.left || controller.right) &&
       (millis() - lastUpdateTime > controller.propagationDelay))
   {
@@ -696,6 +719,8 @@ void readAndRequestJoystickData()
   controller.propagationDelay = word(packet[13], packet[14]);
   controller.unlabelledRightKnob = word(packet[15], packet[16]);
   controller.unlabelledLeftKnob = word(packet[17], packet[18]);
+  // temporarily highjack left knob until a switch is added to the joystick
+  controller.wagTail = (controller.unlabelledLeftKnob > 512);
 
   // Request another joystick packet  
   lastJoystickRequestTime = millis();
