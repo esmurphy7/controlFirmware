@@ -77,7 +77,7 @@ const int vertActuatorTimeout = 1000;   // Vertical actuators have this many ms 
 const byte calibrateMotorSpeed = 150;   // For vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte pulseMotorSpeed = 200;       // Motor speed for jaw/head manual mode. (the jaw uses the module 1 motor)
-const int pidLoopTime = 25;             // We execute the pid loop on this interval (ms)
+const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -261,6 +261,7 @@ void setup()
   clearSerialBuffer(TAIL_SERIAL);
   
   // AVR code to enable overflow interrupt on timer 1
+  // Used for the pid interrupt
   TIMSK1 |= _BV(TOIE1);  
 }
 
@@ -676,7 +677,6 @@ void calculateSensorDeadbands()
   This is an AVR interrupt. On the Arduino MEGA 2560 it triggers every 2ms (different on other Arduinos)
   We are using this interrupt to the run pid loop on a fixed, consistant interval. 
  ***********************************************************************************/
- 
 ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
 {
   static int count = 0;
@@ -684,12 +684,15 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   
   // Wait for "pidLoopTime" milliseconds to occur
   if (count > pidLoopTime / 2) // 2 means 2ms
-  {
+  {    
     if (killSwitchPressed)
+    {
       move(); 
+    }
     else
+    {
       StopMov();
-      
+    }      
     count = 0;
   }
 }
@@ -697,7 +700,6 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
 /************************************************************************************
   move(): Modulates the values to achieve position set points (Runs the PID)
  ***********************************************************************************/
-
 void move()
 {
   //set if any segment moved, so we can turn off motor when setpoint reached
