@@ -1,15 +1,20 @@
 /*
 
-  OneWireNXP.h - Communication with NXP One Wire devices 
+  PIDcontrol.h - PIDControl for a titanoboa actuator 
   
-  Created: April 30, 2013 
+  Created: July 9, 2011 
   Part of the titanaboa.ca project
   
-  Decription: This code was built to communicate with an NXP
-  KMA210 programmable angle sensor but it might work with
-  other devices from NXP with a One-Wire Interface. Please note 
-  that the One-Wire Interface spec from NXP is incompatible with 
-  the popular 1-Wire spec from Maxim.
+  Decription: This class abstracts piston control from the 
+  main code. Provide the sensor and actuator pin numbers on 
+  instantiation. In runtime, provide a setpoint. Repeatedly calling
+  the updateOutput function will move the piston such that the 
+  sensor setpoint is achieved.
+  
+  Depending on the configuration of the piston and orientation of 
+  the sensor you may need to setEven(true). This will reverse
+  the direction the piston needs to travel to obtain an increased 
+  sensor value.
 
 */
 
