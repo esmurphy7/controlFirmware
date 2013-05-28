@@ -70,15 +70,21 @@ byte myModuleNumber = 0;                // My position in the module chain (1,2,
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
 boolean runPidLoop = false;             // Set to true if you want to run pid on interrupt interval.
-byte motorSpeed = 0;                    // Runtime analog output motor speed. Set by joystick.
+byte runtimeMotorSpeed = 0;             // Runtime analog output motor speed. Set by joystick.
 const byte horzAngleDeadband = 10;      // The horizontal deadband, 0 to 254 range
 const byte vertAngleDeadband = 20;      // The vertical deadband, 0 to 254 range
 const int horzActuatorTimeout = 3000;   // Horizontal actuators have this many ms to get to setpoint
 const int vertActuatorTimeout = 1000;   // Vertical actuators have this many ms to get to setpoint
-const byte calibrateMotorSpeed = 150;   // For vertical and horz calibration.
+const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz calibration.
+const byte straightenMotorSpeed = 150;  // Motor speed for vertical and horz straighten.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
+
+// Variables for manual mode
+int manualActuationDelay = 200;
+int manualVertibraeSelect = 0;
+
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -219,45 +225,16 @@ void setup()
   if (avail && (data == 200))
   {
     iAmLastModule = true;
-    USB_COM_PORT << "... and I'm the last module! (" << data << ")\n";
+    USB_COM_PORT << "... and I'm the last module! (" << data << ")\n\n";
   }
   else
   {
-    USB_COM_PORT << "Not last. (" << data << ")\n";    
+    USB_COM_PORT << "Not last. (" << data << ")\n\n";    
   }
+ 
+  printBatteryVoltage();
+  printCalibrationValues();
   
-  // Print out the calibration 
-  USB_COM_PORT.print("\nCurrent voltage reading: ");
-  USB_COM_PORT.println(map(analogRead(BAT_LEVEL_24V),0,1023,0,25000));
-
-  USB_COM_PORT.println("\n> Loaded Calibration and Initialized Horizontal Angle Array");
-  USB_COM_PORT.print("H_HIGH:   \t");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzHighCalibration[i]);
-    USB_COM_PORT.print('\t');
-  }
-  USB_COM_PORT.print("\nH_LOW:   \t");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzLowCalibration[i]);
-    USB_COM_PORT.print('\t');
-  }
-  USB_COM_PORT.print("\nV_HIGH:   \t");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(vertHighCalibration[i]);
-    USB_COM_PORT.print('\t');
-  }
-  USB_COM_PORT.print("\nV_LOW:     \t");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(vertLowCalibration[i]);
-    USB_COM_PORT.print('\t');
-  }
-  USB_COM_PORT.print("\nV_STRAIGHT:\t");  
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(vertStraightArray[i]);
-    USB_COM_PORT.print('\t');
-  }
-  USB_COM_PORT.println('\n');
-  USB_COM_PORT.println("\n");
   clearSerialBuffer(HEAD_SERIAL);
   clearSerialBuffer(TAIL_SERIAL);
   
@@ -274,7 +251,7 @@ void setup()
 void loop()
 { 
   // Check the USB port for command to enter manual mode
-  if (USB_COM_PORT.available()>0)
+  if (USB_COM_PORT.available() > 0)
   {
     if (USB_COM_PORT.read() == 'M')
     {
@@ -463,7 +440,7 @@ void processNewSettingsAndSetpoints()
   if (newKillSwitchPressed == false)
   {
     // Stop all movement when the kill switch is released
-    StopMov();
+    StopMovement();
   }
   if (newKillSwitchPressed == true && killSwitchPressed == false)
   {
@@ -477,7 +454,7 @@ void processNewSettingsAndSetpoints()
   killSwitchPressed = newKillSwitchPressed;
   
   // Copy new motor speed [Setting byte 72]
-  motorSpeed = settings[72];
+  runtimeMotorSpeed = settings[72];
   //USB_COM_PORT.print(motorSpeed);
   //USB_COM_PORT.print("\t");
   //USB_COM_PORT.println(horzAngleArray[4]);
@@ -549,7 +526,7 @@ void sendHeadAndModuleDiagnostics()
   data[0] = highByte(batteryVoltage);
   data[1] = lowByte(batteryVoltage);
   data[2] = 0;
-  data[3] = motorSpeed;
+  data[3] = runtimeMotorSpeed;
   data[4] = 0;
   data[5] = 0;
 
@@ -700,20 +677,20 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   {    
     if (killSwitchPressed)
     {
-      move(); 
+      executePID(runtimeMotorSpeed); 
     }
     else
     {
-      StopMov();
+      StopMovement();
     }      
     count = 0;
   }
 }
 
 /************************************************************************************
-  move(): Modulates the values to achieve position set points (Runs the PID)
+  executePID(): Modulates the values to achieve position set points (Runs the PID)
  ***********************************************************************************/
-void move()
+void executePID(byte motorSpeed)
 {
   //set if any segment moved, so we can turn off motor when setpoint reached
   boolean moved = false;
@@ -792,6 +769,7 @@ void move()
 void straightenHorizontal()
 {
   runPidLoop = false;
+  USB_COM_PORT << "Straightening horizontal... ";
   
   // Set setpoints to halfway between low and high calibration values
   for (int i = 0; i < 5; ++i)
@@ -802,12 +780,15 @@ void straightenHorizontal()
   
   // Do three seconds of movement
   unsigned long startTime = millis();
+  
   while (millis() - startTime < 3000)
   {
-    move();
+    executePID(straightenMotorSpeed);
+    delay(30);
   }
   
   runPidLoop = true;
+  USB_COM_PORT << "Done\n";  
 }
 
 /**************************************************************************************
@@ -816,6 +797,7 @@ void straightenHorizontal()
 void straightenVertical()
 {
   runPidLoop = false;
+  USB_COM_PORT << "Straightening vertical... ";
   
   // Set setpoints to halfway between low and high calibration values  
   for (int i = 0; i < 5; ++i)
@@ -828,10 +810,12 @@ void straightenVertical()
   unsigned long startTime = millis();
   while (millis() - startTime < 3000)
   {
-    move();
+    executePID(straightenMotorSpeed);
+    delay(30);
   }
   
   runPidLoop = true;
+  USB_COM_PORT << "Done\n";  
 }
 
 /**************************************************************************************
@@ -858,7 +842,7 @@ void processCalibrateCommand()
   TAIL_SERIAL.write(vertOrHorz[0]);
   
   // Stop any current motion
-  StopMov();
+  StopMovement();
   
   // Run calibration
   if (vertOrHorz[0] == 'h')
@@ -880,48 +864,39 @@ void processCalibrateCommand()
 void calibrateHorizontal()
 {
   runPidLoop = false;
+  USB_COM_PORT << "\nCalibrating Horizontal\n"; 
   
-  // HIGH: Move to side when the solenoid selection signal is HIGH
-  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
+  USB_COM_PORT << "Contracting All... ";
+  analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);  
   for (int i = 0; i < 5; i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], HIGH);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(4000);
-  // HIGH: Stop
-  analogWrite(MOTOR_CONTROL,0);
-  for (int i=0;i<5;i++)
-  {
-    analogWrite(HORZ_ACTUATOR[i],0);
-  }
+  StopMovement(); 
   delay(1000);
-  // HIGH: Record Values
-  for(int i=0;i<5;i++)
+  for(int i = 0; i < 5; i++)
   {
     horzHighCalibration[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
+  USB_COM_PORT << "Recorded\n";   
 
-  // LOW: Move to side when the selection signal is LOW
+  USB_COM_PORT << "Extending All... ";
   analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
-  for(int i=0;i<5;i++)
+  for(int i = 0; i < 5; i++)
   {
     digitalWrite(HORZ_ACTUATOR_CTRL[i], LOW);
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(4000);
-  // LOW: Stop
-  analogWrite(MOTOR_CONTROL,0);
-  for(int i=0;i<5;i++)
-  {
-    analogWrite(HORZ_ACTUATOR[i],0);
-  }
+  StopMovement();
   delay(1000);
-  // LOW: Record Values
-  for(int i=0;i<5;i++)
+  for(int i = 0; i < 5; i++)
   {
     horzLowCalibration[i] = analogRead(HORZ_POS_SENSOR[i]);
   }
+  USB_COM_PORT << "Recorded\n";    
 
   // Adjust high and low range and account for alternating actuators
   for(int i=0;i<5;i++)
@@ -939,34 +914,19 @@ void calibrateHorizontal()
   
   // Save calibration to EEPROM
   // 10-bit values must be split into two bytes for storage.
-  for(int i=0;i<5;i++){ 
+  for(int i = 0; i < 5; i++)
+  { 
     EEPROM.write(i*5+2,lowByte(horzHighCalibration[i]));
     EEPROM.write(i*5+3,highByte(horzHighCalibration[i]));
     EEPROM.write(i*5+4,lowByte(horzLowCalibration[i]));
     EEPROM.write(i*5+5,highByte(horzLowCalibration[i]));
   }
-   
-  // Print out calibration
-  USB_COM_PORT.println("");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzHighCalibration[i]);
-    USB_COM_PORT.print(' ');
-  }
-  USB_COM_PORT.println("HIGH ");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzLowCalibration[i]);
-    USB_COM_PORT.print(' ');
-  }
-  USB_COM_PORT.println("RANGE ");
-  for(int i=0;i<5;i++){
-    USB_COM_PORT.print(horzHighCalibration[i] - horzLowCalibration[i]);
-    USB_COM_PORT.print(" ");
-  }
-  USB_COM_PORT.println("LOW ");
+
+  straightenHorizontal();
+  USB_COM_PORT << "Calibration Done\n";
   
   calculateSensorDeadbands();
-  // Make titanoboa straight
-  straightenHorizontal();
+  printCalibrationValues();
   
   runPidLoop = true;
 }//end calibrateHorizontal()
@@ -980,6 +940,7 @@ void calibrateHorizontal()
 void calibrateVertical()
 {
   runPidLoop = false;
+  USB_COM_PORT << "Calibrating Vertical\n";
   analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
 
   // for vertical calibration don't run actuators to their extremes all in the same 
@@ -1091,10 +1052,7 @@ void calibrateVertical()
   // Adjust high and low range and account for alternating actuators
   for(int i=0;i<5;i++)
   {
-    if(vertHighCalibration[i]>vertLowCalibration[i])
-    {
-    }
-    else
+    if(vertHighCalibration[i] < vertLowCalibration[i])
     {
       int temp = vertHighCalibration[i];
       vertHighCalibration[i] = vertLowCalibration[i];
@@ -1111,36 +1069,19 @@ void calibrateVertical()
     EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 2, lowByte(vertLowCalibration[i]));
     EEPROM.write(i*5 + VERTICAL_CALIBRATION_ADDRESS + 3, highByte(vertLowCalibration[i]));
   }
-   
-  // Print out calibration
-  USB_COM_PORT.println("");
-  for (int i=0; i<5; i++)
-  {
-    USB_COM_PORT.print(vertHighCalibration[i]);
-    USB_COM_PORT.print(' ');
-  }
-  USB_COM_PORT.println("HIGH ");
-  for (int i=0; i<5; i++)
-  {
-    USB_COM_PORT.print(vertLowCalibration[i]);
-    USB_COM_PORT.print(' ');
-  }
-  USB_COM_PORT.println("LOW ");
-  for(int i=0; i<5; i++)
-  {
-    USB_COM_PORT.print(vertHighCalibration[i] - vertLowCalibration[i]);
-    USB_COM_PORT.print(" ");
-  }
-  USB_COM_PORT.println("RANGE ");
-
-  calculateSensorDeadbands();
-  // Make titanoboa straight
   straightenVertical();
+  USB_COM_PORT << "Calibration Done\n";
+  
+  calculateSensorDeadbands();
+  printCalibrationValues();
+  
   runPidLoop = true;
+
 }//end calibrateVertical()
 
+
 /**************************************************************************************
-  readSensors():
+  readSensors(): Prints all sensor values to the USB serial port.
  *************************************************************************************/
 void readSensors()
 {
@@ -1171,14 +1112,69 @@ void readSensors()
   }
 }
 
+/**************************************************************************************
+  printCalibrationValues(): Prints all calibration values.
+ *************************************************************************************/
+void printCalibrationValues()
+{
+  USB_COM_PORT.println("\nCalibration");
+  USB_COM_PORT.print("H_HIGH:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzHighCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nH_LOW:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzLowCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nH_RANGE: \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzHighCalibration[i] - horzLowCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nV_HIGH:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertHighCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nV_LOW:     \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertLowCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nV_RANGE: \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertHighCalibration[i] - vertLowCalibration[i] << "\t";
+  }  
+  USB_COM_PORT.print("\nV_STRAIGHT:\t");  
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertStraightArray[i] << "\t";
+  }
+  USB_COM_PORT.println('\n');
+}
 
 /**************************************************************************************
-  saveVerticalPosition():
+  printBatteryVoltage(): Saves the current vertical sensor positions
+ *************************************************************************************/
+void printBatteryVoltage()
+{
+  float batteryVolts = ((float)map(analogRead(BAT_LEVEL_24V),0,1023,0,25000))/1000;
+  USB_COM_PORT << "The battery is at " << batteryVolts << "V\n";
+}
+
+
+/**************************************************************************************
+  saveVerticalPosition(): Saves the current vertical sensor positions
  *************************************************************************************/
 void saveVerticalPosition()
 {
   for(int i=0;i<5;i++)
   {
+    USB_COM_PORT.print("\nSaving current vertical position\n");
+    
     // Get the current raw value
     vertStraightArray[i] = analogRead(VERT_POS_SENSOR[i]);
     // Set low and high ranges as +/- 100 of current position
@@ -1207,223 +1203,131 @@ void saveVerticalPosition()
 
 
 /**************************************************************************************
-  manualControl(): Allows for manual actuator control over the USB_SERIAL_PORT
+  setManualActuationDelay(): sets the actuation delay for manual mode actuation
  *************************************************************************************/
-void manualControl()
+void setManualActuationDelay()
 {
-  runPidLoop = false;
-  
-  boolean manual = true;
-  char byteIn = 'z';
-  int segSelect = 0;
-  boolean motor = false;
-  int actuationDelay = 200;
-  char delaySetting = 'm';
-  byte newNum;
-
-    displayMenu();
-
-  while(manual == true)
+  StopMovement();
+  while (USB_COM_PORT.available() < 1);
+  char delaySetting = USB_COM_PORT.read();
+  switch (delaySetting)
   {
-    if(Serial.available() > 0){
-      byteIn = USB_COM_PORT.read();
-      
-      switch(byteIn)
-      {
-        case 'c':
-          USB_COM_PORT << "\nRunning horz calibration... ";
-          calibrateHorizontal();
-          USB_COM_PORT << "Done\n";
-          break;
-        case 'v':
-          USB_COM_PORT << "\nRunning vert calibration... ";
-          calibrateVertical();
-          USB_COM_PORT << "Done\n";
-          break;
-        case 't':
-          USB_COM_PORT << "\nRunning horz straighten...\n";
-          straightenHorizontal();
-          break;
-        case 'y':
-          USB_COM_PORT << "\nRunning vert straighten...\n";
-          straightenVertical();
-          break;
-        case 'p':
-          readSensors();
-          break;
-        case 'r':
-          USB_COM_PORT.print("\nSaving current vertical position\n");
-          saveVerticalPosition();
-          break;
-        case '1':
-          segSelect = 0;
-          StopMov();
-          USB_COM_PORT.print("Seg1\n");
-          motor = false;
-          break;
-        case '2':
-          segSelect = 1;
-          StopMov();
-          USB_COM_PORT.print("Seg2\n");
-          motor = false;
-          break;
-        case '3':
-          segSelect = 2;
-          StopMov();
-          USB_COM_PORT.print("Seg3\n");
-          motor = false;
-          break;
-        case '4':
-          segSelect = 3;
-          StopMov();
-          USB_COM_PORT.print("Seg4\n");
-          motor = false;
-          break;
-        case '5':
-          segSelect = 4;
-          StopMov();
-          USB_COM_PORT.print("Seg5\n");
-          motor = false;
-          break;
-
-        case 'd':
-          StopMov();
-          while (USB_COM_PORT.available() < 1);
-          delaySetting = USB_COM_PORT.read();
-          switch (delaySetting)
-          {
-            case 's':
-              actuationDelay = 150;
-              USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
-              break;
-            case 'm':
-              actuationDelay = 200;
-              USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
-              break;
-            case 'l':
-              actuationDelay = 300;
-              USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
-              break;
-            default:
-              actuationDelay = 200;
-              USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
-              break;
-          }
-          break;
-
-        case 'l':
-          if(motor == false)
-          {
-            StopMov();
-            analogWrite(5, manualMotorSpeed);
-            analogWrite(HORZ_ACTUATOR[segSelect], 255);
-            digitalWrite(31-segSelect, HIGH);
-            USB_COM_PORT.print("l dir\n");
-            delay(actuationDelay);
-            StopMov();
-          }
-          break;
-
-        case 'k':
-          if(motor == false)
-          {
-            StopMov();
-            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
-            analogWrite(HORZ_ACTUATOR[segSelect], 255);
-            digitalWrite(31-segSelect,LOW);
-            USB_COM_PORT.print("k dir\n");
-            delay(actuationDelay);
-            StopMov();
-          }
-          break;
-
-        case 'i':
-          if(motor == false)
-          {
-            StopMov();
-            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
-            analogWrite(VERT_ACTUATOR[segSelect], 255);
-            digitalWrite(26-segSelect, LOW);
-            USB_COM_PORT.print("i dir\n");
-            delay(actuationDelay);
-            StopMov();
-          }
-          break; 
-
-        case 'o':
-          if(motor == false)
-          {
-            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
-            analogWrite(VERT_ACTUATOR[segSelect], 255);
-            digitalWrite(26-segSelect, HIGH);
-            USB_COM_PORT.print("o dir\n");
-            delay(actuationDelay);
-            StopMov();
-          }
-          break;
-
-        case 'n':
-          for (int i=0; i<5; i++)
-          {
-              digitalWrite(LED[i], HIGH);
-          }
-          break;
-
-        case 'm':
-          for (int i=0; i<5; i++)
-          {
-              digitalWrite(LED[i], LOW);
-          }
-          break;
-
-        case 's':
-          StopMov();
-          USB_COM_PORT.print("STOPPED\n");
-          break;
-          
-        
-        case 'u':
-          USB_COM_PORT << "Manually program myModuleNumber (0-9)...\n";
-          while(USB_COM_PORT.available() < 1);
-          newNum = USB_COM_PORT.read() - 48;
-          if (newNum < 0 || newNum > 9)
-          {
-            USB_COM_PORT << "Invalid\n";
-            break;
-          }
-          USB_COM_PORT << "Now set to " << newNum << "\n";
-          EEPROM.write(MY_MODULE_NUMBER_ADDRESS, newNum);
-          myModuleNumber = newNum;
-          break;        
-
-        case 'e':
-            displayMenu();
-            break;
-
-        case 'q':
-          manual = false;
-          HEAD_SERIAL.flush();
-          TAIL_SERIAL.flush();
-          break;
-      }//end switch
-    }//end if serial
-
-    byteIn = 'z';
+    case 's':
+      manualActuationDelay = 150;
+      USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
+      break;
+    case 'm':
+      manualActuationDelay = 200;
+      USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
+      break;
+    case 'l':
+      manualActuationDelay = 300;
+      USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
+      break;
+    default:
+      manualActuationDelay = 200;
+      USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
+      break;
   }
-  USB_COM_PORT.println("\nManual Control mode exited");
-  runPidLoop = true;
 }
 
 
 /**************************************************************************************
-  displayMenu():
+  manualVerticalActuatorMove(): Pulses to extend or contract the selected vertical actuator
+ *************************************************************************************/
+void manualVerticalActuatorMove(char dir)
+{
+  if (dir != 'e' && dir != 'c')
+    return;
+    
+  StopMovement();
+
+  // Setup the valve direction
+  digitalWrite(VERT_ACTUATOR_CTRL[manualVertibraeSelect], LOW);
+  if (dir == 'c')
+  {
+    digitalWrite(VERT_ACTUATOR_CTRL[manualVertibraeSelect], HIGH);
+  }
+  
+  // Run actuation
+  analogWrite(MOTOR_CONTROL, manualMotorSpeed);
+  analogWrite(VERT_ACTUATOR[manualVertibraeSelect], 255);  
+  delay(manualActuationDelay);
+  StopMovement(); 
+   
+  USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " " <<
+    ((dir == 'e') ? "Vertical Extend" : "Vertical Contract") << " (" << manualActuationDelay << "ms)\n";  
+}
+
+
+/**************************************************************************************
+  manualHorizontalActuatorMove(): Pulses to extend or contract the selected horizontal actuator
+ *************************************************************************************/
+void manualHorizontalActuatorMove(char dir)
+{
+  if (dir != 'e' && dir != 'c')
+    return;
+    
+  StopMovement();
+
+  // Setup the valve direction
+  boolean even = PIDcontrollerHorizontal[manualVertibraeSelect].getEven();
+  digitalWrite(HORZ_ACTUATOR_CTRL[manualVertibraeSelect], LOW);
+  if (dir == 'c')
+  {
+    digitalWrite(HORZ_ACTUATOR_CTRL[manualVertibraeSelect], HIGH);
+  }
+  
+  // Run actuation
+  analogWrite(MOTOR_CONTROL, manualMotorSpeed);
+  analogWrite(HORZ_ACTUATOR[manualVertibraeSelect], 255);  
+  delay(manualActuationDelay);
+  StopMovement(); 
+   
+  USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " " <<
+    ((dir == 'e') ? "Hoirzontal Extend" : "Horizontal Contract") << " (" << manualActuationDelay << "ms)\n";  
+}
+
+
+/**************************************************************************************
+  manualSetAllLEDs(): Turn all LEDs on or off
+ *************************************************************************************/
+void manualSetAllLEDs(boolean value)
+{
+  for (int i = 0; i < 5; i++)
+  {
+      digitalWrite(LED[i], value);
+  }  
+}
+
+/**************************************************************************************
+  manualSetModuleNumber(): manually set the module number from USB serial
+ *************************************************************************************/
+void manualSetModuleNumber()
+{
+  USB_COM_PORT << "Manually program myModuleNumber (0-9)...\n";
+  while(USB_COM_PORT.available() < 1);
+  int newNum = USB_COM_PORT.read() - 48;
+  if (newNum < 0 || newNum > 9)
+  {
+    USB_COM_PORT << "Invalid\n";
+    return;
+  }
+  USB_COM_PORT << "Now set to " << newNum << "\n";
+  EEPROM.write(MY_MODULE_NUMBER_ADDRESS, newNum);
+  myModuleNumber = newNum;
+  return;    
+}
+
+/**************************************************************************************
+  displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
 void displayMenu()
 {
-    USB_COM_PORT.print("\nManual Control mode entered\n");
+    USB_COM_PORT.print("\nManual Control Mode\n");
     USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
-    USB_COM_PORT.print("          k/l - horizontal actuation\n");
-    USB_COM_PORT.print("          i/o - vertical actuation\n");
+    USB_COM_PORT.print("          k/l - horizontal actuation - extend/contract\n");
+    USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
     USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          t - straighten horizontal\n");
@@ -1431,18 +1335,126 @@ void displayMenu()
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
     USB_COM_PORT.print("          y - straighten verticals\n");
+    USB_COM_PORT.print("          b - print calibration values\n");    
     USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n");    
+    USB_COM_PORT.print("          a - print battery voltage\n");    
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
 
+/**************************************************************************************
+  manualControl(): Allows for manual control of this module
+ *************************************************************************************/
+void manualControl()
+{
+  runPidLoop = false;
+  displayMenu();
+  
+  boolean manual = true;
+  while(manual == true)
+  {
+    if(Serial.available() > 0)
+    {
+      char manualCommand = USB_COM_PORT.read();      
+      switch(manualCommand)
+      {        
+        case '1':
+          manualVertibraeSelect = 0;
+          USB_COM_PORT.print("Vertibrae 1 Selected\n");
+          break;
+        case '2':
+          manualVertibraeSelect = 1;
+          USB_COM_PORT.print("Vertibrae 2 Selected\n");
+          break;
+        case '3':
+          manualVertibraeSelect = 2;
+          USB_COM_PORT.print("Vertibrae 3 Selected\n");
+          break;
+        case '4':
+          manualVertibraeSelect = 3;
+          USB_COM_PORT.print("Vertibrae 4 Selected\n");
+          break;
+        case '5':
+          manualVertibraeSelect = 4;
+          USB_COM_PORT.print("Vertibrae 5 Selected\n");
+          break;  
+    
+        case 'e':
+          displayMenu();
+          break;
+        case 'c':
+          calibrateHorizontal();
+          break;
+        case 'v':
+          calibrateVertical();
+          break;
+        case 'b':
+          printCalibrationValues();
+          break;
+        case 't':
+          straightenHorizontal();
+          break;
+        case 'y':
+          straightenVertical();
+          break;
+        case 'p':
+          readSensors();
+          break;
+        case 'r':
+          saveVerticalPosition();
+          break;
+        case 'd':
+          setManualActuationDelay();
+          break;
+        case 'l':
+          manualHorizontalActuatorMove('c');
+          break;
+        case 'k':
+          manualHorizontalActuatorMove('e');
+          break;
+        case 'i':
+          manualVerticalActuatorMove('c');
+          break;
+        case 'o':
+          manualVerticalActuatorMove('e');
+          break;
+        case 'n':
+          manualSetAllLEDs(HIGH);
+          break;
+        case 'm':
+          manualSetAllLEDs(LOW);
+          break;
+        case 'u':
+          manualSetModuleNumber();
+          break;
+        case 'a':
+          printBatteryVoltage();
+          break;
+        case 's':
+          USB_COM_PORT.print("Stopped all movement\n");
+          StopMovement();
+          break;          
+        case 'q':
+          manual = false;
+          break;
+      }//end switch
+    }//end if serial
+  }  
+  USB_COM_PORT.println("\nManual Control mode exited");
+  runPidLoop = true;
+  
+  // Clear serial buffers to try and get back in sync
+  clearSerialBuffer(HEAD_SERIAL);
+  clearSerialBuffer(TAIL_SERIAL);  
+}
+
 
 /**************************************************************************************
-  StopMov(): Stops movement of all actuators.
+  StopMovement(): Stops movement of all actuators.
  *************************************************************************************/
-void StopMov()
+void StopMovement()
 {
   // Stop any current motion
   for(int i=0; i < 5; i++)
