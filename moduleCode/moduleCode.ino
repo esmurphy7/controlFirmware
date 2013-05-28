@@ -410,9 +410,17 @@ void processNewSettingsAndSetpoints()
     
     // Valid angles are 0 to 254. Value 255 means disable this actuator. 
     boolean horzDisabled = (newHorzAngle == 255);
-    boolean vertDisabled = (newVertAngle == 255);    
+    boolean vertDisabled = (newVertAngle == 255);
+    
+    // Map the angles to sensor space
     int newHorzSetpoint = horzDisabled ? -1 : map(newHorzAngle,0,254,horzLowCalibration[i],horzHighCalibration[i]);
     int newVertSetpoint = vertDisabled ? -1 : map(newVertAngle,0,254,vertLowCalibration[i],vertHighCalibration[i]);
+    
+    // We have a special setpoint for vertical angle 127
+    if (newVertAngle == 127)
+    {
+      newVertSetpoint = vertStraightArray[i];
+    }
 
     // If this is a new setpoint, reset the PID timout timer
     if (newHorzSetpoint != horzSetpoints[i])
@@ -677,7 +685,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   {    
     if (killSwitchPressed)
     {
-      executePID(runtimeMotorSpeed); 
+      executePID(runtimeMotorSpeed, true, true); 
     }
     else
     {
@@ -690,7 +698,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
 /************************************************************************************
   executePID(): Modulates the values to achieve position set points (Runs the PID)
  ***********************************************************************************/
-void executePID(byte motorSpeed)
+void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
 {
   //set if any segment moved, so we can turn off motor when setpoint reached
   boolean moved = false;
@@ -701,7 +709,7 @@ void executePID(byte motorSpeed)
   {
     //////////////////////////
     ////// HORIZONTAL ////////
-    if (horzSetpoints[i] >= 0)
+    if (horzSetpoints[i] >= 0 && doHorizontal)
     {
       PIDcontrollerHorizontal[i].setSetPoint(horzSetpoints[i]);
       currentAngle = analogRead(HORZ_POS_SENSOR[i]);
@@ -729,7 +737,7 @@ void executePID(byte motorSpeed)
 
     ///////////////////////    
     ////// VERTICAL ///////
-    if (vertSetpoints[i] >= 0)
+    if (vertSetpoints[i] >= 0 && doVertical)
     {      
       PIDcontrollerVertical[i].setSetPoint(vertSetpoints[i]);
       currentAngle = analogRead(VERT_POS_SENSOR[i]);
@@ -764,11 +772,11 @@ void executePID(byte motorSpeed)
 
 
 /**************************************************************************************
-  straightenHorizontal(): Makes titanoboa straight as an arrow.
+  straightenHorizontal(): Makes titanoboa vertically straight as an arrow horizontally.
+                          Important! Make sure pid is disabled when running this function.
  *************************************************************************************/
 void straightenHorizontal()
 {
-  runPidLoop = false;
   USB_COM_PORT << "Straightening horizontal... ";
   
   // Set setpoints to halfway between low and high calibration values
@@ -783,26 +791,25 @@ void straightenHorizontal()
   
   while (millis() - startTime < 3000)
   {
-    executePID(straightenMotorSpeed);
+    executePID(straightenMotorSpeed, true, false);
     delay(30);
   }
   
-  runPidLoop = true;
   USB_COM_PORT << "Done\n";  
 }
 
 /**************************************************************************************
-  straightenVertical(): Makes titanoboa straight as an arrow... vertically?
+  straightenVertical(): For manual mode only. Makes titanoboa vertically straight.
+                        Important! Make sure pid is disabled when running this function.
  *************************************************************************************/
 void straightenVertical()
 {
-  runPidLoop = false;
   USB_COM_PORT << "Straightening vertical... ";
   
   // Set setpoints to halfway between low and high calibration values  
   for (int i = 0; i < 5; ++i)
   {
-    vertSetpoints[i] = (vertLowCalibration[i] + vertHighCalibration[i]) / 2;
+    vertSetpoints[i] = vertStraightArray[i];
     vertTimerArray[i] = millis();
   }
   
@@ -810,11 +817,10 @@ void straightenVertical()
   unsigned long startTime = millis();
   while (millis() - startTime < 3000)
   {
-    executePID(straightenMotorSpeed);
+    executePID(straightenMotorSpeed, false, true);
     delay(30);
   }
   
-  runPidLoop = true;
   USB_COM_PORT << "Done\n";  
 }
 
@@ -824,7 +830,7 @@ void straightenVertical()
 void processCalibrateCommand()
 {
   char vertOrHorz[1];
-
+r
   // Get data array from upstream. This will tell us if we're doing vertical or horizontal
   HEAD_SERIAL.setTimeout(30);
   if (HEAD_SERIAL.readBytes(vertOrHorz, 1) < 1)
@@ -1177,10 +1183,7 @@ void saveVerticalPosition()
     
     // Get the current raw value
     vertStraightArray[i] = analogRead(VERT_POS_SENSOR[i]);
-    // Set low and high ranges as +/- 100 of current position
-    vertLowCalibration[i] = vertStraightArray[i] - 100;
-    vertHighCalibration[i] = vertStraightArray[i] + 100;
-
+ 
     USB_COM_PORT.print("Vertical sensor ");
     USB_COM_PORT.print(i+1);
     USB_COM_PORT.print(": current position ");
