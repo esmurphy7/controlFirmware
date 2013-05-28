@@ -70,14 +70,14 @@ byte myModuleNumber = 0;                // My position in the module chain (1,2,
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
 boolean runPidLoop = false;             // Set to true if you want to run pid on interrupt interval.
-byte motorSpeed = 200;                  // Motor speed for runtime. The analog output to the motor.
+byte motorSpeed = 0;                    // Runtime analog output motor speed. Set by joystick.
 const byte horzAngleDeadband = 10;      // The horizontal deadband, 0 to 254 range
 const byte vertAngleDeadband = 20;      // The vertical deadband, 0 to 254 range
 const int horzActuatorTimeout = 3000;   // Horizontal actuators have this many ms to get to setpoint
 const int vertActuatorTimeout = 1000;   // Vertical actuators have this many ms to get to setpoint
 const byte calibrateMotorSpeed = 150;   // For vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
-const byte pulseMotorSpeed = 200;       // Motor speed for jaw/head manual mode. (the jaw uses the module 1 motor)
+const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
 
 // PID Controllers for the horizontal actuators
@@ -304,10 +304,10 @@ void loop()
         acknowledgeCommand();
         break;
       case 'h':
-        processLongMotorPulseCommand();
+        processJawMovingMotorPulseCommand();
         break;
       case 'g':
-        processShortMotorPulseCommand();
+        processHeadManualModeMotorPulseCommand();
         break;
       case 't':
         processCommunicationTestCommand();
@@ -626,11 +626,11 @@ void sendVertCalibrationDiagnostics()
 
 
 /************************************************************************************
-  processLongMotorPulseCommand(): Pulses the first module motor on and off. Used for 
-                                  jaw and head lift actuation.
+  processJawMovingMotorCommand(): Turns the first motor on the off so the jaw can 
+                                  open or close.
  ***********************************************************************************/
 
-void processLongMotorPulseCommand()
+void processJawMovingMotorPulseCommand()
 {
   runPidLoop = false;
   
@@ -648,11 +648,11 @@ void processLongMotorPulseCommand()
 }
 
 /************************************************************************************
-  processShortMotorPulseCommand(): Turns the first module motor on and off. Used for 
-                                   controlling the jaw and head lift in manual mode.
+  processShortMotorPulseCommand(): Turns the first module motor on and off so we can
+                                   do manual mode on the head and jaw.
  ***********************************************************************************/
  
-void processShortMotorPulseCommand()
+void processHeadManualModeMotorPulseCommand()
 { 
   runPidLoop = false;
   
@@ -661,7 +661,7 @@ void processShortMotorPulseCommand()
     return;
     
   USB_COM_PORT.print("Turning motor on for 200ms\n");
-  analogWrite(MOTOR_CONTROL, pulseMotorSpeed);
+  analogWrite(MOTOR_CONTROL, manualMotorSpeed);
   delay(200);
   analogWrite(MOTOR_CONTROL, 0);
   USB_COM_PORT.print("Turning motor off\n");
@@ -1315,7 +1315,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(5, motorSpeed);
+            analogWrite(5, manualMotorSpeed);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect, HIGH);
             USB_COM_PORT.print("l dir\n");
@@ -1328,7 +1328,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(MOTOR_CONTROL, motorSpeed);
+            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
             analogWrite(HORZ_ACTUATOR[segSelect], 255);
             digitalWrite(31-segSelect,LOW);
             USB_COM_PORT.print("k dir\n");
@@ -1341,7 +1341,7 @@ void manualControl()
           if(motor == false)
           {
             StopMov();
-            analogWrite(MOTOR_CONTROL, motorSpeed);
+            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, LOW);
             USB_COM_PORT.print("i dir\n");
@@ -1353,7 +1353,7 @@ void manualControl()
         case 'o':
           if(motor == false)
           {
-            analogWrite(MOTOR_CONTROL, motorSpeed);
+            analogWrite(MOTOR_CONTROL, manualMotorSpeed);
             analogWrite(VERT_ACTUATOR[segSelect], 255);
             digitalWrite(26-segSelect, HIGH);
             USB_COM_PORT.print("o dir\n");
