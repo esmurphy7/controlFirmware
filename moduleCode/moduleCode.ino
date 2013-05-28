@@ -69,6 +69,7 @@ int vertSensorDeadbands[] = {-1,-1,-1,-1,-1};
 byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
+boolean runPidLoop = false;             // Set to true if you want to run pid on interrupt interval.
 byte motorSpeed = 200;                  // Motor speed for runtime. The analog output to the motor.
 const byte horzAngleDeadband = 10;      // The horizontal deadband, 0 to 254 range
 const byte vertAngleDeadband = 20;      // The vertical deadband, 0 to 254 range
@@ -262,7 +263,8 @@ void setup()
   
   // AVR code to enable overflow interrupt on timer 1
   // Used for the pid interrupt
-  TIMSK1 |= _BV(TOIE1);  
+  TIMSK1 |= _BV(TOIE1);
+  runPidLoop = true;
 }
 
 /***********************************************************************************
@@ -401,7 +403,7 @@ void processCountModulesCommand()
   
   // Tell the head I exist.
   HEAD_SERIAL.write(myModuleNumber);  
-  USB_COM_PORT.println(myModuleNumber);  
+  USB_COM_PORT.println(myModuleNumber);
 }
 
 /************************************************************************************
@@ -629,16 +631,20 @@ void sendVertCalibrationDiagnostics()
  ***********************************************************************************/
 
 void processLongMotorPulseCommand()
-{ 
+{
+  runPidLoop = false;
+  
   // This command is only for the first module
   if (myModuleNumber != 1)
     return;
     
-  USB_COM_PORT.print("Turning motor on for 2500ms\n");
+  USB_COM_PORT << "Turning motor on for 2500ms (speed = " << jawMotorSpeed << ")\n";
   analogWrite(MOTOR_CONTROL, jawMotorSpeed);
   delay(2500);
   analogWrite(MOTOR_CONTROL, 0);
-  USB_COM_PORT.print("Turning motor off\n");  
+  USB_COM_PORT.print("Turning motor off\n");
+  
+  runPidLoop = true;
 }
 
 /************************************************************************************
@@ -648,6 +654,8 @@ void processLongMotorPulseCommand()
  
 void processShortMotorPulseCommand()
 { 
+  runPidLoop = false;
+  
   // This command is only for the first module
   if (myModuleNumber != 1)
     return;
@@ -656,7 +664,9 @@ void processShortMotorPulseCommand()
   analogWrite(MOTOR_CONTROL, pulseMotorSpeed);
   delay(200);
   analogWrite(MOTOR_CONTROL, 0);
-  USB_COM_PORT.print("Turning motor off\n");  
+  USB_COM_PORT.print("Turning motor off\n");
+  
+  runPidLoop = true;
 }
 
 /************************************************************************************
@@ -679,6 +689,9 @@ void calculateSensorDeadbands()
  ***********************************************************************************/
 ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
 {
+  if (runPidLoop == false)
+    return;
+    
   static int count = 0;
   ++count;
   
@@ -778,6 +791,8 @@ void move()
  *************************************************************************************/
 void straightenHorizontal()
 {
+  runPidLoop = false;
+  
   // Set setpoints to halfway between low and high calibration values
   for (int i = 0; i < 5; ++i)
   {
@@ -791,6 +806,8 @@ void straightenHorizontal()
   {
     move();
   }
+  
+  runPidLoop = true;
 }
 
 /**************************************************************************************
@@ -798,6 +815,8 @@ void straightenHorizontal()
  *************************************************************************************/
 void straightenVertical()
 {
+  runPidLoop = false;
+  
   // Set setpoints to halfway between low and high calibration values  
   for (int i = 0; i < 5; ++i)
   {
@@ -811,6 +830,8 @@ void straightenVertical()
   {
     move();
   }
+  
+  runPidLoop = true;
 }
 
 /**************************************************************************************
@@ -858,6 +879,8 @@ void processCalibrateCommand()
  *************************************************************************************/
 void calibrateHorizontal()
 {
+  runPidLoop = false;
+  
   // HIGH: Move to side when the solenoid selection signal is HIGH
   analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
   for (int i = 0; i < 5; i++)
@@ -945,6 +968,7 @@ void calibrateHorizontal()
   // Make titanoboa straight
   straightenHorizontal();
   
+  runPidLoop = true;
 }//end calibrateHorizontal()
 
 
@@ -955,6 +979,7 @@ void calibrateHorizontal()
  *************************************************************************************/
 void calibrateVertical()
 {
+  runPidLoop = false;
   analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
 
   // for vertical calibration don't run actuators to their extremes all in the same 
@@ -1111,7 +1136,7 @@ void calibrateVertical()
   calculateSensorDeadbands();
   // Make titanoboa straight
   straightenVertical();
-
+  runPidLoop = true;
 }//end calibrateVertical()
 
 /**************************************************************************************
@@ -1186,6 +1211,8 @@ void saveVerticalPosition()
  *************************************************************************************/
 void manualControl()
 {
+  runPidLoop = false;
+  
   boolean manual = true;
   char byteIn = 'z';
   int segSelect = 0;
@@ -1384,6 +1411,7 @@ void manualControl()
     byteIn = 'z';
   }
   USB_COM_PORT.println("\nManual Control mode exited");
+  runPidLoop = true;
 }
 
 
