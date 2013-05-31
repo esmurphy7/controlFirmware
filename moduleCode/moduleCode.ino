@@ -830,7 +830,7 @@ void straightenVertical()
 void processCalibrateCommand()
 {
   char vertOrHorz[1];
-r
+
   // Get data array from upstream. This will tell us if we're doing vertical or horizontal
   HEAD_SERIAL.setTimeout(30);
   if (HEAD_SERIAL.readBytes(vertOrHorz, 1) < 1)
