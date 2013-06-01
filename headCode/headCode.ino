@@ -163,7 +163,6 @@ void loop()
   // Should we calibrate?
   if (controller.calibrate && controller.killSwitchPressed)
   {
-    countNumberOfModules();
     runHorzSensorCalibration();
     synchronizeWithJoystick();
     return;
@@ -471,27 +470,6 @@ void runVertSensorCalibration()
   {
     vertSetpoints[i] = 127;  
   }
-}
-
-/**************************************************************************************
-  countNumberOfModules(): Counts the number of modules connected to the serial daisy chain.
- *************************************************************************************/
-void countNumberOfModules()
-{
-  USB_COM_PORT.print("Counting modules... ");
-  TAIL_SERIAL.write('n');
-  
-  // Tell the first module it's module number 1
-  TAIL_SERIAL.write(1);
-  delay(500);
-  
-  // Record number of modules that responded
-  numberOfModules = TAIL_SERIAL.available();
-  EEPROM.write(0, numberOfModules);  
-  
-  clearSerialBuffer(TAIL_SERIAL);  
-  USB_COM_PORT.print("Found ");
-  USB_COM_PORT.println(numberOfModules);
 }
 
 /**************************************************************************************
@@ -813,7 +791,7 @@ void manualControl()
     {
       byteIn = USB_COM_PORT.read();
       
-      // characters in use: a, b, c, j, h, u, m, d, l, k, n, t, s, q, y, u, i
+      // characters in use: a, b, c, j, h, u, d, l, k, n, t, s, q, y, u, i
       switch(byteIn)
       {
         case 'y':
@@ -826,10 +804,6 @@ void manualControl()
           USB_COM_PORT << "\nCalibrating verticals... ";
           runVertSensorCalibration();
           USB_COM_PORT << "Done\n";
-          break;
-          
-        case 'm':
-          countNumberOfModules();
           break;
           
         case 'a':

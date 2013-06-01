@@ -262,16 +262,13 @@ void loop()
   // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
   {
-    //letters in use: p, s, c, h, g, n, v, t
+    //letters in use: p, s, c, h, g, v, t
     char command = HEAD_SERIAL.read();
     switch (command)
     {
       case 's':
         processNewSettingsAndSetpoints();
         acknowledgeCommand();
-        break;
-      case 'n':
-        processCountModulesCommand();
         break;
       case 'd':
         processDiagnosticsCommand();
@@ -359,28 +356,6 @@ void processCommunicationTestCommand()
     }
   }
   USB_COM_PORT << "\n";
-}
-
-/************************************************************************************
-  processCountModulesCommand(): Tells the head this modules exists, records myModuleNumber.
- ***********************************************************************************/
-void processCountModulesCommand()
-{
-  USB_COM_PORT.print("I am module number... ");
-  while (HEAD_SERIAL.available() < 1);
-  
-  // Record my module number
-  myModuleNumber = HEAD_SERIAL.read();
-  EEPROM.write(0, myModuleNumber);
-  
-  // Tell the next module it's number
-  clearSerialBuffer(TAIL_SERIAL);
-  TAIL_SERIAL.write('n');
-  TAIL_SERIAL.write(myModuleNumber + 1);
-  
-  // Tell the head I exist.
-  HEAD_SERIAL.write(myModuleNumber);  
-  USB_COM_PORT.println(myModuleNumber);
 }
 
 /************************************************************************************
