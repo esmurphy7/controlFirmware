@@ -44,8 +44,10 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 
 // Target sensor values for the actuators
 // -1 means un initialized
-int horzSetpoints[] = {-1,-1,-1,-1,-1};
-int vertSetpoints[] = {-1,-1,-1,-1,-1};
+int horzSensorSetpoints[] = {-1,-1,-1,-1,-1};
+int vertSensorSetpoints[] = {-1,-1,-1,-1,-1};
+int horzAngleSetpoints[] = {255,255,255,255,255};
+int vertAngleSetpoints[] = {255,255,255,255,255};
 
 // Array of sensor values we recorded as straight for the verticals
 int vertStraightArray[] = {-1, -1, -1, -1, -1};
@@ -398,15 +400,15 @@ void processNewSettingsAndSetpoints()
     }
 
     // If this is a new setpoint, reset the PID timout timer
-    if (newHorzSetpoint != horzSetpoints[i])
+    if (newHorzSetpoint != horzSensorSetpoints[i])
     {
       horzTimerArray[i] = millis();
-      horzSetpoints[i] = newHorzSetpoint;      
+      horzSensorSetpoints[i] = newHorzSetpoint;      
     }
-    if (newVertSetpoint != vertSetpoints[i])
+    if (newVertSetpoint != vertSensorSetpoints[i])
     {
       vertTimerArray[i] = millis();
-      vertSetpoints[i] = newVertSetpoint;
+      vertSensorSetpoints[i] = newVertSetpoint;
     }
   }
   
@@ -477,15 +479,12 @@ void processDiagnosticsCommand()
     sendHeadAndModuleDiagnostics();
     break;
   case 2:
-    sendHorzAngleDiagnostics();
+    sendAngleAndSetpointDiagnostics();
     break;
   case 3:
-    sendVertAngleDiagnostics();
-    break;
-  case 4:
     sendHorzCalibrationDiagnostics();
     break;
-  case 5:
+  case 4:
     sendVertCalibrationDiagnostics();
     break;
   default:
@@ -519,33 +518,18 @@ void sendHeadAndModuleDiagnostics()
 /************************************************************************************
  * sendHorzAngleDiagnostics(): 
  ***********************************************************************************/
-void sendHorzAngleDiagnostics()
+void sendAngleAndSetpointDiagnostics()
 {
   byte data[20];
   for (int i = 0; i < 5; ++i)
   {
-    int sensorValue = analogRead(HORZ_POS_SENSOR[i]);
-    data[i * 4 + 0] = highByte(horzSetpoints[i]);
-    data[i * 4 + 1] = lowByte(horzSetpoints[i]);
-    data[i * 4 + 2] = highByte(sensorValue);
-    data[i * 4 + 3] = lowByte(sensorValue);
-  }
-  HEAD_SERIAL.write(data, 20);
-}
-
-/************************************************************************************
- * sendVertAngleDiagnostics(): 
- ***********************************************************************************/
-void sendVertAngleDiagnostics()
-{
-  byte data[20];
-  for (int i = 0; i < 5; ++i)
-  {
-    int sensorValue = analogRead(VERT_POS_SENSOR[i]);
-    data[i * 4 + 0] = highByte(vertSetpoints[i]);
-    data[i * 4 + 1] = lowByte(vertSetpoints[i]);
-    data[i * 4 + 2] = highByte(sensorValue);
-    data[i * 4 + 3] = lowByte(sensorValue);
+    byte horzAngle = map(analogRead(HORZ_POS_SENSOR[i]), horzLowCalibration[i], horzHighCalibration[i], 0, 254);
+    byte vertAngle = map(analogRead(VERT_POS_SENSOR[i]), vertLowCalibration[i], vertHighCalibration[i], 0, 254);
+       
+    data[i * 4 + 0] = horzAngleSetpoints[i];
+    data[i * 4 + 1] = horzAngle;
+    data[i * 4 + 2] = vertAngleSetpoints[i];
+    data[i * 4 + 3] = vertAngle;
   }
   HEAD_SERIAL.write(data, 20);
 }
@@ -684,13 +668,13 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
   {
     //////////////////////////
     ////// HORIZONTAL ////////
-    if (horzSetpoints[i] >= 0 && doHorizontal)
+    if (horzSensorSetpoints[i] >= 0 && doHorizontal)
     {
-      PIDcontrollerHorizontal[i].setSetPoint(horzSetpoints[i]);
+      PIDcontrollerHorizontal[i].setSetPoint(horzSensorSetpoints[i]);
       currentAngle = analogRead(HORZ_POS_SENSOR[i]);
       
       // If we are have not reached the deadband and haven't timed out
-      if ((abs(currentAngle - horzSetpoints[i]) > horzSensorDeadbands[i]) &&
+      if ((abs(currentAngle - horzSensorSetpoints[i]) > horzSensorDeadbands[i]) &&
           (millis() - horzTimerArray[i]) < horzActuatorTimeout)
       {
         // Update the acutator PID output
@@ -712,13 +696,13 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
 
     ///////////////////////    
     ////// VERTICAL ///////
-    if (vertSetpoints[i] >= 0 && doVertical)
+    if (vertSensorSetpoints[i] >= 0 && doVertical)
     {      
-      PIDcontrollerVertical[i].setSetPoint(vertSetpoints[i]);
+      PIDcontrollerVertical[i].setSetPoint(vertSensorSetpoints[i]);
       currentAngle = analogRead(VERT_POS_SENSOR[i]);
       
       // If we are have not reached the deadzone and haven't timed out
-      if ((abs(currentAngle - vertSetpoints[i]) > vertSensorDeadbands[i]) &&
+      if ((abs(currentAngle - vertSensorSetpoints[i]) > vertSensorDeadbands[i]) &&
           (millis() - vertTimerArray[i]) < vertActuatorTimeout)
       {
         // Update the acutator PID output        
@@ -757,7 +741,7 @@ void straightenHorizontal()
   // Set setpoints to halfway between low and high calibration values
   for (int i = 0; i < 5; ++i)
   {
-    horzSetpoints[i] = (horzLowCalibration[i] + horzHighCalibration[i]) / 2;
+    horzSensorSetpoints[i] = (horzLowCalibration[i] + horzHighCalibration[i]) / 2;
     horzTimerArray[i] = millis();    
   }
   
@@ -784,7 +768,7 @@ void straightenVertical()
   // Set setpoints to halfway between low and high calibration values  
   for (int i = 0; i < 5; ++i)
   {
-    vertSetpoints[i] = vertStraightArray[i];
+    vertSensorSetpoints[i] = vertStraightArray[i];
     vertTimerArray[i] = millis();
   }
   

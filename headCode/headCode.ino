@@ -70,6 +70,7 @@ boolean lights[30];
 
 // Other data
 byte numberOfModules = 0;
+boolean anglesAreInitialized = false;
 boolean joystickIsConnected = false;
 int longDelayBetweenHeartBeats = 1100;
 int shortDelayBetweenHeartBeats = 250;
@@ -147,6 +148,29 @@ void setup()
 **************************************************************************/
 void loop()
 {
+  if (anglesAreInitialized)
+  {
+    doRuntimeLogic();
+  }
+  else
+  {
+    initializeAngleArray();
+  }
+
+  // Should we enter manual mode?
+  if (USB_COM_PORT.available() > 0 && USB_COM_PORT.read() == 'M')
+  {
+    manualControl();
+    synchronizeWithJoystick();
+    return;
+  }
+}
+
+/*************************************************************************
+ runRuntimeLogic(): 
+**************************************************************************/
+void doRuntimeLogic()
+{
   ////////////////////////////////////////////////////////////////////
   // This block of code runs the core functionality of Titanoboa 
   
@@ -182,14 +206,37 @@ void loop()
     closeTheJaw();
     synchronizeWithJoystick(); 
     return;
-  }
+  }  
+}
+
+/**************************************************************************************
+  initializeAngleArray(): Initialize the setpoints based on the current position of the snake.
+ *************************************************************************************/
+void initializeAngleArray()
+{
+  USB_COM_PORT << "Trying to initialize angle array... ";
   
-  // Should we enter manual mode?
-  if (USB_COM_PORT.available() > 0 && USB_COM_PORT.read() == 'M')
+  byte packet[125];
+  boolean result = getAngleAndSetpointDiagnostics(packet);
+  
+  
+  if (result)
   {
-    manualControl();
-    synchronizeWithJoystick();
-    return;
+    for (int i = 0; i < numberOfModules; ++i)
+    {
+      for (int j = 0; j < 5; ++j)
+      {
+        horzSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 1 + 1];
+        vertSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 3 + 1];
+      }
+    }
+    anglesAreInitialized = true;
+    USB_COM_PORT << "Success!\n";
+  }
+  else
+  {
+    USB_COM_PORT << "Failed (Communication Failure?)\n";
+    delay(1000);
   }
 }
 
@@ -222,15 +269,12 @@ void getAndSendDiagnostics()
       retVal = getHeadAndModuleDiagnostics(packet);
       break;
     case 2:
-      retVal = getHorzAngleDiagnostics(packet);
+      retVal = getAngleAndSetpointDiagnostics(packet);
       break;
     case 3:
-      retVal = getVertAngleDiagnostics(packet);
-      break;
-    case 4:
       retVal = getHorzCalibrationDiagnostics(packet);
       break;
-    case 5:
+    case 4:
       retVal = getVertCalibrationDiagnostics(packet);
       break;
     default: 
@@ -266,6 +310,7 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
   buffer[3] = lowByte(headBattery);
 
   // Tell modules to send us this type of diagnostics
+  clearSerialBuffer(TAIL_SERIAL);
   TAIL_SERIAL.write('d');   
   TAIL_SERIAL.write(1);
 
@@ -290,13 +335,14 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
 }
 
 /**************************************************************************************
-  getHorzAngleDiagnostics(): Fills a 125 byte buffer with horizontal angle info
+  getAngleAndSetpointDiagnostics(): Fills a 125 byte buffer with angle and setpoint information.
  *************************************************************************************/
-boolean getHorzAngleDiagnostics(byte* buffer)
+boolean getAngleAndSetpointDiagnostics(byte* buffer)
 {
   buffer[0] = 2;
   
   // Tell modules to send us this type of diagnostics
+  clearSerialBuffer(TAIL_SERIAL);  
   TAIL_SERIAL.write('d');   
   TAIL_SERIAL.write(2);
 
@@ -307,7 +353,7 @@ boolean getHorzAngleDiagnostics(byte* buffer)
     char data[20];  
     if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
-      DEBUG_STREAM << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all AngleAndSetpoint info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 20; ++j)
@@ -318,35 +364,6 @@ boolean getHorzAngleDiagnostics(byte* buffer)
   return true;
 }
 
-/**************************************************************************************
-  getVertAngleDiagnostics(): Fills a 125 byte buffer with vertical angle info
- *************************************************************************************/
-boolean getVertAngleDiagnostics(byte* buffer)
-{
-  // Tell the wifi listeners what type of packet this is
-  buffer[0] = 3;
-  
-  // Tell modules to send us this type of diagnostics
-  TAIL_SERIAL.write('d');   
-  TAIL_SERIAL.write(3);
-
-  // Fill in the packet with module info as it comes in
-  TAIL_SERIAL.setTimeout(30);      
-  for (int i = 0; i < numberOfModules; ++i)
-  {
-    char data[20];  
-    if (TAIL_SERIAL.readBytes(data, 20) < 20)
-    {
-      DEBUG_STREAM << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
-      return false;
-    }
-    for (int j = 0; j < 20; ++j)
-    {
-      buffer[i * 20 + j + 1] = data[j];    
-    }
-  }
-  return true;
-}
 
 /**************************************************************************************
   getHorzCalibrationDiagnostics(): Fills a 125 byte buffer with horizontal calibration info
@@ -354,11 +371,12 @@ boolean getVertAngleDiagnostics(byte* buffer)
 boolean getHorzCalibrationDiagnostics(byte* buffer)
 {
   // Tell the wifi listeners what type of packet this is
-  buffer[0] = 4;
+  buffer[0] = 3;
   
   // Tell modules to send us this type of diagnostics
+  clearSerialBuffer(TAIL_SERIAL);  
   TAIL_SERIAL.write('d');   
-  TAIL_SERIAL.write(4);
+  TAIL_SERIAL.write(3);
 
   // Fill in the packet with module info as it comes in
   TAIL_SERIAL.setTimeout(30);      
@@ -384,11 +402,12 @@ boolean getHorzCalibrationDiagnostics(byte* buffer)
 boolean getVertCalibrationDiagnostics(byte* buffer)
 {
   // Tell the wifi listeners what type of packet this is
-  buffer[0] = 5;
+    buffer[0] = 4;
   
   // Tell modules to send us this type of diagnostics
+  clearSerialBuffer(TAIL_SERIAL);
   TAIL_SERIAL.write('d');   
-  TAIL_SERIAL.write(5);
+  TAIL_SERIAL.write(4);
 
   // Fill in the packet with module info as it comes in
   TAIL_SERIAL.setTimeout(30);      
@@ -747,7 +766,7 @@ void openTheJaw()
  *************************************************************************************/
 void closeTheJaw()
 {
-  USB_COM_PORT << "Closing this jaw... ";
+  USB_COM_PORT << "Closing the jaw... ";
   
   // Tell the first module to turn on the motor for a bit
   TAIL_SERIAL.write("h");
