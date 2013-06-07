@@ -127,8 +127,8 @@
 
 
 // Motor
-#define MOTOR_TACH     ADC5  //input
-#define MOTOR_CONTROL  PWM5  //output
+#define PRESSURE_SENSOR  ADC5  //input
+#define MOTOR_CONTROL    PWM5  //output
 
 
 // Kill circuit

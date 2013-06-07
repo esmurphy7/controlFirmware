@@ -165,7 +165,8 @@ void setup()
   }
 
   // Load previous calibration from EEPROM
-  myModuleNumber = EEPROM.read(MY_MODULE_NUMBER_ADDRESS);
+  setModuleNumber(EEPROM.read(MY_MODULE_NUMBER_ADDRESS));
+  
   for(int i=0;i<5;i++)
   { 
     horzHighCalibration[i] = EEPROM.read(i*5 + HORIZONTAL_CALIBRATION_ADDRESS) + 
@@ -183,36 +184,6 @@ void setup()
   }
   
   calculateSensorDeadbands();
-
-  // setup even/odd for even modules
-  if (myModuleNumber%2 == 0)
-  {  
-    PIDcontrollerVertical[0].setEven(false);
-    PIDcontrollerVertical[1].setEven(true);
-    PIDcontrollerVertical[2].setEven(false);
-    PIDcontrollerVertical[3].setEven(true);
-    PIDcontrollerVertical[4].setEven(false);
-    
-    PIDcontrollerHorizontal[0].setEven(false);
-    PIDcontrollerHorizontal[1].setEven(true);
-    PIDcontrollerHorizontal[2].setEven(false);
-    PIDcontrollerHorizontal[3].setEven(true);
-    PIDcontrollerHorizontal[4].setEven(false);
-  }
-  else
-  {
-    PIDcontrollerVertical[0].setEven(true);
-    PIDcontrollerVertical[1].setEven(false);
-    PIDcontrollerVertical[2].setEven(true);
-    PIDcontrollerVertical[3].setEven(false);
-    PIDcontrollerVertical[4].setEven(true);
-    
-    PIDcontrollerHorizontal[0].setEven(true);
-    PIDcontrollerHorizontal[1].setEven(false);
-    PIDcontrollerHorizontal[2].setEven(true);
-    PIDcontrollerHorizontal[3].setEven(false);
-    PIDcontrollerHorizontal[4].setEven(true);  
-  }
 
   // Print out the initialization information
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
@@ -523,8 +494,8 @@ void sendAngleAndSetpointDiagnostics()
   byte data[20];
   for (int i = 0; i < 5; ++i)
   {
-    byte horzAngle = map(analogRead(HORZ_POS_SENSOR[i]), horzLowCalibration[i], horzHighCalibration[i], 0, 254);
-    byte vertAngle = map(analogRead(VERT_POS_SENSOR[i]), vertLowCalibration[i], vertHighCalibration[i], 0, 254);
+    byte horzAngle = getCurrentHorizontalAngle(i);
+    byte vertAngle = getCurrentVerticalAngle(i);
        
     data[i * 4 + 0] = horzAngleSetpoints[i];
     data[i * 4 + 1] = horzAngle;
@@ -1046,36 +1017,105 @@ void calibrateVertical()
 
 
 /**************************************************************************************
-  readSensors(): Prints all sensor values to the USB serial port.
+  getCurrentHorizontalAngle(): Get horizontal vertibrae value in 0-254 angle space
  *************************************************************************************/
-void readSensors()
+byte getCurrentHorizontalAngle(int i)
 {
-  int sensorVal = 0;
-
-  for(int i=0;i<5;i++)
-  {
-    // Get the current raw value
-    sensorVal = analogRead(HORZ_POS_SENSOR[i]);
-
-    USB_COM_PORT.print("Horizontal sensor ");
-    USB_COM_PORT.print(i+1);
-    USB_COM_PORT.print(": current position ");
-    USB_COM_PORT.println(sensorVal);
-  }
-
-  for(int i=0;i<5;i++)
-  {
-    // Get the current raw value
-    sensorVal = analogRead(VERT_POS_SENSOR[i]);
-
-    USB_COM_PORT.print("Vertical sensor ");
-    USB_COM_PORT.print(i+1);
-    USB_COM_PORT.print(": current position ");
-    USB_COM_PORT.print(sensorVal);
-    USB_COM_PORT.print(", straight is ");
-    USB_COM_PORT.println(vertStraightArray[i]);
-  }
+  return map(analogRead(HORZ_POS_SENSOR[i]), horzLowCalibration[i], horzHighCalibration[i], 0, 254);
 }
+
+
+/**************************************************************************************
+  getCurrentVerticalAngle(): Get vertical vertibrae value in 0-254 angle space
+ *************************************************************************************/
+byte getCurrentVerticalAngle(int i)
+{
+  return map(analogRead(VERT_POS_SENSOR[i]), vertLowCalibration[i], vertHighCalibration[i], 0, 254);
+}
+
+/**************************************************************************************
+  printSensorValuesAndSetpoints(): Print sensor values and setpoints to the USB Serial
+ *************************************************************************************/
+void printSensorValuesAndSetpoints()
+{
+  USB_COM_PORT.print("\nSensors and Setpoints\n");
+  USB_COM_PORT.print("Angles Values are 0-254: 255 = disabled\n");
+  USB_COM_PORT.print("Sensors Values are 0-1023: -1 = disabled\n");
+
+  USB_COM_PORT.print("\nHorizontal\n");
+  USB_COM_PORT.print("\nHORZ_ANGLE_SETPOINT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleSetpoints[i] << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_ANGLE_CURRENT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << getCurrentHorizontalAngle(i) << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_ANGLE_DEADBAND:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleDeadband << "\t";
+  }
+  USB_COM_PORT << "\n";
+
+
+  USB_COM_PORT.print("\nHORZ_SENSOR_SETPOINT:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorSetpoints[i] << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_SENSOR_CURRENT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << analogRead(HORZ_POS_SENSOR[i]) << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_SENSOR_DEADBAND:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorDeadbands[i] << "\t";
+  }
+  USB_COM_PORT << "\n";
+  
+  
+  USB_COM_PORT.print("\nVertical\n");
+  USB_COM_PORT.print("\nVERT_ANGLE_SETPOINT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleSetpoints[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_CURRENT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << getCurrentVerticalAngle(i) << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_DEADBAND:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleDeadband << "\t";
+  }
+  USB_COM_PORT << "\n";
+
+  USB_COM_PORT.print("\nVERT_SENSOR_SETPOINT:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorSetpoints[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_CURRENT:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << analogRead(VERT_POS_SENSOR[i]) << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_DEADBAND:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorDeadbands[i] << "\t";
+  }
+  USB_COM_PORT << "\n\n";
+
+}
+
 
 /**************************************************************************************
   printCalibrationValues(): Prints all calibration values.
@@ -1083,51 +1123,63 @@ void readSensors()
 void printCalibrationValues()
 {
   USB_COM_PORT.println("\nCalibration");
-  USB_COM_PORT.print("H_HIGH:   \t");
+  USB_COM_PORT.print("HORZ_HIGH:   \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << horzHighCalibration[i] << "\t";
   }
-  USB_COM_PORT.print("\nH_LOW:   \t");
+  USB_COM_PORT.print("\nHORZ_LOW:   \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << horzLowCalibration[i] << "\t";
   }
-  USB_COM_PORT.print("\nH_RANGE: \t");
+  USB_COM_PORT.print("\nHORZ_RANGE: \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << horzHighCalibration[i] - horzLowCalibration[i] << "\t";
   }
-  USB_COM_PORT.print("\nV_HIGH:   \t");
+  
+  USB_COM_PORT.print("\n\nVERT_HIGH:   \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertHighCalibration[i] << "\t";
   }
-  USB_COM_PORT.print("\nV_LOW:     \t");
+  USB_COM_PORT.print("\nVERT_LOW:     \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertLowCalibration[i] << "\t";
   }
-  USB_COM_PORT.print("\nV_RANGE: \t");
+  USB_COM_PORT.print("\nVERT_RANGE: \t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertHighCalibration[i] - vertLowCalibration[i] << "\t";
   }  
-  USB_COM_PORT.print("\nV_STRAIGHT:\t");  
+  USB_COM_PORT.print("\nVERT_STRAIGHT:\t");  
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertStraightArray[i] << "\t";
-  }
+  }  
   USB_COM_PORT.println('\n');
 }
 
 /**************************************************************************************
-  printBatteryVoltage(): Saves the current vertical sensor positions
+  printBatteryVoltage(): Prints the battery voltage to the USB Serial port.
  *************************************************************************************/
 void printBatteryVoltage()
 {
   float batteryVolts = ((float)map(analogRead(BAT_LEVEL_24V),0,1023,0,25000))/1000;
   USB_COM_PORT << "The battery is at " << batteryVolts << "V\n";
+}
+
+/**************************************************************************************
+  printHydraulicPressure(): Prints the pressure to the USB Serial port.
+ *************************************************************************************/
+void printHydraulicPressure()
+{
+  int readout = analogRead(PRESSURE_SENSOR);
+  int hydraulicPressure = map(readout,102.3,920.7,0,2000);
+  float voltage = map((float)readout,0,1023,0.0,5.0);
+  USB_COM_PORT << "The pressure is at " << hydraulicPressure << "psi (" << voltage << "V)\n";
 }
 
 
@@ -1277,8 +1329,46 @@ void manualSetModuleNumber()
   }
   USB_COM_PORT << "Now set to " << newNum << "\n";
   EEPROM.write(MY_MODULE_NUMBER_ADDRESS, newNum);
-  myModuleNumber = newNum;
+  setModuleNumber(newNum);
   return;    
+}
+
+/**************************************************************************************
+  setModuleNumber(): Sets the module number. Set even and odd vertibrae accordingly.
+ *************************************************************************************/
+void setModuleNumber(int value)
+{
+  myModuleNumber = value;
+ 
+  // setup even/odd for even modules
+  if (myModuleNumber%2 == 0)
+  {  
+    PIDcontrollerVertical[0].setEven(false);
+    PIDcontrollerVertical[1].setEven(true);
+    PIDcontrollerVertical[2].setEven(false);
+    PIDcontrollerVertical[3].setEven(true);
+    PIDcontrollerVertical[4].setEven(false);
+    
+    PIDcontrollerHorizontal[0].setEven(false);
+    PIDcontrollerHorizontal[1].setEven(true);
+    PIDcontrollerHorizontal[2].setEven(false);
+    PIDcontrollerHorizontal[3].setEven(true);
+    PIDcontrollerHorizontal[4].setEven(false);
+  }
+  else
+  {
+    PIDcontrollerVertical[0].setEven(true);
+    PIDcontrollerVertical[1].setEven(false);
+    PIDcontrollerVertical[2].setEven(true);
+    PIDcontrollerVertical[3].setEven(false);
+    PIDcontrollerVertical[4].setEven(true);
+    
+    PIDcontrollerHorizontal[0].setEven(true);
+    PIDcontrollerHorizontal[1].setEven(false);
+    PIDcontrollerHorizontal[2].setEven(true);
+    PIDcontrollerHorizontal[3].setEven(false);
+    PIDcontrollerHorizontal[4].setEven(true);  
+  }  
 }
 
 /**************************************************************************************
@@ -1293,11 +1383,12 @@ void displayMenu()
     USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
     USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          t - straighten horizontal\n");
-    USB_COM_PORT.print("          p - print raw values of position sensors\n");
+    USB_COM_PORT.print("          p - print sensor values and setpoints()\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
     USB_COM_PORT.print("          y - straighten verticals\n");
-    USB_COM_PORT.print("          b - print calibration values\n");    
+    USB_COM_PORT.print("          b - print calibration values\n");
+    USB_COM_PORT.print("          f - print hydraulic pressure\n");   
     USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n");    
@@ -1362,7 +1453,10 @@ void manualControl()
           straightenVertical();
           break;
         case 'p':
-          readSensors();
+          printSensorValuesAndSetpoints();
+          break;
+        case 'f':
+          printHydraulicPressure();
           break;
         case 'r':
           saveVerticalPosition();

@@ -989,7 +989,7 @@ void manualControl()
           USB_COM_PORT.print("STOPPED\n");
           break;
           
-       case 'p':
+       case 'z':
           if (inDebugMode)
           {
             USB_COM_PORT.println("Debug stream messages OFF");
@@ -1000,6 +1000,9 @@ void manualControl()
             USB_COM_PORT.println("Debug stream messages ON");
             inDebugMode = true;
           }
+          break;
+        case 'p':
+          printSetpointAngleArrays();
           break;
         case 't':
           runCommunicationTest();
@@ -1020,6 +1023,21 @@ void manualControl()
     byteIn = 'z';
   }
   USB_COM_PORT.print("\nManual Control mode exited\n");
+}
+
+/**************************************************************************************
+  printSetpointAngleArrays(): Prints out the vertical and horizontal angle arrays
+ *************************************************************************************/
+void printSetpointAngleArrays()
+{
+  USB_COM_PORT << "Printing Angle Arrays \n";
+  USB_COM_PORT << "V#\tHorz\tVert\n";
+  
+  for (int i = 0; i < 30; ++i)
+  {
+    USB_COM_PORT << i << "\n" << "\t" << horzSetpoints[i] << "\t" << vertSetpoints[i] << "\n";
+  }
+  USB_COM_PORT << "\n";
 }
 
 /**************************************************************************************
@@ -1125,7 +1143,8 @@ void displayMenu()
     USB_COM_PORT.print("          s - stop motor\n");
     USB_COM_PORT.print("          n - manually set numberOfModules\n"); 
     USB_COM_PORT.print("          m - auto calibrate numberOfModules\n"); 
-    USB_COM_PORT.print("          p - print debug stream\n");     
+    USB_COM_PORT.print("          z - print debug stream\n");
+    USB_COM_PORT.print("          p - print angle array\n");   
     USB_COM_PORT.print("          t - test communication\n");     
     USB_COM_PORT.print("          y - calibrate horizontal\n");     
     USB_COM_PORT.print("          i - calibrate vertical\n");     
