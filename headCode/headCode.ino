@@ -95,7 +95,8 @@ void setup()
   USB_COM_PORT.println("Hi I'm the Titanoboa Head!");  
   USB_COM_PORT.print("Number of modules: ");
   USB_COM_PORT.println(numberOfModules);
-
+  USB_COM_PORT.println();
+ 
   // Initialize setponts
   //   - Actuators are disabled.
   //   - Lights are off
@@ -235,7 +236,7 @@ void initializeAngleArray()
   }
   else
   {
-    USB_COM_PORT << "Failed (Communication Failure?)\n";
+    USB_COM_PORT << "Failed (Modules not responding?)\n";
     delay(1000);
   }
 }
@@ -1030,12 +1031,16 @@ void manualControl()
  *************************************************************************************/
 void printSetpointAngleArrays()
 {
-  USB_COM_PORT << "Printing Angle Arrays \n";
+  USB_COM_PORT << "\nPrinting Angle Arrays \n";
   USB_COM_PORT << "V#\tHorz\tVert\n";
   
   for (int i = 0; i < 30; ++i)
   {
-    USB_COM_PORT << i << "\n" << "\t" << horzSetpoints[i] << "\t" << vertSetpoints[i] << "\n";
+    USB_COM_PORT << i << "\t" << horzSetpoints[i] << "\t" << vertSetpoints[i] << "\n";
+    if (i == (numberOfModules * 5) - 1)
+    {
+      USB_COM_PORT << "--- END OF SNAKE (" << numberOfModules << " modules)\n";
+    }
   }
   USB_COM_PORT << "\n";
 }
