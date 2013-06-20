@@ -75,6 +75,8 @@ boolean joystickIsConnected = false;
 int longDelayBetweenHeartBeats = 1100;
 int shortDelayBetweenHeartBeats = 250;
 int ledDelayWhenRunning = 30;
+int manualActuatorSelect = 0;
+int manualActuationDelay = 200;
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -790,244 +792,43 @@ void closeTheJaw()
 }
 
 /**************************************************************************************
-  manualControl(): Allows for manual actuator control over the USB_COM_PORT
+  manualSetModuleCount(): Manually set the number of modules we are currently using.
  *************************************************************************************/
-void manualControl()
+void manualSetModuleCount()
 {
-  boolean manual = true;
-  char byteIn = 'z';
-  int actuatorSel = 0;
-  int actuationDelay = 200;
-  char delaySetting = 'm';
-  int led_choice = -1;
-  int sensors[6];
-  byte numberOfModulesNew;
-  
-  displayMenu();
-  
-  while(manual == true)
+  USB_COM_PORT << "Manually program number of modules (1-6)...\n";
+  while(USB_COM_PORT.available() < 1);
+  byte numberOfModulesNew = USB_COM_PORT.read() - 48;
+  if (numberOfModulesNew < 1 || numberOfModulesNew > 6)
   {
-    if(Serial.available() > 0)
-    {
-      byteIn = USB_COM_PORT.read();
-      
-      // characters in use: a, b, c, j, h, u, d, l, k, n, t, s, q, y, u, i
-      switch(byteIn)
-      {
-        case 'y':
-          USB_COM_PORT << "\nCalibrating horizontals... ";
-          runHorzSensorCalibration();
-          USB_COM_PORT << "Done\n";
-          break;
-          
-        case 'i':
-          USB_COM_PORT << "\nCalibrating verticals... ";
-          runVertSensorCalibration();
-          USB_COM_PORT << "Done\n";
-          break;
-          
-        case 'a':
-          while(USB_COM_PORT.available() < 1)
-          {
-            delay(1);
-          }
-        
-          led_choice = USB_COM_PORT.read();
-          if(led_choice == -1) break; //read() returns -1 if no data is available
-          switch(led_choice)
-          {
-            case '1': digitalWrite(LED_1, HIGH); break; 
-            case '2': digitalWrite(LED_2, HIGH); break;
-            case '3': digitalWrite(LED_3, HIGH); break;
-            case '4': digitalWrite(LED_4, HIGH); break;
-            case '5': digitalWrite(LED_5, HIGH); break;
-            case '6': digitalWrite(LED_6, HIGH); break;
-            default: break;
-          }
-          USB_COM_PORT.print("LED ");
-          USB_COM_PORT.write(led_choice);
-          USB_COM_PORT.print(" turned on\n");
-          break;
-        case 'b':
-         while(USB_COM_PORT.available() < 1)
-          {
-            delay(1);
-          }
-          led_choice = USB_COM_PORT.read();
-          if(led_choice == -1) break; //read() returns -1 if no data is available
-          switch(led_choice)
-          {
-            case '1': digitalWrite(LED_1, LOW); break; 
-            case '2': digitalWrite(LED_2, LOW); break;
-            case '3': digitalWrite(LED_3, LOW); break;
-            case '4': digitalWrite(LED_4, LOW); break;
-            case '5': digitalWrite(LED_5, LOW); break;
-            case '6': digitalWrite(LED_6, LOW); break;
-            default: break;
-          }
-          USB_COM_PORT.print("LED ");
-          USB_COM_PORT.write(led_choice);
-          USB_COM_PORT.print(" turned off\r\n");
-          break;
-        case 'c':
-          for(int k =0;k<6;k++)
-          {
-            sensors[k] = analogRead(HEAD_POS_SENSOR[k]);
-            USB_COM_PORT.print("Sensor ");
-            USB_COM_PORT.print(k+1,DEC);
-            USB_COM_PORT.print(" reads ");
-            USB_COM_PORT.print(sensors[k],DEC);
-            USB_COM_PORT.print("\r\n");
-          }
-          USB_COM_PORT.print("\r\n");
-          break;
-        case 'j':
-          actuatorSel = 0;
-          StopMov();
-          USB_COM_PORT.print("Jaw actuator selected\n");
-          break;
-        case 'h':
-          actuatorSel = 1;
-          StopMov();
-          USB_COM_PORT.print("Head actuator selected\n");
-          break;
-        case 'u':
-          actuatorSel = 2;
-          StopMov();
-          USB_COM_PORT.print("Auxiliary actuator selected\n");
-          break;
-
-        case 'd':
-          StopMov();
-          delaySetting = USB_COM_PORT.read();
-          switch (delaySetting)
-          {
-            case 's':
-              actuationDelay = 150;
-              USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
-              break;
-            case 'm':
-              actuationDelay = 200;
-              USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
-              break;
-            case 'l':
-              actuationDelay = 300;
-              USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
-              break;
-            default:
-              actuationDelay = 200;
-              USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
-              break;
-          }
-          break;
-          
-        case 'l':
-          StopMov();
-          //instruct downsteam module to turn on motor, will run for 200ms
-          TAIL_SERIAL.write('g');
-          USB_COM_PORT.print("l dir\n");
-          if (actuatorSel == 0)
-          {
-            digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
-            analogWrite(JAW_ACTUATOR, 255);
-          }
-          else if (actuatorSel == 1)
-          {
-            digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
-            analogWrite(HEAD_ACTUATOR, 255);
-          }
-          else if(actuatorSel == 2)
-          {
-            digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
-            analogWrite(AUX_ACTUATOR, 255);
-          }
-          delay(actuationDelay);
-          StopMov();
-          break;
-         
-        case 'k':
-          StopMov();
-          //instruct downsteam module to turn on motor, will run for 200ms
-          USB_COM_PORT.print("sending motor on\n");
-          TAIL_SERIAL.write('g');
-          USB_COM_PORT.print("k dir\n");
-          if (actuatorSel == 0)
-          {
-            digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
-            analogWrite(JAW_ACTUATOR, 255);
-          }
-          else if (actuatorSel == 1)
-          {
-            digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
-            analogWrite(HEAD_ACTUATOR, 255);
-          }
-          else if(actuatorSel == 2)
-          {
-            digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
-            analogWrite(AUX_ACTUATOR, 255);
-          }
-          delay(actuationDelay);
-          StopMov();
-          USB_COM_PORT.print("done, motor can turn off\n");
-          break;
-        
-        case 'n':
-          USB_COM_PORT << "Manually program number of modules (0-9)...\n";
-          while(USB_COM_PORT.available() < 1);
-          numberOfModulesNew = USB_COM_PORT.read() - 48;
-          if (numberOfModulesNew < 0 || numberOfModulesNew > 9)
-          {
-            USB_COM_PORT << "Invalid\n";
-            break;
-          }
-          USB_COM_PORT << "Now set to " << numberOfModulesNew << "\n";
-          EEPROM.write(0, numberOfModulesNew);
-          numberOfModules = numberOfModulesNew;
-          break;
-
-        case 's':
-          StopMov();
-          USB_COM_PORT.print("STOPPED\n");
-          break;
-          
-       case 'z':
-          if (inDebugMode)
-          {
-            USB_COM_PORT.println("Debug stream messages OFF");
-            inDebugMode = false;
-          }
-          else
-          {
-            USB_COM_PORT.println("Debug stream messages ON");
-            inDebugMode = true;
-          }
-          break;
-        case 'p':
-          printSetpointAngleArrays();
-          break;
-        case 't':
-          runCommunicationTest();
-          break;
-
-        case 'e':
-            displayMenu();
-            break;
-
-        case 'q':
-          manual = false;
-          INPUT_SERIAL.flush();
-          TAIL_SERIAL.flush();
-          break;
-      }//end switch
-    }//end if serial
-    
-    byteIn = 'z';
+    USB_COM_PORT << "Invalid\n";
+    return;
   }
-  USB_COM_PORT.print("\nManual Control mode exited\n");
+  USB_COM_PORT << "Now set to " << numberOfModulesNew << "\n";
+  EEPROM.write(0, numberOfModulesNew);
+  numberOfModules = numberOfModulesNew;
 }
 
 /**************************************************************************************
-  printSetpointAngleArrays(): Prints out the vertical and horizontal angle arrays
+  manualToggleDebugMessages(): To avoid slow downs, runtime debug messages are turned off
+                               by default. This function allow them to be turned on.
+ *************************************************************************************/
+void manualToggleDebugMessages()
+{
+  if (inDebugMode)
+  {
+    USB_COM_PORT.println("Debug stream messages OFF");
+    inDebugMode = false;
+  }
+  else
+  {
+    USB_COM_PORT.println("Debug stream messages ON");
+    inDebugMode = true;
+  }
+}
+
+/**************************************************************************************
+  printSetpointAngleArrays(): Prints out the vertical and horizontal angle arrays for the whole snake.
  *************************************************************************************/
 void printSetpointAngleArrays()
 {
@@ -1046,13 +847,144 @@ void printSetpointAngleArrays()
 }
 
 /**************************************************************************************
+  manualExtendActuator(): Extends the actuator selected in manual mode
+ *************************************************************************************/
+void manualExtendActuator()
+{
+  StopMovement();
+  
+  // Instruct downsteam module to turn on motor, will run for 400ms
+  TAIL_SERIAL.write('g');
+  
+  if (manualActuatorSelect == 0)
+  {
+    digitalWrite(JAW_CTRL, JAW_OPEN_CTRL_SELECT);
+    analogWrite(JAW_ACTUATOR, 255);
+    USB_COM_PORT << "Jaw Actuator Extended (" << manualActuationDelay << "ms)\n";  
+  }
+  else if (manualActuatorSelect == 1)
+  {
+    digitalWrite(HEAD_CTRL, HEAD_RAISE_CTRL_SELECT);
+    analogWrite(HEAD_ACTUATOR, 255);
+    USB_COM_PORT << "Head Actuator Extended (" << manualActuationDelay << "ms)\n";  
+  }
+  else if(manualActuatorSelect == 2)
+  {
+    digitalWrite(AUX_CTRL, AUX_EXTEND_CTRL_SELECT);
+    analogWrite(AUX_ACTUATOR, 255);
+    USB_COM_PORT << "Auxiliary Actuator Extended (" << manualActuationDelay << "ms)\n";  
+  }
+  delay(manualActuationDelay);
+  StopMovement();
+}
+
+/**************************************************************************************
+  manualContractActuator(): Contracts the actuator selected in manual mode
+ *************************************************************************************/
+void manualContractActuator()
+{
+  StopMovement();
+  
+  // Instruct downsteam module to turn on motor, will run for 400ms
+  TAIL_SERIAL.write('g');
+  
+  if (manualActuatorSelect == 0)
+  {
+    digitalWrite(JAW_CTRL, JAW_CLOSE_CTRL_SELECT);
+    analogWrite(JAW_ACTUATOR, 255);
+    USB_COM_PORT << "Jaw Actuator Contracted (" << manualActuationDelay << "ms)\n";  
+  }
+  else if (manualActuatorSelect == 1)
+  {
+    digitalWrite(HEAD_CTRL, HEAD_LOWER_CTRL_SELECT);
+    analogWrite(HEAD_ACTUATOR, 255);
+    USB_COM_PORT << "Head Actuator Contracted (" << manualActuationDelay << "ms)\n";  
+  }
+  else if(manualActuatorSelect == 2)
+  {
+    digitalWrite(AUX_CTRL, AUX_RETRACT_CTRL_SELECT);
+    analogWrite(AUX_ACTUATOR, 255);
+    USB_COM_PORT << "Auxiliary Actuator Contracted (" << manualActuationDelay << "ms)\n";  
+  }
+  delay(manualActuationDelay);
+  StopMovement();
+}
+
+/**************************************************************************************
+  setManualActuationDelay(): sets the actuation delay for manual mode actuation
+ *************************************************************************************/
+void setManualActuationDelay()
+{
+  StopMovement();
+  while (USB_COM_PORT.available() < 1);
+  char delaySetting = USB_COM_PORT.read();
+  switch (delaySetting)
+  {
+    case 's':
+      manualActuationDelay = 150;
+      USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
+      break;
+    default:
+    case 'm':
+      manualActuationDelay = 200;
+      USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
+      break;
+    case 'l':
+      manualActuationDelay = 300;
+      USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
+      break;
+  }
+}
+
+/**************************************************************************************
+  printHeadSensorValuesAndSetpoints(): Prints the values of the head's sensors.
+                                       Will print setpoints when we get sensors mounted.
+ *************************************************************************************/
+void printHeadSensorValuesAndSetpoints()
+{
+  for(int k =0;k<6;k++)
+  {
+    USB_COM_PORT.print("\r\nSensor ");
+    USB_COM_PORT.print(k+1,DEC);
+    USB_COM_PORT.print(" reads ");
+    USB_COM_PORT.print(analogRead(HEAD_POS_SENSOR[k]),DEC);
+    USB_COM_PORT.print("\r\n");
+  }
+  USB_COM_PORT.print("\r\n");
+}
+
+/**************************************************************************************
+  manualSetLEDState(): Waits for LED number over usb then sets it to On or Off
+ *************************************************************************************/
+void manualSetLEDState(boolean state)
+{
+  while(USB_COM_PORT.available() < 1)
+  {
+    delay(1);
+  }
+  byte led_choice = USB_COM_PORT.read()  - 48;
+  if(led_choice == -1) return; //read() returns -1 if no data is available
+  switch(led_choice)
+  {
+    case 1: digitalWrite(LED_1, state); break; 
+    case 2: digitalWrite(LED_2, state); break;
+    case 3: digitalWrite(LED_3, state); break;
+    case 4: digitalWrite(LED_4, state); break;
+    case 5: digitalWrite(LED_5, state); break;
+    case 6: digitalWrite(LED_6, state); break;
+    default: USB_COM_PORT << "Invalid LED Number.\n\r"; return;
+  }
+  USB_COM_PORT << "LED " << led_choice << " set to " << (state ? "ON" : "OFF") << "\r\n";
+}
+
+/**************************************************************************************
   runCommunicationTest(): Makes sure all modules are responding and the last module is 
                           terminated. Returns true if it passed the test.
  *************************************************************************************/
 boolean runCommunicationTest()
 {
   clearSerialBuffer(TAIL_SERIAL);
-  boolean allError = false;
+  int numberOfErrors = 0;
   
   for (int i = 1; i <= 20; ++i)
   {
@@ -1117,11 +1049,11 @@ boolean runCommunicationTest()
     }
     USB_COM_PORT << "\n";
     
-    allError = (error) ? true : allError;
+    if(error) ++numberOfErrors;
   }
   
   // Give the result of the tests
-  if (allError)
+  if (numberOfErrors > 0)
   {
     USB_COM_PORT << "RESULT: ERROR! Some communication tests failed.\n\n";
   }
@@ -1130,38 +1062,127 @@ boolean runCommunicationTest()
     USB_COM_PORT << "RESULT: SUCCESS! All communication tests passed.\n\n";
   }
   delay(500);
+  clearSerialBuffer(TAIL_SERIAL);
 }
 
 /**************************************************************************************
-  displayMenu():
+  displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
 void displayMenu()
 {
-    USB_COM_PORT.print("\nManual control mode menu\n");
+    USB_COM_PORT.print("\nManual Control Mode\n");
     USB_COM_PORT.print("commands: j or h to select jaw or head actuator.\n");
     USB_COM_PORT.print("          u to select Aux actuator\n");
     USB_COM_PORT.print("\n");
-    USB_COM_PORT.print("          a/b - leds [0-6]\n");
-    USB_COM_PORT.print("          c - list sensor values\n");
-    USB_COM_PORT.print("          k/l - actuation\n");
-    USB_COM_PORT.print("          d'v' - adjust actuation delay, where v=s(small),m(medium),l(large)\n");
-    USB_COM_PORT.print("          s - stop motor\n");
-    USB_COM_PORT.print("          n - manually set numberOfModules\n"); 
-    USB_COM_PORT.print("          m - auto calibrate numberOfModules\n"); 
-    USB_COM_PORT.print("          z - print debug stream\n");
-    USB_COM_PORT.print("          p - print angle array\n");   
+    USB_COM_PORT.print("          k/l - extend/contract actuator\n");
+    USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
+    USB_COM_PORT.print("          a* - turn LED on where *=led number(1-5)\n");
+    USB_COM_PORT.print("          b* - turn LED off where *=led number(1-5)\n");
+    USB_COM_PORT.print("          c - print head sensor values \n");
+    USB_COM_PORT.print("          p - print angle array\n");
+    USB_COM_PORT.print("          n - manually set numberOfModules\n");
+    USB_COM_PORT.print("          z - toggle printing of debug stream\n");   
     USB_COM_PORT.print("          t - test communication\n");     
     USB_COM_PORT.print("          y - calibrate horizontal\n");     
-    USB_COM_PORT.print("          i - calibrate vertical\n");     
+    USB_COM_PORT.print("          i - calibrate vertical\n");
+    USB_COM_PORT.print("          s - stop motor\n");     
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
 
+/**************************************************************************************
+  manualControl(): Allows for manual actuator control over the USB_COM_PORT
+ *************************************************************************************/
+void manualControl()
+{
+  displayMenu();
+
+  boolean manual = true;  
+  while(manual == true)
+  {
+    if(Serial.available() > 0)
+    {
+      byte manualCommand = USB_COM_PORT.read();
+      
+      switch(manualCommand)
+      {       
+        case 'j':
+          manualActuatorSelect = 0;
+          USB_COM_PORT.print("Jaw actuator selected\n");
+          break;
+        case 'h':
+          manualActuatorSelect = 1;
+          USB_COM_PORT.print("Head actuator selected\n");
+          break;
+        case 'u':
+          manualActuatorSelect = 2;
+          USB_COM_PORT.print("Auxiliary actuator selected\n");
+          break;
+        case 'y':
+          USB_COM_PORT << "\nCalibrating horizontals... ";
+          runHorzSensorCalibration();
+          USB_COM_PORT << "Done\n";
+          break;          
+        case 'i':
+          USB_COM_PORT << "\nCalibrating verticals... ";
+          runVertSensorCalibration();
+          USB_COM_PORT << "Done\n";
+          break;
+          
+        case 'a':
+          manualSetLEDState(HIGH);
+          break;
+        case 'b':
+          manualSetLEDState(LOW);
+          break;
+        case 'c':
+          printHeadSensorValuesAndSetpoints();
+          break;
+        case 'd':
+          setManualActuationDelay();
+          break;         
+        case 'l':
+          manualContractActuator();
+          break;         
+        case 'k':
+          manualExtendActuator();
+          break;       
+        case 'n':
+          manualSetModuleCount();
+          break;     
+        case 'z':
+          manualToggleDebugMessages();
+          break;
+        case 'p':
+          printSetpointAngleArrays();
+          break;
+        case 't':
+          runCommunicationTest();
+          break;
+        case 'e':
+          displayMenu();
+          break;
+        case 's':
+          StopMovement();
+          USB_COM_PORT.print("Stopped all movement\n");
+          break;     
+        case 'q':
+          manual = false;
+          break;
+      }//end switch
+    }//end if serial
+  }
+  USB_COM_PORT.print("\nManual Control mode exited\n");  
+  
+  // Clear serial buffers to try and get back in sync
+  clearSerialBuffer(INPUT_SERIAL);
+  clearSerialBuffer(TAIL_SERIAL);    
+}
 
 /**************************************************************************************
-  StopMov(): In manual mode, stops movement of all actuators.
+  StopMovement(): In manual mode, stops movement of all actuators.
  *************************************************************************************/
-void StopMov()
+void StopMovement()
 {
   analogWrite(JAW_ACTUATOR, 0);
   analogWrite(HEAD_ACTUATOR, 0);

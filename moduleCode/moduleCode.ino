@@ -577,7 +577,7 @@ void processHeadManualModeMotorPulseCommand()
     
   USB_COM_PORT.print("Turning motor on for 200ms\n");
   analogWrite(MOTOR_CONTROL, manualMotorSpeed);
-  delay(200);
+  delay(400);
   analogWrite(MOTOR_CONTROL, 0);
   USB_COM_PORT.print("Turning motor off\n");
   
@@ -1230,6 +1230,7 @@ void setManualActuationDelay()
       manualActuationDelay = 150;
       USB_COM_PORT.print("Actuation delay set to smallest time (150ms)\n");
       break;
+    default:
     case 'm':
       manualActuationDelay = 200;
       USB_COM_PORT.print("Actuation delay set to medium time (200ms)\n");
@@ -1237,10 +1238,6 @@ void setManualActuationDelay()
     case 'l':
       manualActuationDelay = 300;
       USB_COM_PORT.print("Actuation delay set to largest time (300ms)\n");
-      break;
-    default:
-      manualActuationDelay = 200;
-      USB_COM_PORT.print("Invalid entry, actuation delay set to medium time (200ms)\n");
       break;
   }
 }
@@ -1334,7 +1331,7 @@ void manualSetModuleNumber()
 }
 
 /**************************************************************************************
-  setModuleNumber(): Sets the module number. Set even and odd vertibrae accordingly.
+  setModuleNumber(): Sets the module number and thus the even and odd vertibrae accordingly.
  *************************************************************************************/
 void setModuleNumber(int value)
 {
@@ -1380,19 +1377,19 @@ void displayMenu()
     USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
     USB_COM_PORT.print("          k/l - horizontal actuation - extend/contract\n");
     USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
-    USB_COM_PORT.print("          d* - adjust actuation delay, where *=s(small),m(medium),l(large)\n");
-    USB_COM_PORT.print("          c - calibrate horizontal\n");
-    USB_COM_PORT.print("          t - straighten horizontal\n");
-    USB_COM_PORT.print("          p - print sensor values and setpoints()\n");
+    USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
+    USB_COM_PORT.print("          u - manually set myModuleNumber\n");
+    USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
-    USB_COM_PORT.print("          y - straighten verticals\n");
+    USB_COM_PORT.print("          t - straighten horizontal\n");  
+    USB_COM_PORT.print("          y - straighten verticals\n");  
+    USB_COM_PORT.print("          a - print battery voltage\n");  
     USB_COM_PORT.print("          b - print calibration values\n");
-    USB_COM_PORT.print("          f - print hydraulic pressure\n");   
+    USB_COM_PORT.print("          f - print hydraulic pressure\n"); 
+    USB_COM_PORT.print("          p - print sensor values and setpoints\n");
     USB_COM_PORT.print("          n/m - all leds on/off\n");
-    USB_COM_PORT.print("          s - stop motor\n");
-    USB_COM_PORT.print("          u - manually set myModuleNumber\n");    
-    USB_COM_PORT.print("          a - print battery voltage\n");    
+    USB_COM_PORT.print("          s - stop motor\n");  
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
