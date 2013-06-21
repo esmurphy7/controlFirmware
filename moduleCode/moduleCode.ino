@@ -1177,9 +1177,18 @@ void printBatteryVoltage()
 void printHydraulicPressure()
 {
   int readout = analogRead(PRESSURE_SENSOR);
-  int hydraulicPressure = map(readout,102.3,920.7,0,2000);
-  float voltage = map((float)readout,0,1023,0.0,5.0);
-  USB_COM_PORT << "The pressure is at " << hydraulicPressure << "psi (" << voltage << "V)\n";
+  float voltage = (float)map(readout, 0, 1023, 0, 500) / 100;
+  
+  if (voltage < 0.45 || voltage > 4.55)
+  {
+    USB_COM_PORT << "ERROR: Pressure sensor should be between 0.5V and 4.5V. (" << voltage << "V)\n";
+  }
+  else
+  {
+    int hydraulicPressure = map(readout,102,921,0,2000); // 0.5-4.5V > 0-2000psi
+    hydraulicPressure = (hydraulicPressure < 0) ? 0 : hydraulicPressure;    
+    USB_COM_PORT << "The pressure is at " << hydraulicPressure << "psi (" << voltage << "V)\n";
+  }
 }
 
 
