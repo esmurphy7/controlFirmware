@@ -1389,9 +1389,9 @@ boolean runCommunicationTest()
   while (USB_COM_PORT.available() == 0);
 
   int lastModuleNumber = USB_COM_PORT.read() - 48;
-  if (lastModuleNumber < 1 || lastModuleNumber > 6)
+  if (lastModuleNumber < myModuleNumber || lastModuleNumber > 6)
   {
-    USB_COM_PORT << "INVALID: " << lastModuleNumber << " is not a valid module number.\n";
+    USB_COM_PORT << "INVALID: " << lastModuleNumber << " is not a valid module number. Can only communicate downstream up to module 6.\n";
     return false;
   }
   USB_COM_PORT << "Running Communication Test: Module " << myModuleNumber << " to Module " << lastModuleNumber << "\n\n";
@@ -1483,6 +1483,36 @@ boolean runCommunicationTest()
 }
 
 /**************************************************************************************
+  manualTurnMotorOn(): Runs that motor at at one of three speed levels. manual mode must
+                       be used to stop the motor.
+ *************************************************************************************/
+
+void manualTurnMotorOn()
+{
+  // Figure out what speed to run at
+  while (USB_COM_PORT.available() == 0);
+  
+  char speedSelect = USB_COM_PORT.read();
+  switch (speedSelect)
+  {
+    case '1':
+      USB_COM_PORT << "Motor running at speed 80 (SEND 's' TO TURN OFF).\n";
+      analogWrite(MOTOR_CONTROL, 80);      
+      break;
+    case '2':
+      USB_COM_PORT << "Motor running at speed 160 (SEND 's' TO TURN OFF).\n";
+      analogWrite(MOTOR_CONTROL, 160);  
+      break;
+    case '3':
+      USB_COM_PORT << "Motor running at speed 240 (SEND 's' TO TURN OFF).\n";
+      analogWrite(MOTOR_CONTROL, 240);      
+      break;    
+    default:
+      USB_COM_PORT << "ERROR: " << speedSelect << " is not a valid speed selection.\n";
+  }
+}
+
+/**************************************************************************************
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
 void displayMenu()
@@ -1504,6 +1534,7 @@ void displayMenu()
     USB_COM_PORT.print("          f - print hydraulic pressure\n"); 
     USB_COM_PORT.print("          p - print sensor values and setpoints\n");
     USB_COM_PORT.print("          n/m - all leds on/off\n");
+    USB_COM_PORT.print("          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n");
     USB_COM_PORT.print("          s - stop motor\n");  
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
@@ -1603,6 +1634,9 @@ void manualControl()
         case 'a':
           printBatteryVoltage();
           break;
+        case 'x':
+          manualTurnMotorOn();
+          break;
         case 's':
           USB_COM_PORT.print("Stopped all movement\n");
           StopMovement();
@@ -1613,6 +1647,8 @@ void manualControl()
       }//end switch
     }//end if serial
   }  
+  
+  StopMovement();
   USB_COM_PORT.println("\nManual Control mode exited");
   runPidLoop = true;
   
