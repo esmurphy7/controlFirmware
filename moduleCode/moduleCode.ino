@@ -1328,7 +1328,7 @@ void manualSetModuleNumber()
   USB_COM_PORT << "Manually program myModuleNumber (0-9)...\n";
   while(USB_COM_PORT.available() < 1);
   int newNum = USB_COM_PORT.read() - 48;
-  if (newNum < 0 || newNum > 9)
+  if (newNum < 0 || newNum > 6)
   {
     USB_COM_PORT << "Invalid\n";
     return;
@@ -1377,6 +1377,111 @@ void setModuleNumber(int value)
   }  
 }
 
+
+/**************************************************************************************
+  runCommunicationTest(): Tests the communication between this module and a downstream 
+                          module with the serial terminator. 
+ *************************************************************************************/
+boolean runCommunicationTest()
+{
+  // Figure out what module we're running the test to.
+  USB_COM_PORT << "\nI am module " << myModuleNumber << ". What is the last module number?\n";
+  while (USB_COM_PORT.available() == 0);
+
+  int lastModuleNumber = USB_COM_PORT.read() - 48;
+  if (lastModuleNumber < 1 || lastModuleNumber > 6)
+  {
+    USB_COM_PORT << "INVALID: " << lastModuleNumber << " is not a valid module number.\n";
+    return false;
+  }
+  USB_COM_PORT << "Running Communication Test: Module " << myModuleNumber << " to Module " << lastModuleNumber << "\n\n";
+  USB_COM_PORT << "Send any key to start...\n\n";
+  while (USB_COM_PORT.read() == -1);
+  
+  // Run 20 communication tests
+  clearSerialBuffer(TAIL_SERIAL);
+  int numberOfErrors = 0;
+  
+  for (int i = 1; i <= 20; ++i)
+  {
+    USB_COM_PORT << "Running test " << i << " of 20.\n";
+    TAIL_SERIAL.write('t');
+    delay(100);
+    
+    // We should recieve modules numbers followed by ASCII 't' aka ASCII 116
+    long startTime = millis();
+    int num = myModuleNumber + 1;
+    boolean gotLastModuleT = false;
+    boolean error = false;
+    int numberOfModulesInTest = (lastModuleNumber - myModuleNumber + 1);
+    
+    while(millis() - startTime < 150)
+    {
+      // Wait for data
+      if (!TAIL_SERIAL.available())
+      {
+        continue;
+      }
+      byte data = TAIL_SERIAL.read();
+      
+      // If we've heard from every module look for ASCII charater 't'
+      if (num > lastModuleNumber)
+      {
+        if (data == 't')
+        {
+          USB_COM_PORT << "Module #" << num - 1 << " knows it's the last module!\n";
+          gotLastModuleT = true;
+        }
+        else
+        {
+          USB_COM_PORT << "ERROR: Didn't recieve 't' from last module #" << num -1 << ". Recieved ASCII " << data << " instead.\n";
+          error = true;
+        }
+        break;              
+      }
+      
+      // Look for each module to respond with it's module number (in sequence)
+      if (data == num)
+      {
+        USB_COM_PORT << "Module #" << num << " is talking!\n";
+      }
+      else
+      {
+        USB_COM_PORT << "ERROR: Expected Module # '" << num << "'. Recieved '" << data << "'\n";
+        error = true;
+      }
+      ++num;
+    }
+    // If we didn't recieve data from all modules.
+    if (!error && num <= numberOfModulesInTest)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve data from all " << numberOfModulesInTest << " modules.\n";
+      error = true;     
+    }
+    // If we didn't recieve 't' from the last module.
+    if (!error && !gotLastModuleT)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve 't' from the last module. Is the serial terminator plugged in?\n";
+      error = true;
+    }
+    USB_COM_PORT << "\n";
+    
+    if(error) ++numberOfErrors;
+  }
+  
+  // Give the result of the tests
+  if (numberOfErrors > 0)
+  {
+    USB_COM_PORT << "RESULT: ERROR! Some communication tests failed.\n\n";
+  }
+  else
+  {
+    USB_COM_PORT << "RESULT: SUCCESS! All communication tests passed.\n\n";
+  }
+  delay(500);
+  clearSerialBuffer(TAIL_SERIAL);
+}
+
 /**************************************************************************************
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
@@ -1389,6 +1494,7 @@ void displayMenu()
     USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n");
+    USB_COM_PORT.print("          g - run communication test (between modules only)\n");
     USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
     USB_COM_PORT.print("          t - straighten horizontal\n");  
@@ -1490,6 +1596,9 @@ void manualControl()
           break;
         case 'u':
           manualSetModuleNumber();
+          break;
+        case 'g':
+          runCommunicationTest();
           break;
         case 'a':
           printBatteryVoltage();
