@@ -474,14 +474,15 @@ void processDiagnosticsCommand()
 void sendHeadAndModuleDiagnostics()
 {
   int batteryVoltage = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
-
+  int hydraulicPressure = map(analogRead(PRESSURE_SENSOR),102,921,0,2000);
+  
   byte data[6];
   data[0] = highByte(batteryVoltage);
   data[1] = lowByte(batteryVoltage);
   data[2] = 0;
   data[3] = runtimeMotorSpeed;
-  data[4] = 0;
-  data[5] = 0;
+  data[4] = highByte(hydraulicPressure);
+  data[5] = lowByte(hydraulicPressure);
 
   HEAD_SERIAL.write(data, 6);
 }
