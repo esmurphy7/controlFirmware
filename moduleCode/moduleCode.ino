@@ -360,6 +360,12 @@ void processNewSettingsAndSetpoints()
     boolean horzDisabled = (newHorzAngle == 255);
     boolean vertDisabled = (newVertAngle == 255);
     
+    if ((i % 2) == 1)
+    {
+      newVertAngle = 254 - newVertAngle;
+    }/*
+    USB_COM_PORT << newVertAngle << "\t";*/
+    
     // Map the angles to sensor space
     int newHorzSetpoint = horzDisabled ? -1 : map(newHorzAngle,0,254,horzLowCalibration[i],horzHighCalibration[i]);
     int newVertSetpoint = vertDisabled ? -1 : map(newVertAngle,0,254,vertLowCalibration[i],vertHighCalibration[i]);
@@ -374,14 +380,17 @@ void processNewSettingsAndSetpoints()
     if (newHorzSetpoint != horzSensorSetpoints[i])
     {
       horzTimerArray[i] = millis();
-      horzSensorSetpoints[i] = newHorzSetpoint;      
+      horzSensorSetpoints[i] = newHorzSetpoint;
+      horzAngleSetpoints[i] = newHorzAngle;
     }
     if (newVertSetpoint != vertSensorSetpoints[i])
     {
       vertTimerArray[i] = millis();
       vertSensorSetpoints[i] = newVertSetpoint;
+      vertAngleSetpoints[i] = newVertAngle;
     }
   }
+  //USB_COM_PORT << "\n";
   
   // Change the lights
   int lightByte = 60 + myModuleNumber - 1;
@@ -725,6 +734,7 @@ void straightenHorizontal()
     executePID(straightenMotorSpeed, true, false);
     delay(30);
   }
+  analogWrite(MOTOR_CONTROL, 0);
   
   USB_COM_PORT << "Done\n";  
 }
@@ -751,6 +761,7 @@ void straightenVertical()
     executePID(straightenMotorSpeed, false, true);
     delay(30);
   }
+  analogWrite(MOTOR_CONTROL, 0);
   
   USB_COM_PORT << "Done\n";  
 }
@@ -760,6 +771,7 @@ void straightenVertical()
  *************************************************************************************/
 void processCalibrateCommand()
 {
+  runPidLoop = false;
   char vertOrHorz[1];
 
   // Get data array from upstream. This will tell us if we're doing vertical or horizontal
@@ -791,6 +803,7 @@ void processCalibrateCommand()
   {
     calibrateVertical();
   }
+  runPidLoop = true;
 } // end processHorzCalibrateCommand
 
 
@@ -800,7 +813,6 @@ void processCalibrateCommand()
  *************************************************************************************/
 void calibrateHorizontal()
 {
-  runPidLoop = false;
   USB_COM_PORT << "\nCalibrating Horizontal\n"; 
   
   USB_COM_PORT << "Contracting All... ";
@@ -865,7 +877,6 @@ void calibrateHorizontal()
   calculateSensorDeadbands();
   printCalibrationValues();
   
-  runPidLoop = true;
 }//end calibrateHorizontal()
 
 
@@ -876,7 +887,6 @@ void calibrateHorizontal()
  *************************************************************************************/
 void calibrateVertical()
 {
-  runPidLoop = false;
   USB_COM_PORT << "Calibrating Vertical\n";
   analogWrite(MOTOR_CONTROL, calibrateMotorSpeed);
 
@@ -1012,8 +1022,6 @@ void calibrateVertical()
   calculateSensorDeadbands();
   printCalibrationValues();
   
-  runPidLoop = true;
-
 }//end calibrateVertical()
 
 
@@ -1414,7 +1422,7 @@ boolean runCommunicationTest()
     int num = myModuleNumber + 1;
     boolean gotLastModuleT = false;
     boolean error = false;
-    int numberOfModulesInTest = (lastModuleNumber - myModuleNumber + 1);
+    int numberOfModulesInTest = (lastModuleNumber - myModuleNumber);
     
     while(millis() - startTime < 150)
     {
@@ -1454,7 +1462,7 @@ boolean runCommunicationTest()
       ++num;
     }
     // If we didn't recieve data from all modules.
-    if (!error && num <= numberOfModulesInTest)
+    if (!error && num <= lastModuleNumber)
     {
       USB_COM_PORT << "ERROR: Did not recieve data from all " << numberOfModulesInTest << " modules.\n";
       error = true;     

@@ -68,6 +68,14 @@ byte vertSetpoints[30];
 byte horzSetpoints[30];
 boolean lights[30];
 
+// Actuator Positions
+const int horzLeftAngle = 10;
+const int horzRightAngle = 244;
+const int horzStraightAngle = 127;
+const int vertUpAngle = 50;
+const int vertDownAngle = 204;
+const int vertStraightAngle = 127;
+
 // Other data
 byte numberOfModules = 0;
 boolean anglesAreInitialized = false;
@@ -229,8 +237,8 @@ void initializeAngleArray()
     {
       for (int j = 0; j < 5; ++j)
       {
-        horzSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 1 + 1];
-        vertSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 3 + 1];
+        horzSetpoints[i * 5 + j] = 127;//packet[i * 20 + j * 4 + 1 + 1];
+        vertSetpoints[i * 5 + j] = 127;//packet[i * 20 + j * 4 + 3 + 1];
       }
     }
     anglesAreInitialized = true;
@@ -544,36 +552,59 @@ void updateSetpoints()
   // Disable vertical actuation. If (1) the straighten vertical switch is
   // pressed or (2) vertical straighten on the fly is enabled, set all
   // verticals to straight.
-  byte allVertSetpoints = 255;
+  boolean allowVerticalControl = true;
   if (controller.killSwitchPressed &&
       (controller.straightenVertOnTheFly || controller.straightenVertical))
   {
-      allVertSetpoints = 127;
-  }
-  for (int i = 0; i < 30; ++i)
-  {
-    vertSetpoints[i] = allVertSetpoints;
+    allowVerticalControl = false;
+    for (int i = 0; i < 30; ++i)
+    {
+      vertSetpoints[i] = vertStraightAngle;
+    }
   }
 
-  // Propagate horizontal setpoints if it's time to do so.
+  // Propagate setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
-      (controller.left || controller.right) &&
+      (controller.left || controller.right || controller.up || controller.down) &&
       (millis() - lastUpdateTime > controller.propagationDelay))
   {
+    // Propagation of all angles
     for (int i = 29; i > 0; --i)
     {
       horzSetpoints[i] = horzSetpoints[i - 1];
+      vertSetpoints[i] = vertSetpoints[i - 1];     
     }
     
-    // The first actuator gets the new setpoint
+    // The first actuator gets the new setpoints
     if (controller.right)
     {
-      horzSetpoints[0] = 245;
+      horzSetpoints[0] = horzRightAngle;
     }
-    if (controller.left)
+    else if (controller.left)
     {
-      horzSetpoints[0] = 10;
+      horzSetpoints[0] = horzLeftAngle;
     }
+    else
+    {
+      horzSetpoints[0] = horzStraightAngle;
+    }
+      
+    
+    // Allow new vertical setpoints if we're not doing auto straightening
+    if (controller.up && allowVerticalControl)
+    {
+      vertSetpoints[0] = vertUpAngle;
+    }
+    else if (controller.down && allowVerticalControl)
+    {
+      vertSetpoints[0] = vertDownAngle;
+    }
+    else if ( allowVerticalControl )
+    {
+      vertSetpoints[0] = vertStraightAngle;
+    }
+      
+    
     lastUpdateTime = millis();  
   }
 }
