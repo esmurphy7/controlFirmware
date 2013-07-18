@@ -372,7 +372,7 @@ void processNewSettingsAndSetpoints()
   if (newKillSwitchPressed == false)
   {
     // Stop all movement when the kill switch is released
-    StopMovement();
+    stopMovement();
   }
   if (newKillSwitchPressed == true && killSwitchPressed == false)
   {
@@ -588,7 +588,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   ++count;
   
   // Wait for "pidLoopTime" milliseconds to occur
-  if (count > pidLoopTime / 2) // 2 means 2ms
+  if (count << 1 > pidLoopTime) // bitshift left to multiple by 2 (i.e. 2 milliseconds per count)
   {    
     if (killSwitchPressed)
     {
@@ -596,7 +596,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
     }
     else
     {
-      StopMovement();
+      stopMovement();
     }      
     count = 0;
   }
@@ -736,7 +736,7 @@ void processCalibrateCommand()
   TAIL_SERIAL.write(vertOrHorz[0]);
   
   // Stop any current motion
-  StopMovement();
+  stopMovement();
   
   // Run calibration
   if (vertOrHorz[0] == 'h')
@@ -768,7 +768,7 @@ void calibrateHorizontal()
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(4000);
-  StopMovement(); 
+  stopMovement(); 
   delay(1000);
   for(int i = 0; i < 5; i++)
   {
@@ -784,7 +784,7 @@ void calibrateHorizontal()
     analogWrite(HORZ_ACTUATOR[i],255);
   }
   delay(4000);
-  StopMovement();
+  stopMovement();
   delay(1000);
   for(int i = 0; i < 5; i++)
   {
@@ -1184,7 +1184,7 @@ void saveVerticalPosition()
  *************************************************************************************/
 void setManualActuationDelay()
 {
-  StopMovement();
+  stopMovement();
   while (USB_COM_PORT.available() < 1);
   char delaySetting = USB_COM_PORT.read();
   switch (delaySetting)
@@ -1213,7 +1213,7 @@ void manualVerticalActuatorMove(char dir)
   if (dir != 'e' && dir != 'c')
     return;
     
-  StopMovement();
+  stopMovement();
 
   // Setup the valve direction
   digitalWrite(VERT_ACTUATOR_CTRL[manualVertibraeSelect], LOW);
@@ -1226,7 +1226,7 @@ void manualVerticalActuatorMove(char dir)
   analogWrite(MOTOR_CONTROL, manualMotorSpeed);
   analogWrite(VERT_ACTUATOR[manualVertibraeSelect], 255);  
   delay(manualActuationDelay);
-  StopMovement(); 
+  stopMovement(); 
    
   USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " " <<
     ((dir == 'e') ? "Vertical Extend" : "Vertical Contract") << " (" << manualActuationDelay << "ms)\n";  
@@ -1241,7 +1241,7 @@ void manualHorizontalActuatorMove(char dir)
   if (dir != 'e' && dir != 'c')
     return;
     
-  StopMovement();
+  stopMovement();
 
   // Setup the valve direction
   boolean even = PIDcontrollerHorizontal[manualVertibraeSelect].getEven();
@@ -1255,7 +1255,7 @@ void manualHorizontalActuatorMove(char dir)
   analogWrite(MOTOR_CONTROL, manualMotorSpeed);
   analogWrite(HORZ_ACTUATOR[manualVertibraeSelect], 255);  
   delay(manualActuationDelay);
-  StopMovement(); 
+  stopMovement(); 
    
   USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " " <<
     ((dir == 'e') ? "Hoirzontal Extend" : "Horizontal Contract") << " (" << manualActuationDelay << "ms)\n";  
@@ -1466,7 +1466,7 @@ void manualTurnMotorOn()
 }
 
 /**************************************************************************************
-  manualGoToSetpoints(): 
+  manualGoToSetpoints(): Runs the PID loop for 3 seconds to achieve the setpoints.
  *************************************************************************************/
 void manualGoToSetpoints()
 {
@@ -1486,12 +1486,15 @@ void manualGoToSetpoints()
     executePID(manualMotorSpeed, true, true);
     delay(pidLoopTime);
   }
-  analogWrite(MOTOR_CONTROL, 0);
+  stopMovement();
+  
   USB_COM_PORT << "Done.\n";
 }
 
 /**************************************************************************************
-  setHorzAngleSetpoint(): 
+  setHorzAngleSetpoint(): Sets a horizontal angle setpoint. The actuator will not move until the 
+                          pid loops runs. Actuator numbers are 0 to 4. Angles are 0 ro 254.
+                          Angle of 255 means the actuator is disabled and will not be moved.
  *************************************************************************************/
 void setHorzAngleSetpoint(int actuator, byte angle)
 {
@@ -1518,7 +1521,9 @@ void setHorzAngleSetpoint(int actuator, byte angle)
 }
 
 /**************************************************************************************
-  setVertAngleSetpoint(): 
+  setVertAngleSetpoint(): Sets a vertical angle setpoint. The actuator will not move until the 
+                          pid loops runs. Actuator numbers are 0 to 4. Angles are 0 ro 254.
+                          Angle of 255 means the actuator is disabled and will not be moved.
  *************************************************************************************/
 void setVertAngleSetpoint(int actuator, byte angle)
 {
@@ -1555,7 +1560,10 @@ void setVertAngleSetpoint(int actuator, byte angle)
 }
 
 /**************************************************************************************
-  getNumberFromUsbComPort(): 
+  getNumberFromUsbComPort(): Allows us to type demical numbers in ASCII through the serial
+                             com port. Can be reused anywhere. Stops interpretting characters
+                             when there are no more left or when it find a space character.
+                             VALID VALUES: 0 to 32767
  *************************************************************************************/
 boolean getNumberFromUsbComPort(int &number)
 {
@@ -1578,7 +1586,7 @@ boolean getNumberFromUsbComPort(int &number)
 }
 
 /**************************************************************************************
-  manualSetHorizontalAngle(): 
+  manualSetHorizontalAngle(): For manual mode. Set the horizonal angle of the selected vertibrae.
  *************************************************************************************/
  void manualSetHorizontalAngle()
  {
@@ -1600,7 +1608,7 @@ boolean getNumberFromUsbComPort(int &number)
  }
  
  /**************************************************************************************
-  manualSetVertAngleSetpoint():
+  manualSetVertAngleSetpoint(): For manual mode. Set the vertical angle of the selected vertibrae.
  *************************************************************************************/
 void manualSetVertAngleSetpoint()
 {  
@@ -1622,6 +1630,15 @@ void manualSetVertAngleSetpoint()
 }
 
 
+ /**************************************************************************************
+  runVertibraeThroughSinWave(): Not implimented yet
+ *************************************************************************************/
+void runVertibraeThroughSinWave()
+{
+  static const int test = 0; 
+  
+}
+
 /**************************************************************************************
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
@@ -1632,23 +1649,26 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - horizontal actuation - extend/contract\n");
     USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
     USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
-    USB_COM_PORT.print("          r - save current vertical position as straight\n");
-    USB_COM_PORT.print("          u - manually set myModuleNumber\n");
-    USB_COM_PORT.print("          g - run communication test (between modules only)\n");
     USB_COM_PORT.print("          w* - set vertical setpoint\n");
     USB_COM_PORT.print("          z* - set horizontal setpoint\n");
-    USB_COM_PORT.print("          j - go to setpoints\n"); 
+    USB_COM_PORT.print("          j - go to setpoints\n\n"); 
+    
     USB_COM_PORT.print("          c - calibrate horizontal\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
     USB_COM_PORT.print("          t - straighten horizontal\n");  
-    USB_COM_PORT.print("          y - straighten verticals\n");  
+    USB_COM_PORT.print("          y - straighten verticals\n\n");  
+    
+    USB_COM_PORT.print("          r - save current vertical position as straight\n");
     USB_COM_PORT.print("          a - print battery voltage\n");  
     USB_COM_PORT.print("          b - print calibration values\n");
     USB_COM_PORT.print("          f - print hydraulic pressure\n"); 
     USB_COM_PORT.print("          p - print sensor values and setpoints\n");
-    USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n");
     USB_COM_PORT.print("          s - stop motor\n");  
+    USB_COM_PORT.print("          n/m - all leds on/off\n");
+    USB_COM_PORT.print("          g - run communication test (between modules only)\n");
+    USB_COM_PORT.print("          u - manually set myModuleNumber\n\n");
+    
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
@@ -1761,7 +1781,7 @@ void manualControl()
           break;
         case 's':
           USB_COM_PORT.print("Stopped all movement\n");
-          StopMovement();
+          stopMovement();
           break;          
         case 'q':
           manual = false;
@@ -1770,7 +1790,7 @@ void manualControl()
     }//end if serial
   }  
   
-  StopMovement();
+  stopMovement();
   USB_COM_PORT.println("\nManual Control mode exited");
   runPidLoop = true;
   
@@ -1783,7 +1803,7 @@ void manualControl()
 /**************************************************************************************
   StopMovement(): Stops movement of all actuators.
  *************************************************************************************/
-void StopMovement()
+void stopMovement()
 {
   // Stop any current motion
   for(int i=0; i < 5; i++)
