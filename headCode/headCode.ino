@@ -56,11 +56,11 @@ class ControllerData
 
 // Ethernet/Wi-Fi variables
 EthernetUDP Udp;
-byte macAddress[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; 
-byte localIP[] = { 192, 168, 1, 2 };
+byte myMacAddress[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; 
+byte myIPAddress[] = { 192, 168, 1, 2 };
 byte broadcastIP[] = { 192, 168, 1, 255 };
 unsigned int broadcastPort = 12345;
-unsigned int localPort = 12345;
+unsigned int listeningPort = 12346;
 
 // Setpoints for all 30 vertibrae in the snake
 // Angles are from 0 to 254, 255 means uninitialized.
@@ -68,23 +68,23 @@ byte vertSetpoints[30];
 byte horzSetpoints[30];
 boolean lights[30];
 
-// Actuator Positions
+// Constants
 const int horzLeftAngle = 10;
 const int horzRightAngle = 244;
 const int horzStraightAngle = 127;
 const int vertUpAngle = 50;
 const int vertDownAngle = 204;
 const int vertStraightAngle = 127;
+const int longDelayBetweenHeartBeats = 1100; 
+const int shortDelayBetweenHeartBeats = 250;
+const int ledDelayWhenRunning = 30;
 
-// Other data
-byte numberOfModules = 0;
-boolean anglesAreInitialized = false;
-boolean joystickIsConnected = false;
-int longDelayBetweenHeartBeats = 1100;
-int shortDelayBetweenHeartBeats = 250;
-int ledDelayWhenRunning = 30;
-int manualActuatorSelect = 0;
-int manualActuationDelay = 200;
+// Global variables
+byte numberOfModules = 0;                // Number of modules stored in EEPROM
+boolean anglesAreInitialized = false;    // On initialization we wait for all modules to report their current angles
+boolean joystickIsConnected = false;     // True if we are recieving data from the joystick
+int manualActuatorSelect = 0;            // For selecting which actuator we are operating in manual mode
+int manualActuationDelay = 200;          // 
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -97,8 +97,8 @@ void setup()
   INPUT_SERIAL.begin(115200);
   
   // Initialize Ethernet Board
-  Ethernet.begin(macAddress, localIP);
-  Udp.begin(localPort);  
+  Ethernet.begin(myMacAddress, myIPAddress);
+  Udp.begin(listeningPort);  
   
   // Load saved settings
   numberOfModules = EEPROM.read(0);
@@ -108,11 +108,10 @@ void setup()
   USB_COM_PORT.println();
  
   // Initialize setponts
-  //   - Actuators are disabled.
+  //   - Actuators are disabled (ie. angle 255)
   //   - Lights are off
   for (int i = 0; i < 30; ++i)
   {
-  
     horzSetpoints[i] = 255;
     vertSetpoints[i] = 255;    
     lights[i] = false;    
@@ -149,7 +148,7 @@ void setup()
   // Initialize position sensor inputs.
   for(int i=0;i<5;i++)
   {
-    pinMode(HEAD_POS_SENSOR[i],INPUT);
+    pinMode(HEAD_POS_SENSOR[i], INPUT);
   }
 }
 
@@ -159,16 +158,20 @@ void setup()
 **************************************************************************/
 void loop()
 {
-  if (anglesAreInitialized)
-  {
-    doRuntimeLogic();
-  }
-  else
+  // The first thing we do before we are allowed to run is get the current 
+  // angles from every module. 
+  if (!anglesAreInitialized)
   {
     initializeAngleArray();
   }
+  else
+  {
+    // If the angle array had been initialized we are can the snake in
+    // normal operation.
+    doRuntimeLogic();
+  }
 
-  // Should we enter manual mode?
+  // Manual mode over USB Serial.
   if (USB_COM_PORT.available() > 0 && USB_COM_PORT.read() == 'M')
   {
     manualControl();
@@ -189,7 +192,7 @@ void doRuntimeLogic()
   updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
-  getAndSendDiagnostics();
+  getAndBroadcastDiagnostics();
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
@@ -237,8 +240,8 @@ void initializeAngleArray()
     {
       for (int j = 0; j < 5; ++j)
       {
-        horzSetpoints[i * 5 + j] = 127;//packet[i * 20 + j * 4 + 1 + 1];
-        vertSetpoints[i * 5 + j] = 127;//packet[i * 20 + j * 4 + 3 + 1];
+        horzSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 1 + 1];
+        vertSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 3 + 1];
       }
     }
     anglesAreInitialized = true;
@@ -252,9 +255,9 @@ void initializeAngleArray()
 }
 
 /**************************************************************************************
-  getAndSendDiagnostics(): Gets information from the modules and sends it over WiFi
+  getAndBroadcastDiagnostics(): Gets information from the modules and sends it over WiFi
  *************************************************************************************/
-void getAndSendDiagnostics()
+void getAndBroadcastDiagnostics()
 {
   // Clear the packet data array
   static byte packet[125];

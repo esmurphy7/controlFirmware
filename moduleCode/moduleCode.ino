@@ -6,11 +6,11 @@
   Part of the titanaboa.ca project
   
   Decription: This code runs on an Arduino MEGA with a BoaShield to
-  the control 5 vertical and 5 horizontal actuators of a 
-  5 vertebrae module. Titanaboa moves by pushing a sequence of
-  angles from head to tail at an interval initiated by the head board.
+  control 5 vertical and 5 horizontal actuators of a 5 vertibrae module.
+  Titanaboa moves by pushing a sequence of angles from head to tail at an 
+  interval initiated by the head board.
   
-  Vertebrae angles are controlled by a hydrualic system in a PID
+  Vertebrae angles are controlled by a hydrualic system in a control
   loop with angular position sensors. Communication between the 
   modules is done over a serial daisy chain. 
 */
@@ -42,12 +42,16 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 #define VERTICAL_CALIBRATION_ADDRESS  (HORIZONTAL_CALIBRATION_ADDRESS + 25)
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
 
-// Target sensor values for the actuators
-// -1 means un initialized
-int horzSensorSetpoints[] = {-1,-1,-1,-1,-1};
-int vertSensorSetpoints[] = {-1,-1,-1,-1,-1};
-int horzAngleSetpoints[] = {255,255,255,255,255};
-int vertAngleSetpoints[] = {255,255,255,255,255};
+// The master setpoints for all actuators. 
+int horzAngleSetpoints[] = {255,255,255,255,255};  // Target horizontal setpoints in angle space. (Range 0 - 254)
+int vertAngleSetpoints[] = {255,255,255,255,255};  // Target vertical setpoints int angle space. (255 = disabled)
+int horzSensorSetpoints[] = {-1,-1,-1,-1,-1};      // Target horizontal setpoints in sensor space. (Range 0 to 1023)
+int vertSensorSetpoints[] = {-1,-1,-1,-1,-1};      // Target vertical setpoints in sensor space. (-1 = disabled)
+
+// Incrimental setpoints moving torwards the master setpoints. 
+// They are determined by the current position, the master setpoint and the slew rate 
+int horzSensorIncrementalSetpoints[] = {-1,-1,-1,-1,-1};
+int vertSensorIncrementalSetpoints[] = {-1,-1,-1,-1,-1};
 
 // Array of sensor values we recorded as straight for the verticals
 int vertStraightArray[] = {-1, -1, -1, -1, -1};
@@ -69,12 +73,8 @@ int horzSensorDeadbands[] = {-1,-1,-1,-1,-1};
 int vertSensorDeadbands[] = {-1,-1,-1,-1,-1};
 
 // When moving actuators . Number of angles to incriment each PID loop.
-byte horzSensorSpeeds[] = {-1,-1,-1,-1,-1};
-byte vertSensorSpeeds[] = {-1,-1,-1,-1,-1};
-
-// So we know where we were and how we're getting there.
-int prevHorzSensorSetpoints[] = {-1,-1,-1,-1,-1};
-int prevVertSensorSetpoints[] = {-1,-1,-1,-1,-1};
+byte horzSensorSlewRates[] = {-1,-1,-1,-1,-1};
+byte vertSensorSlewRates[] = {-1,-1,-1,-1,-1};
 
 byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
@@ -83,13 +83,13 @@ boolean runPidLoop = false;             // Set to true if you want to run pid on
 byte runtimeMotorSpeed = 0;             // Runtime analog output motor speed. Set by joystick.
 const byte horzAngleDeadband = 5;       // The horizontal deadband, 0 to 254 range
 const byte vertAngleDeadband = 5;       // The vertical deadband, 0 to 254 range
-const int actuatorTimeout = 4000;       // Actuators have this many ms to get to setpoint
+const int actuatorTimeout = 4000;       // Actuators have this many ms to get to the master setpoint
 const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
-const byte horzAngleSpeed = 4;          // When moving horizontals. Number of angles to incriment each PID loop.
-const byte vertAngleSpeed = 4;          // When moving verticals. Number of angles to incriment each PID loop.
+const byte horzAngleSlewRate = 4;       // When moving horizontals. Max number of angles to incriment each PID loop.
+const byte vertAngleSlewRate = 4;       // When moving verticals. Max number of angles to incriment each PID loop.
 
 // Variables for manual mode
 int manualActuationDelay = 200;
@@ -580,8 +580,12 @@ void calculateSensorDeadbandsAndSpeeds()
   {
     horzSensorDeadbands[i] = map(horzAngleDeadband, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorDeadbands[i] = map(vertAngleDeadband, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
-    horzSensorSpeeds[i] = map(horzAngleSpeed, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
-    vertSensorSpeeds[i] = map(vertAngleSpeed, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    horzSensorSlewRates[i] = map(horzAngleSlewRate, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    vertSensorSlewRates[i] = map(vertAngleSlewRate, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    
+    // Ensure we never get 0 slew rate due to a bad calibration. 
+    if (horzSensorSlewRates[i] == 0) horzSensorSlewRates[i] = 1;
+    if (vertSensorSlewRates[i] == 0) vertSensorSlewRates[i] = 1;  
   }
 }
 
@@ -599,7 +603,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   ++count;
   
   // Wait for "pidLoopTime" milliseconds to occur
-  if (count << 1 > pidLoopTime) // bitshift left to multiple by 2 (i.e. 2 milliseconds per count)
+  if ((count << 1) > pidLoopTime) // bitshift left to multiple by 2 (i.e. 2 milliseconds per count)
   {    
     if (killSwitchPressed)
     {
@@ -633,13 +637,13 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
       if ((abs(currentSensorValue - horzSensorSetpoints[i]) > horzSensorDeadbands[i]) &&
           (millis() - horzTimerArray[i]) < actuatorTimeout)
       {
-        if (prevHorzSensorSetpoints[i] == -1) prevHorzSensorSetpoints[i] = currentSensorValue;
-        signed int dir = (prevHorzSensorSetpoints[i] > horzSensorSetpoints[i]) ? -1 : 1;
-        int setpoint = prevHorzSensorSetpoints[i] + dir * horzSensorSpeeds[i];
+        if (horzSensorIncrementalSetpoints[i] == -1) horzSensorIncrementalSetpoints[i] = currentSensorValue;
+        signed int dir = (horzSensorIncrementalSetpoints[i] > horzSensorSetpoints[i]) ? -1 : 1;
+        int setpoint = horzSensorIncrementalSetpoints[i] + dir * horzSensorSlewRates[i];
         
         if (dir > 0 && setpoint > horzSensorSetpoints[i]) setpoint = horzSensorSetpoints[i];
         if (dir < 0 && setpoint < horzSensorSetpoints[i]) setpoint = horzSensorSetpoints[i];    
-        prevHorzSensorSetpoints[i] = setpoint;
+        horzSensorIncrementalSetpoints[i] = setpoint;
         
         PIDcontrollerHorizontal[i].setSetPoint(setpoint);
         analogWrite(MOTOR_CONTROL, motorSpeed);
@@ -668,13 +672,13 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
       if ((abs(currentSensorValue - vertSensorSetpoints[i]) > vertSensorDeadbands[i]) &&
           (millis() - vertTimerArray[i]) < actuatorTimeout)
       {
-        if (prevVertSensorSetpoints[i] == -1) prevVertSensorSetpoints[i] = currentSensorValue;
-        signed int dir = (prevVertSensorSetpoints[i] > vertSensorSetpoints[i]) ? -1 : 1;
-        int setpoint = prevVertSensorSetpoints[i] + dir * vertSensorSpeeds[i];
+        if (vertSensorIncrementalSetpoints[i] == -1) vertSensorIncrementalSetpoints[i] = currentSensorValue;
+        signed int dir = (vertSensorIncrementalSetpoints[i] > vertSensorSetpoints[i]) ? -1 : 1;
+        int setpoint = vertSensorIncrementalSetpoints[i] + dir * vertSensorSlewRates[i];
         
         if (dir > 0 && setpoint > vertSensorSetpoints[i]) setpoint = vertSensorSetpoints[i];
         if (dir < 0 && setpoint < vertSensorSetpoints[i]) setpoint = vertSensorSetpoints[i];    
-        prevVertSensorSetpoints[i] = setpoint;
+        vertSensorIncrementalSetpoints[i] = setpoint;
         
         PIDcontrollerVertical[i].setSetPoint(setpoint);    
         analogWrite(MOTOR_CONTROL, motorSpeed);
@@ -1035,6 +1039,11 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzAngleDeadband << "\t";
   }
+  USB_COM_PORT.print("\nHORZ_ANGLE_SLEW_RATE:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleSlewRate << "\t";
+  }
   USB_COM_PORT << "\n";
 
 
@@ -1053,10 +1062,10 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzSensorDeadbands[i] << "\t";
   }
-  USB_COM_PORT.print("\nHORZ_SENSOR_SPEEDS:\t");
+  USB_COM_PORT.print("\nHORZ_SENSOR_SLEW_RATE:\t");
   for(int i=0;i<5;i++)
   {
-    USB_COM_PORT << horzSensorSpeeds[i] << "\t";
+    USB_COM_PORT << horzSensorSlewRates[i] << "\t";
   }
   USB_COM_PORT << "\n";
   
@@ -1077,7 +1086,13 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertAngleDeadband << "\t";
   }
+  USB_COM_PORT.print("\nVERT_ANGLE_SLEW_RATE:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleSlewRate << "\t";
+  }
   USB_COM_PORT << "\n";
+  
 
   USB_COM_PORT.print("\nVERT_SENSOR_SETPOINT:\t");
   for(int i=0;i<5;i++)
@@ -1094,10 +1109,10 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertSensorDeadbands[i] << "\t";
   }
-  USB_COM_PORT.print("\nVERT_SENSOR_SPEEDS:\t");
+  USB_COM_PORT.print("\nVERT_SENSOR_SLEW_RATE:\t");
   for(int i=0;i<5;i++)
   {
-    USB_COM_PORT << vertSensorSpeeds[i] << "\t";
+    USB_COM_PORT << vertSensorSlewRates[i] << "\t";
   }
   USB_COM_PORT << "\n\n";
 
