@@ -54,7 +54,7 @@ int vertStraightArray[] = {-1, -1, -1, -1, -1};
 
 // Timer arrays used to timeout when waiting for an actuator to reach its set point
 unsigned long horzTimerArray[] = {0,0,0,0,0};                           
-unsigned long vertTimerArray[] = {0,0,0,0,0};  
+unsigned long vertTimerArray[] = {0,0,0,0,0};
 
 // Calibration values. The values of the position sensors at the hard limits of actuation.
 // Assume a linear sensor characteristic between these two points.
@@ -68,19 +68,28 @@ int vertLowCalibration[]  = {0, 0, 0, 0, 0};
 int horzSensorDeadbands[] = {-1,-1,-1,-1,-1};
 int vertSensorDeadbands[] = {-1,-1,-1,-1,-1};
 
+// When moving actuators . Number of angles to incriment each PID loop.
+byte horzSensorSpeeds[] = {-1,-1,-1,-1,-1};
+byte vertSensorSpeeds[] = {-1,-1,-1,-1,-1};
+
+// So we know where we were and how we're getting there.
+int prevHorzSensorSetpoints[] = {-1,-1,-1,-1,-1};
+int prevVertSensorSetpoints[] = {-1,-1,-1,-1,-1};
+
 byte myModuleNumber = 0;                // My position in the module chain (1,2,3...)
 boolean iAmLastModule = false;          // If we are the last module don't read tail serial
 byte killSwitchPressed = false;         // If the kill switch isn't pressed. Don't move.
 boolean runPidLoop = false;             // Set to true if you want to run pid on interrupt interval.
 byte runtimeMotorSpeed = 0;             // Runtime analog output motor speed. Set by joystick.
-const byte horzAngleDeadband = 10;      // The horizontal deadband, 0 to 254 range
-const byte vertAngleDeadband = 10;      // The vertical deadband, 0 to 254 range
-const int horzActuatorTimeout = 3000;   // Horizontal actuators have this many ms to get to setpoint
-const int vertActuatorTimeout = 3000;   // Vertical actuators have this many ms to get to setpoint
+const byte horzAngleDeadband = 5;       // The horizontal deadband, 0 to 254 range
+const byte vertAngleDeadband = 5;       // The vertical deadband, 0 to 254 range
+const int actuatorTimeout = 4000;       // Actuators have this many ms to get to setpoint
 const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
+const byte horzAngleSpeed = 4;          // When moving horizontals. Number of angles to incriment each PID loop.
+const byte vertAngleSpeed = 4;          // When moving verticals. Number of angles to incriment each PID loop.
 
 // Variables for manual mode
 int manualActuationDelay = 200;
@@ -159,8 +168,8 @@ void setup()
   // Set the constants of the PID controllers
   for(int i=0;i<5;i++)
   {
-    PIDcontrollerHorizontal[i].setConstants(50,0,0);
-    PIDcontrollerVertical[i].setConstants(50,0,0);
+    PIDcontrollerHorizontal[i].setConstants(7,0,30);
+    PIDcontrollerVertical[i].setConstants(5,20,10);
   }
 
   // Load previous calibration from EEPROM
@@ -182,7 +191,7 @@ void setup()
                             (EEPROM.read(i*5 + VERTICAL_CALIBRATION_ADDRESS + 3) << 8);   
   }
   
-  calculateSensorDeadbands();
+  calculateSensorDeadbandsAndSpeeds();
 
   // Print out the initialization information
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
@@ -562,15 +571,17 @@ void processHeadManualModeMotorPulseCommand()
 }
 
 /************************************************************************************
-  calculateSensorDeadBands(): Based on the calibration, map the deadbands from angle space (0-254) to
-                              sensor space (low to high calibration)
+  calculateSensorDeadbandsAndSpeeds(): Based on the calibration, map the deadbands from angle 
+                                       space (0-254) to sensor space (low to high calibration)
  ***********************************************************************************/
-void calculateSensorDeadbands()
+void calculateSensorDeadbandsAndSpeeds()
 {
   for (int i = 0; i < 5; ++i)
   {
     horzSensorDeadbands[i] = map(horzAngleDeadband, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorDeadbands[i] = map(vertAngleDeadband, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    horzSensorSpeeds[i] = map(horzAngleSpeed, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    vertSensorSpeeds[i] = map(vertAngleSpeed, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
   }
 }
 
@@ -609,8 +620,6 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
 {
   //set if any segment moved, so we can turn off motor when setpoint reached
   boolean moved = false;
-  int goal;
-  int currentAngle;
 
   for (int i=0; i < 5; i++)
   {
@@ -618,14 +627,21 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
     ////// HORIZONTAL ////////
     if (horzSensorSetpoints[i] >= 0 && doHorizontal)
     {
-      PIDcontrollerHorizontal[i].setSetPoint(horzSensorSetpoints[i]);
-      currentAngle = analogRead(HORZ_POS_SENSOR[i]);
+      int currentSensorValue = analogRead(HORZ_POS_SENSOR[i]);
       
       // If we are have not reached the deadband and haven't timed out
-      if ((abs(currentAngle - horzSensorSetpoints[i]) > horzSensorDeadbands[i]) &&
-          (millis() - horzTimerArray[i]) < horzActuatorTimeout)
+      if ((abs(currentSensorValue - horzSensorSetpoints[i]) > horzSensorDeadbands[i]) &&
+          (millis() - horzTimerArray[i]) < actuatorTimeout)
       {
-        // Update the acutator PID output
+        if (prevHorzSensorSetpoints[i] == -1) prevHorzSensorSetpoints[i] = currentSensorValue;
+        signed int dir = (prevHorzSensorSetpoints[i] > horzSensorSetpoints[i]) ? -1 : 1;
+        int setpoint = prevHorzSensorSetpoints[i] + dir * horzSensorSpeeds[i];
+        
+        if (dir > 0 && setpoint > horzSensorSetpoints[i]) setpoint = horzSensorSetpoints[i];
+        if (dir < 0 && setpoint < horzSensorSetpoints[i]) setpoint = horzSensorSetpoints[i];    
+        prevHorzSensorSetpoints[i] = setpoint;
+        
+        PIDcontrollerHorizontal[i].setSetPoint(setpoint);
         analogWrite(MOTOR_CONTROL, motorSpeed);
         PIDcontrollerHorizontal[i].updateOutput();
         moved = true;
@@ -645,15 +661,22 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
     ///////////////////////    
     ////// VERTICAL ///////
     if (vertSensorSetpoints[i] >= 0 && doVertical)
-    {      
-      PIDcontrollerVertical[i].setSetPoint(vertSensorSetpoints[i]);
-      currentAngle = analogRead(VERT_POS_SENSOR[i]);
+    {
+      int currentSensorValue = analogRead(VERT_POS_SENSOR[i]);
       
       // If we are have not reached the deadzone and haven't timed out
-      if ((abs(currentAngle - vertSensorSetpoints[i]) > vertSensorDeadbands[i]) &&
-          (millis() - vertTimerArray[i]) < vertActuatorTimeout)
+      if ((abs(currentSensorValue - vertSensorSetpoints[i]) > vertSensorDeadbands[i]) &&
+          (millis() - vertTimerArray[i]) < actuatorTimeout)
       {
-        // Update the acutator PID output        
+        if (prevVertSensorSetpoints[i] == -1) prevVertSensorSetpoints[i] = currentSensorValue;
+        signed int dir = (prevVertSensorSetpoints[i] > vertSensorSetpoints[i]) ? -1 : 1;
+        int setpoint = prevVertSensorSetpoints[i] + dir * vertSensorSpeeds[i];
+        
+        if (dir > 0 && setpoint > vertSensorSetpoints[i]) setpoint = vertSensorSetpoints[i];
+        if (dir < 0 && setpoint < vertSensorSetpoints[i]) setpoint = vertSensorSetpoints[i];    
+        prevVertSensorSetpoints[i] = setpoint;
+        
+        PIDcontrollerVertical[i].setSetPoint(setpoint);    
         analogWrite(MOTOR_CONTROL, motorSpeed);
         PIDcontrollerVertical[i].updateOutput();
         moved = true;
@@ -819,7 +842,7 @@ void calibrateHorizontal()
   manualStraightenHorizontal();
   USB_COM_PORT << "Calibration Done\n";
   
-  calculateSensorDeadbands();
+  calculateSensorDeadbandsAndSpeeds();
   printCalibrationValues();
   
 }//end calibrateHorizontal()
@@ -964,7 +987,7 @@ void calibrateVertical()
   manualStraightenVertical();
   USB_COM_PORT << "Calibration Done\n";
   
-  calculateSensorDeadbands();
+  calculateSensorDeadbandsAndSpeeds();
   printCalibrationValues();
   
 }//end calibrateVertical()
@@ -1030,6 +1053,11 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzSensorDeadbands[i] << "\t";
   }
+  USB_COM_PORT.print("\nHORZ_SENSOR_SPEEDS:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorSpeeds[i] << "\t";
+  }
   USB_COM_PORT << "\n";
   
   
@@ -1065,6 +1093,11 @@ void printSensorValuesAndSetpoints()
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertSensorDeadbands[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_SPEEDS:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorSpeeds[i] << "\t";
   }
   USB_COM_PORT << "\n\n";
 
@@ -1481,7 +1514,7 @@ void manualGoToSetpoints()
   
   // Do three seconds of movement
   unsigned long startTime = millis();
-  while (millis() - startTime < 3000)
+  while (millis() - startTime < actuatorTimeout)
   {
     executePID(manualMotorSpeed, true, true);
     delay(pidLoopTime);
@@ -1489,6 +1522,30 @@ void manualGoToSetpoints()
   stopMovement();
   
   USB_COM_PORT << "Done.\n";
+}
+
+ /**************************************************************************************
+  setAllVertAngleSetpoints(): 
+ *************************************************************************************/
+void setAllVertAngleSetpoints(byte setpoint)
+{
+  setVertAngleSetpoint(0, setpoint);
+  setVertAngleSetpoint(1, setpoint);
+  setVertAngleSetpoint(2, setpoint);
+  setVertAngleSetpoint(3, setpoint);
+  setVertAngleSetpoint(4, setpoint);  
+}
+
+ /**************************************************************************************
+  setAllHorzAngleSetpoints(): 
+ *************************************************************************************/
+void setAllHorzAngleSetpoints(byte setpoint)
+{
+  setHorzAngleSetpoint(0, setpoint);
+  setHorzAngleSetpoint(1, setpoint);
+  setHorzAngleSetpoint(2, setpoint);
+  setHorzAngleSetpoint(3, setpoint);
+  setHorzAngleSetpoint(4, setpoint);  
 }
 
 /**************************************************************************************
@@ -1629,16 +1686,6 @@ void manualSetVertAngleSetpoint()
   }   
 }
 
-
- /**************************************************************************************
-  runVertibraeThroughSinWave(): Not implimented yet
- *************************************************************************************/
-void runVertibraeThroughSinWave()
-{
-  static const int test = 0; 
-  
-}
-
 /**************************************************************************************
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
@@ -1649,8 +1696,10 @@ void displayMenu()
     USB_COM_PORT.print("          k/l - horizontal actuation - extend/contract\n");
     USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
     USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
-    USB_COM_PORT.print("          w* - set vertical setpoint\n");
-    USB_COM_PORT.print("          z* - set horizontal setpoint\n");
+    USB_COM_PORT.print("          w* - set horizontal setpoint where * is 0 to 255\n");
+    USB_COM_PORT.print("          z* - set vertical setpoint where * is 0 to 255\n");
+    USB_COM_PORT.print("          W - set all horizontals to 255 (disabled)\n");
+    USB_COM_PORT.print("          Z - set all verticals to 255 (disabled)\n");   
     USB_COM_PORT.print("          j - go to setpoints\n\n"); 
     
     USB_COM_PORT.print("          c - calibrate horizontal\n");
@@ -1714,14 +1763,24 @@ void manualControl()
           displayMenu();
           break;
         case 'w':
-          manualSetVertAngleSetpoint();
-          break;
-        case 'z':
           manualSetHorizontalAngle();
           break;
+        case 'z':
+          manualSetVertAngleSetpoint();
+          break;
+        case 'W':
+          USB_COM_PORT << "All Horizontals set to 255 (disabled)\n";
+          setAllHorzAngleSetpoints(255);
+          break;
+        case 'Z':
+          USB_COM_PORT << "All Verticals set to 255 (disabled)\n";
+          setAllVertAngleSetpoints(255);
+          break;         
         case 'j':
           manualGoToSetpoints();
           break;
+          
+          
         case 'c':
           calibrateHorizontal();
           break;
