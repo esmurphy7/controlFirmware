@@ -169,7 +169,7 @@ void setup()
   for(int i=0;i<5;i++)
   {
     PIDcontrollerHorizontal[i].setConstants(7,0,30);
-    PIDcontrollerVertical[i].setConstants(5,20,10);
+    PIDcontrollerVertical[i].setConstants(5,0,10);
   }
 
   // Load previous calibration from EEPROM

@@ -81,7 +81,7 @@ const int ledDelayWhenRunning = 30;
 
 // Global variables
 byte numberOfModules = 0;                // Number of modules stored in EEPROM
-boolean anglesAreInitialized = false;    // On initialization we wait for all modules to report their current angles
+boolean anglesAreInitialized = true;    // On initialization we wait for all modules to report their current angles
 boolean joystickIsConnected = false;     // True if we are recieving data from the joystick
 int manualActuatorSelect = 0;            // For selecting which actuator we are operating in manual mode
 int manualActuationDelay = 200;          // 
@@ -192,7 +192,7 @@ void doRuntimeLogic()
   updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
-  getAndBroadcastDiagnostics();
+  //getAndBroadcastDiagnostics();
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
@@ -589,7 +589,7 @@ void updateSetpoints()
     }
     else
     {
-      horzSetpoints[0] = horzStraightAngle;
+      horzSetpoints[0] = 255;
     }
       
     
@@ -604,7 +604,7 @@ void updateSetpoints()
     }
     else if ( allowVerticalControl )
     {
-      vertSetpoints[0] = vertStraightAngle;
+      vertSetpoints[0] = 255;
     }
       
     
