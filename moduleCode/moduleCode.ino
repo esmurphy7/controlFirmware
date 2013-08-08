@@ -344,25 +344,37 @@ void processCommunicationTestCommand()
  ***********************************************************************************/
 void processNewSettingsAndSetpoints()
 {
-  char settings[125];
+  char chars[125];
+  byte* settings;
   
   // Get data array from upstream. Store in an array.
   HEAD_SERIAL.setTimeout(30);
-  if (HEAD_SERIAL.readBytes(settings, 125) < 125)
+  if (HEAD_SERIAL.readBytes(chars, 125) < 125)
   {
-    USB_COM_PORT.println("ERROR: Missing settings array");
+    USB_COM_PORT.println("ERROR: Missing part of settings array.");
+    clearSerialBuffer(HEAD_SERIAL);
+    return;
+  }
+  settings = (byte*)&chars[0];
+  
+  // Ensure the data is valid. 
+  byte checksum = calculateChecksum(settings, 124);
+  if (settings[124] != checksum)
+  {
+    USB_COM_PORT << "ERROR: Settings array checksum failed (is: " << checksum << " should be: " << settings[124] << ")\n";
+    clearSerialBuffer(HEAD_SERIAL);
     return;
   }
   
   // Send data array downstream.
   TAIL_SERIAL.write('s');
-  TAIL_SERIAL.write((byte*)settings, 125);
+  TAIL_SERIAL.write(settings, 125);
 
   // Copy new setpoints [Setting bytes 0 to 59]
   for (int i = 0; i < 5; ++i)
   {
-    byte newHorzAngle = (char)settings[(myModuleNumber-1) * 5 + i];
-    byte newVertAngle = (char)settings[(myModuleNumber-1) * 5 + i + 30];
+    byte newHorzAngle = settings[(myModuleNumber-1) * 5 + i];
+    byte newVertAngle = settings[(myModuleNumber-1) * 5 + i + 30];
       
     setHorzAngleSetpoint(i, newHorzAngle);
     setVertAngleSetpoint(i, newVertAngle);
@@ -399,6 +411,21 @@ void processNewSettingsAndSetpoints()
   //USB_COM_PORT.print(motorSpeed);
   //USB_COM_PORT.print("\t");
   //USB_COM_PORT.println(horzAngleArray[4]);
+}
+
+/**************************************************************************************
+  calculateChecksum(): Calculates a simple XOR checksum from the provided array
+ *************************************************************************************/
+byte calculateChecksum(byte* array, int count)
+{
+  byte checksum = 0;
+  for (int i = 0; i < count; ++i)
+  {
+    //USB_COM_PORT.println(array[i]);
+    checksum = checksum ^ array[i];    
+  }
+  //USB_COM_PORT << "\n\n\n\n";
+  return checksum;
 }
 
 /**************************************************************************************

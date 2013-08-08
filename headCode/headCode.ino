@@ -187,7 +187,7 @@ void doRuntimeLogic()
 {
   ////////////////////////////////////////////////////////////////////
   // This block of code runs the core functionality of Titanoboa 
-  
+
   readAndRequestJoystickData();
   updateLights();
   updateSetpoints();  
@@ -537,12 +537,29 @@ void sendSetpointsAndSettings()
   settings[70] += controller.killSwitchPressed & B00000001;
   settings[72] = controller.motorSpeed;
   
+  settings[124] = calculateChecksum(settings, 124); 
+  
   // Send settings
   TAIL_SERIAL.write('s');
   TAIL_SERIAL.write(settings, 125);
   
   // Wait for ack
   waitForModuleAcknowledgments("settings", 40);
+}
+
+/**************************************************************************************
+  calculateChecksum(): Calculates a simple XOR checksum from the provided array
+ *************************************************************************************/
+byte calculateChecksum(byte* array, int count)
+{
+  byte checksum = 0;
+  for (int i = 0; i < count; ++i)
+  {
+    //USB_COM_PORT.println(array[i]);
+    checksum = checksum ^ array[i];    
+  }
+  //USB_COM_PORT << "\n\n\n\n";
+  return checksum;
 }
 
 /**************************************************************************************
