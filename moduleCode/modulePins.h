@@ -122,9 +122,11 @@
 
 /************************** Titanoboa BoaShield Defines **********************************/
 
+// RS485 Enable Line
+#define RS485_TX_ENABLE ARD53
+
 // Battery
 #define BAT_LEVEL_24V  ADC1  //input
-
 
 // Motor
 #define PRESSURE_SENSOR  ADC5  //input

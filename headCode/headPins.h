@@ -119,6 +119,9 @@
 
 /************************** Titanoboa BoaShield Defines **********************************/
 
+// RS485 Enable Line
+#define RS485_TX_ENABLE ARD53
+
 // Actuators
 #define DITHER         PWM6 //Maps to PV-DITHER in schematic, PIN 6
 

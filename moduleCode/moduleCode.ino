@@ -31,6 +31,7 @@
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
+#define RS485_SERIAL Serial3            // Serial bus over the entire snake
 #define USB_COM_PORT Serial             // Serial for debugging
 
 // Enable serial stream writing
@@ -128,6 +129,11 @@ void setup()
   TAIL_SERIAL.begin(115200); 
   HEAD_SERIAL.begin(115200); 
   USB_COM_PORT.begin(115200);
+  RS485_SERIAL.begin(115200);
+
+  // Setup the output that enables RS485 transmit  
+  pinMode(RS485_TX_ENABLE, OUTPUT);
+  digitalWrite(RS485_TX_ENABLE, LOW);
 
   // Turn off motor pin
   pinMode(MOTOR_CONTROL,OUTPUT);
@@ -239,6 +245,14 @@ void loop()
       manualControl();
     }
   }
+  
+  if (RS485_SERIAL.available() > 0)
+  {
+    if (RS485_SERIAL.read() == 't')
+    {      
+        processRS485CommunicationTestCommand();
+    }
+  }
 
   // Check upstream Serial for commands from the head
   if (HEAD_SERIAL.available() > 0)
@@ -265,7 +279,7 @@ void loop()
         processHeadManualModeMotorPulseCommand();
         break;
       case 't':
-        processCommunicationTestCommand();
+        processSerialChainCommunicationTestCommand();
         break;
 
       default:
@@ -296,47 +310,91 @@ void acknowledgeCommand()
 /************************************************************************************
   processCommmunicationTestCommand(): Tests up and down serial communication
  ***********************************************************************************/
-void processCommunicationTestCommand()
+void processSerialChainCommunicationTestCommand()
 {
-  USB_COM_PORT << "Running communication test. Sending up myModuleNumber = " << myModuleNumber <<"\n";
+  USB_COM_PORT << "Running serial chain communication test. Sending up myModuleNumber = " << myModuleNumber <<"\n";
   
   // Respond with module number so the head knows I got the message.
   HEAD_SERIAL.write(myModuleNumber);
   
-  // Pass on test message.
-  clearSerialBuffer(TAIL_SERIAL);
-  TAIL_SERIAL.write('t');
-  
-  // Check to see if the serial terminator is plugged into my tail serial.
-  delay(1);
-  if (TAIL_SERIAL.available() > 0)
+  // Echo back 't' if this is the last module.
+  if (iAmLastModule)
   {
-    // Yep. It's plugged in.
-    if (TAIL_SERIAL.peek() == 't')
-    {
-      // Read out the 't' and sent it up.
-      USB_COM_PORT << "Looks like the serial terminator is plugged into me. Sending up 't' aka ASCII 116.\n";
-      TAIL_SERIAL.read();
-      HEAD_SERIAL.write('t');
-    }
+    HEAD_SERIAL.write('t');
+    USB_COM_PORT << "I'm the last module. Sending up 't'.\n";
   }
   else
   {
-    USB_COM_PORT << "No serial terminator\n";
-  }
+    // If this is not the last module continue to send the command down.
+    clearSerialBuffer(TAIL_SERIAL);
+    TAIL_SERIAL.write('t');
   
-  // Take 100ms to send up any other serial data.
-  long startTime = millis();
-  while ((millis() - startTime) < 100)
-  {
-    if (TAIL_SERIAL.available() > 0)
+    // Take 100ms to send up any other serial data.
+    long startTime = millis();
+    int i = 0;
+    while ((millis() - startTime) < 100)
     {
-      byte data = TAIL_SERIAL.read();
-      USB_COM_PORT << "Recieved " << data << " on tail. Sending it up.\n";
-      HEAD_SERIAL.write(data); 
+      if (TAIL_SERIAL.available() > 0)
+      {
+        byte data = TAIL_SERIAL.read();
+        USB_COM_PORT << "Recieved " << data << " on tail. Sending it up. " << i++ << "\n";
+        HEAD_SERIAL.write(data); 
+      }
     }
   }
   USB_COM_PORT << "\n";
+}
+
+
+/************************************************************************************
+  processCommmunicationTestCommand(): Tests up and down serial communication
+ ***********************************************************************************/
+void processRS485CommunicationTestCommand()
+{
+  USB_COM_PORT << "Running RS-485 communication test.\n";
+  
+  if (myModuleNumber != 1)
+  {
+    USB_COM_PORT << "Waiting for Module " << (myModuleNumber - 1) << " to respond.... ";
+    
+    // Wait for the previous module to respond on RS485 port.
+    boolean previousModuleFound = false;
+    long startTime = millis();
+    while ((millis() - startTime) < 100)
+    { 
+      byte data = RS485_SERIAL.read();  
+      if (data == (myModuleNumber - 1))
+      {
+        previousModuleFound = true;
+        USB_COM_PORT << "Got it!\n";
+        break;    
+      }
+    }
+    
+    // Print error and quit if we don't find previous module number.
+    if (!previousModuleFound)
+    {
+      USB_COM_PORT << "\nNo response from Module " << (myModuleNumber - 1) << " Will not send out myModuleNumber. Quitting.\n";
+      delay(100);
+      clearSerialBuffer(RS485_SERIAL);
+      return;       
+    }
+  }
+
+  
+  digitalWrite(RS485_TX_ENABLE, HIGH);
+  
+  // Respond with module number to let everyone know im here.
+  USB_COM_PORT << "It's now my turn. Sending out myModuleNumber on RS-485.\n";
+  RS485_SERIAL.write(myModuleNumber); 
+  
+  delayMicroseconds(70);  
+  digitalWrite(RS485_TX_ENABLE, LOW);
+
+  USB_COM_PORT << "\n";
+  //delay(20);
+  clearSerialBuffer(RS485_SERIAL);
+  return;   
 }
 
 /************************************************************************************
@@ -437,6 +495,20 @@ void clearSerialBuffer(HardwareSerial &serial)
   while (serial.available() > 0)
   {
     serial.read();
+  }
+}
+
+/**************************************************************************************
+  clearSerialBuffer(): Removes a given number of bytes from the serial buffer
+ *************************************************************************************/
+void clearSerialBuffer(HardwareSerial &serial, int bytesToClear)
+{
+  int bytesCleared = 0;
+  while (bytesCleared < bytesToClear)
+  {
+    while (serial.available() == 0);
+    serial.read();
+    bytesCleared++;
   }
 }
 
@@ -1407,10 +1479,10 @@ void setModuleNumber(int value)
 
 
 /**************************************************************************************
-  runCommunicationTest(): Tests the communication between this module and a downstream 
-                          module with the serial terminator. 
+  runSerialChainCommunicationTest(): Tests the communication between this module and a downstream 
+                                      module with the serial terminator. 
  *************************************************************************************/
-boolean runCommunicationTest()
+boolean runSerialChainCommunicationTest()
 {
   // Figure out what module we're running the test to.
   USB_COM_PORT << "\nI am module " << myModuleNumber << ". What is the last module number?\n";
@@ -1422,7 +1494,7 @@ boolean runCommunicationTest()
     USB_COM_PORT << "INVALID: " << lastModuleNumber << " is not a valid module number. Can only communicate downstream up to module 6.\n";
     return false;
   }
-  USB_COM_PORT << "Running Communication Test: Module " << myModuleNumber << " to Module " << lastModuleNumber << "\n\n";
+  USB_COM_PORT << "Running Serial Chain Communication Test: Module " << myModuleNumber << " to Module " << lastModuleNumber << "\n\n";
   USB_COM_PORT << "Send any key to start...\n\n";
   while (USB_COM_PORT.read() == -1);
   
@@ -1500,15 +1572,105 @@ boolean runCommunicationTest()
   // Give the result of the tests
   if (numberOfErrors > 0)
   {
-    USB_COM_PORT << "RESULT: ERROR! Some communication tests failed.\n\n";
+    USB_COM_PORT << "RESULT: ERROR! Some serial chain communication tests failed.\n\n";
   }
   else
   {
-    USB_COM_PORT << "RESULT: SUCCESS! All communication tests passed.\n\n";
+    USB_COM_PORT << "RESULT: SUCCESS! All serial chain communication tests passed.\n\n";
   }
   delay(500);
   clearSerialBuffer(TAIL_SERIAL);
 }
+
+/**************************************************************************************
+  runRS485CommunicationTest(): Makes sure downstream modules are responding over RS-485.
+ *************************************************************************************/
+boolean runRS485CommunicationTest()
+{  
+  // Figure out what module we're running the test to.
+  USB_COM_PORT << "\nI am module " << myModuleNumber << ". What is the last module number?\n";
+  while (USB_COM_PORT.available() == 0);
+
+  int lastModuleNumber = USB_COM_PORT.read() - 48;
+  if (lastModuleNumber < myModuleNumber || lastModuleNumber > 6)
+  {
+    USB_COM_PORT << "INVALID: " << lastModuleNumber << " is not a valid module number. Can only communicate downstream up to module 6.\n";
+    return false;
+  }
+  USB_COM_PORT << "Running RS-485 Communication Test: Module " << myModuleNumber << " to Module " << lastModuleNumber << "\n\n";
+  USB_COM_PORT << "Send any key to start...\n\n";
+  while (USB_COM_PORT.read() == -1);  
+  
+  clearSerialBuffer(RS485_SERIAL);
+  int numberOfErrors = 0;
+  
+  for (int i = 1; i <= 20; ++i)
+  {
+    USB_COM_PORT << "Running RS-485 test " << i << " of 20.\n";
+    digitalWrite(RS485_TX_ENABLE, HIGH);
+    RS485_SERIAL.write('t');
+    RS485_SERIAL.write(myModuleNumber);
+    delayMicroseconds(140);
+    digitalWrite(RS485_TX_ENABLE, LOW);
+    clearSerialBuffer(RS485_SERIAL, 2); 
+    
+    // We should recieve modules numbers in a row
+    long startTime = millis();
+    int num = myModuleNumber + 1;
+    boolean error = false;
+    int numberOfModulesInTest = (lastModuleNumber - myModuleNumber);
+    
+    while(millis() - startTime < 150)
+    {
+      // Wait for data
+      if (!RS485_SERIAL.available())
+      {
+        continue;
+      }
+      byte data = RS485_SERIAL.read();
+      
+      // If we've heard from every module we're done.
+      if (num > lastModuleNumber)
+      {
+        break;              
+      }
+      
+      // Look for each module to respond with it's module number (in sequence)
+      if (data == num)
+      {
+        USB_COM_PORT << "Module #" << num << " is talking!\n";
+      }
+      else
+      {
+        USB_COM_PORT << "ERROR: Expected Module # '" << num << "'. Recieved '" << data << "'\n";
+        error = true;
+      }
+      ++num;
+    }
+    // If we didn't recieve data from all modules.
+    if (!error && num <= lastModuleNumber)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve data from all " << numberOfModulesInTest << " modules.\n";
+      error = true;     
+    }
+    USB_COM_PORT << "\n";
+    
+    if(error) ++numberOfErrors;
+  }
+  
+  // Give the result of the tests
+  if (numberOfErrors > 0)
+  {
+    USB_COM_PORT << "RESULT: ERROR! Some RS-485 communication tests failed.\n\n";
+  }
+  else
+  {
+    USB_COM_PORT << "RESULT: SUCCESS! All RS-485 communication tests passed.\n\n";
+  }
+  delay(500);
+  clearSerialBuffer(RS485_SERIAL);
+}
+
 
 /**************************************************************************************
   manualTurnMotorOn(): Runs that motor at at one of three speed levels. manual mode must
@@ -1757,7 +1919,8 @@ void displayMenu()
     USB_COM_PORT.print("          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n");
     USB_COM_PORT.print("          s - stop motor\n");  
     USB_COM_PORT.print("          n/m - all leds on/off\n");
-    USB_COM_PORT.print("          g - run communication test (between modules only)\n");
+    USB_COM_PORT.print("          g - run serial chain communication test to downstram modules\n");
+    USB_COM_PORT.print("          G - run RS-485 communication test to downstram modules\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n\n");
     
     USB_COM_PORT.print("          e - menu\n");
@@ -1872,7 +2035,10 @@ void manualControl()
           manualSetModuleNumber();
           break;
         case 'g':
-          runCommunicationTest();
+          runSerialChainCommunicationTest();
+          break;
+        case 'G':
+          runRS485CommunicationTest();
           break;
         case 'a':
           printBatteryVoltage();

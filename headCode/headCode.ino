@@ -23,6 +23,7 @@
 
 #define INPUT_SERIAL Serial3            // Xbee
 #define TAIL_SERIAL Serial2             // Serial to the downstream module
+#define RS485_SERIAL Serial1            // Serial bus over the entire snake
 #define USB_COM_PORT Serial             // Serial for debugging
 
 // Enable serial stream writing
@@ -95,6 +96,11 @@ void setup()
   USB_COM_PORT.begin(115200);
   TAIL_SERIAL.begin(115200);
   INPUT_SERIAL.begin(115200);
+  RS485_SERIAL.begin(115200);
+  
+  // Setup the output that enables RS485 transmit  
+  pinMode(RS485_TX_ENABLE, OUTPUT);
+  digitalWrite(RS485_TX_ENABLE, LOW);  
   
   // Initialize Ethernet Board
   Ethernet.begin(myMacAddress, myIPAddress);
@@ -192,7 +198,7 @@ void doRuntimeLogic()
   updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
-  //getAndBroadcastDiagnostics();
+  //getAndBroadcastDiagnostics(); 
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
@@ -789,6 +795,20 @@ void clearSerialBuffer(HardwareSerial &serial)
 }
 
 /**************************************************************************************
+  clearSerialBuffer(): Removes a given number of bytes from the serial buffer
+ *************************************************************************************/
+void clearSerialBuffer(HardwareSerial &serial, int bytesToClear)
+{
+  int bytesCleared = 0;
+  while (bytesCleared < bytesToClear)
+  {
+    while (serial.available() == 0);
+    serial.read();
+    bytesCleared++;
+  }
+}
+
+/**************************************************************************************
   openTheJaw(): Opens the jaw.
  *************************************************************************************/
 void openTheJaw()
@@ -1029,17 +1049,17 @@ void manualSetLEDState(boolean state)
 }
 
 /**************************************************************************************
-  runCommunicationTest(): Makes sure all modules are responding and the last module is 
-                          terminated. Returns true if it passed the test.
+  runSerialChainCommunicationTest(): Makes sure all modules are responding and the last module
+                                     is terminated. Returns true if it passed the test.
  *************************************************************************************/
-boolean runCommunicationTest()
-{
+boolean runSerialChainCommunicationTest()
+{  
   clearSerialBuffer(TAIL_SERIAL);
   int numberOfErrors = 0;
   
   for (int i = 1; i <= 20; ++i)
   {
-    USB_COM_PORT << "Running test " << i << " of 20.\n";
+    USB_COM_PORT << "Running serial chain test " << i << " of 20.\n";
     TAIL_SERIAL.write('t');
     delay(100);
     
@@ -1106,14 +1126,88 @@ boolean runCommunicationTest()
   // Give the result of the tests
   if (numberOfErrors > 0)
   {
-    USB_COM_PORT << "RESULT: ERROR! Some communication tests failed.\n\n";
+    USB_COM_PORT << "RESULT: ERROR! Some serial chain communication tests failed.\n\n";
   }
   else
   {
-    USB_COM_PORT << "RESULT: SUCCESS! All communication tests passed.\n\n";
+    USB_COM_PORT << "RESULT: SUCCESS! All serial chain communication tests passed.\n\n";
   }
   delay(500);
   clearSerialBuffer(TAIL_SERIAL);
+}
+
+/**************************************************************************************
+  runRS485CommunicationTest(): Makes sure all modules are responding on the RS485 bus
+ *************************************************************************************/
+boolean runRS485CommunicationTest()
+{  
+  clearSerialBuffer(RS485_SERIAL);
+  int numberOfErrors = 0;
+  
+  for (int i = 1; i <= 20; ++i)
+  {
+    USB_COM_PORT << "Running RS-485 test " << i << " of 20.\n";
+    digitalWrite(RS485_TX_ENABLE, HIGH);
+    RS485_SERIAL.write('t');
+    delayMicroseconds(70);
+    digitalWrite(RS485_TX_ENABLE, LOW);
+    clearSerialBuffer(RS485_SERIAL, 1); 
+    
+    
+    // We should recieve modules number (1 2 3 4) followed by ASCII 't' aka ASCII 116
+    long startTime = millis();
+    int num = 1;
+    boolean error = false;
+    
+    while(millis() - startTime < 150)
+    {
+      // Wait for data
+      if (!RS485_SERIAL.available())
+      {
+        continue;
+      }
+      byte data = RS485_SERIAL.read();
+      
+      // If we've heard from every module we're done.
+      if (num > numberOfModules)
+      {
+        break;              
+      }
+      
+      // Look for each module to respond with it's module number (in sequence)
+      if (data == num)
+      {
+        USB_COM_PORT << "Module #" << num << " is talking!\n";
+      }
+      else
+      {
+        USB_COM_PORT << "ERROR: Expected Module # '" << num << "'. Recieved '" << data << "'\n";
+        error = true;
+      }
+      ++num;
+    }
+    // If we didn't recieve data from all modules.
+    if (!error && num <= numberOfModules)
+    {
+      USB_COM_PORT << "ERROR: Did not recieve data from all " << numberOfModules << " modules.\n";
+      error = true;     
+    }
+    USB_COM_PORT << "\n";
+    
+    if(error) ++numberOfErrors;
+  }
+  
+  // Give the result of the tests
+  if (numberOfErrors > 0)
+  {
+    USB_COM_PORT << "RESULT: ERROR! Some RS-485 communication tests failed.\n\n";
+  }
+  else
+  {
+    USB_COM_PORT << "RESULT: SUCCESS! All RS-485 communication tests passed.\n\n";
+  }
+  delay(500);
+  clearSerialBuffer(RS485_SERIAL);
 }
 
 /**************************************************************************************
@@ -1133,7 +1227,8 @@ void displayMenu()
     USB_COM_PORT.print("          p - print angle array\n");
     USB_COM_PORT.print("          n - manually set numberOfModules\n");
     USB_COM_PORT.print("          z - toggle printing of debug stream\n");   
-    USB_COM_PORT.print("          t - test communication\n");     
+    USB_COM_PORT.print("          t - test communication on serial chain\n");     
+    USB_COM_PORT.print("          T - test communication on RS-485 bus\n");     
     USB_COM_PORT.print("          y - calibrate horizontal\n");     
     USB_COM_PORT.print("          i - calibrate vertical\n");
     USB_COM_PORT.print("          s - stop motor\n");     
@@ -1208,7 +1303,10 @@ void manualControl()
           printSetpointAngleArrays();
           break;
         case 't':
-          runCommunicationTest();
+          runSerialChainCommunicationTest();
+          break;
+        case 'T':
+          runRS485CommunicationTest();
           break;
         case 'e':
           displayMenu();
