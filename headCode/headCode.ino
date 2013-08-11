@@ -198,7 +198,7 @@ void doRuntimeLogic()
   updateLights();
   updateSetpoints();  
   sendSetpointsAndSettings();
-  //getAndBroadcastDiagnostics(); 
+  getAndBroadcastDiagnostics(); 
   
   ////////////////////////////////////////////////////////////////////
   // The following functions don't run on a regular basis.
@@ -276,7 +276,7 @@ void getAndBroadcastDiagnostics()
   // Cycle through each of the 5 packet each time this function is called.
   static byte packetType = 0;
   ++packetType;
-  if (packetType > 5)
+  if (packetType > 4)
   {
     packetType = 1;
   }
@@ -585,49 +585,49 @@ void updateSetpoints()
     allowVerticalControl = false;
     for (int i = 0; i < 30; ++i)
     {
-      vertSetpoints[i] = vertStraightAngle;
+      //vertSetpoints[i] = vertStraightAngle;
     }
   }
 
   // Propagate setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
-      (controller.left || controller.right || controller.up || controller.down) &&
+      true &&
       (millis() - lastUpdateTime > controller.propagationDelay))
   {
     // Propagation of all angles
-    for (int i = 29; i > 0; --i)
+    /*for (int i = 29; i > 0; --i)
     {
       horzSetpoints[i] = horzSetpoints[i - 1];
       vertSetpoints[i] = vertSetpoints[i - 1];     
-    }
+    }*/
     
     // The first actuator gets the new setpoints
     if (controller.right)
     {
-      horzSetpoints[0] = horzRightAngle;
+      horzSetpoints[8] = horzRightAngle;
     }
     else if (controller.left)
     {
-      horzSetpoints[0] = horzLeftAngle;
+      horzSetpoints[8] = horzLeftAngle;
     }
     else
     {
-      horzSetpoints[0] = 255;
+      horzSetpoints[8] = horzStraightAngle;
     }
       
     
     // Allow new vertical setpoints if we're not doing auto straightening
     if (controller.up && allowVerticalControl)
     {
-      vertSetpoints[0] = vertUpAngle;
+      vertSetpoints[8] = vertUpAngle;
     }
     else if (controller.down && allowVerticalControl)
     {
-      vertSetpoints[0] = vertDownAngle;
+      vertSetpoints[8] = vertDownAngle;
     }
     else if ( allowVerticalControl )
     {
-      vertSetpoints[0] = 255;
+      vertSetpoints[8] = vertStraightAngle;
     }
       
     
@@ -1149,7 +1149,7 @@ boolean runRS485CommunicationTest()
     USB_COM_PORT << "Running RS-485 test " << i << " of 20.\n";
     digitalWrite(RS485_TX_ENABLE, HIGH);
     RS485_SERIAL.write('t');
-    delayMicroseconds(70);
+    RS485_SERIAL.flush();
     digitalWrite(RS485_TX_ENABLE, LOW);
     clearSerialBuffer(RS485_SERIAL, 1); 
     

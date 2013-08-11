@@ -381,14 +381,11 @@ void processRS485CommunicationTestCommand()
     }
   }
 
-  
-  digitalWrite(RS485_TX_ENABLE, HIGH);
-  
   // Respond with module number to let everyone know im here.
   USB_COM_PORT << "It's now my turn. Sending out myModuleNumber on RS-485.\n";
+  digitalWrite(RS485_TX_ENABLE, HIGH);  
   RS485_SERIAL.write(myModuleNumber); 
-  
-  delayMicroseconds(70);  
+  RS485_SERIAL.flush();
   digitalWrite(RS485_TX_ENABLE, LOW);
 
   USB_COM_PORT << "\n";
@@ -581,10 +578,12 @@ void sendAngleAndSetpointDiagnostics()
   {
     byte horzAngle = getCurrentHorizontalAngle(i);
     byte vertAngle = getCurrentVerticalAngle(i);
+    byte horzIncSetpoint = getCurrentHorizontalIncrimentalSetpoint(i);
+    byte vertIncSetpoint = getCurrentVerticalIncrimentalSetpoint(i);
        
-    data[i * 4 + 0] = horzAngleSetpoints[i];
+    data[i * 4 + 0] = horzIncSetpoint;
     data[i * 4 + 1] = horzAngle;
-    data[i * 4 + 2] = vertAngleSetpoints[i];
+    data[i * 4 + 2] = vertIncSetpoint;
     data[i * 4 + 3] = vertAngle;
   }
   HEAD_SERIAL.write(data, 20);
@@ -758,7 +757,7 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
     // Setpoint is uninitialized (-1) turn actuator off
     else
     {
-      analogWrite(VERT_ACTUATOR[i], 0);
+      analogWrite(HORZ_ACTUATOR[i], 0);
     }
 
     ///////////////////////    
@@ -1104,13 +1103,30 @@ byte getCurrentHorizontalAngle(int i)
   return map(analogRead(HORZ_POS_SENSOR[i]), horzLowCalibration[i], horzHighCalibration[i], 0, 254);
 }
 
-
 /**************************************************************************************
   getCurrentVerticalAngle(): Get vertical vertibrae value in 0-254 angle space
  *************************************************************************************/
 byte getCurrentVerticalAngle(int i)
 {
   return map(analogRead(VERT_POS_SENSOR[i]), vertLowCalibration[i], vertHighCalibration[i], 0, 254);
+}
+
+/**************************************************************************************
+  getCurrentHorizontalIncrimentalSetpoint(): 
+ *************************************************************************************/
+byte getCurrentHorizontalIncrimentalSetpoint(int i)
+{
+  if (horzSensorIncrementalSetpoints[i] == -1) return 255;
+  return map(horzSensorIncrementalSetpoints[i], horzLowCalibration[i], horzHighCalibration[i], 0, 254);
+}
+
+/**************************************************************************************
+  getCurrentVerticalIncrimentalSetpoint(): 
+ *************************************************************************************/
+byte getCurrentVerticalIncrimentalSetpoint(int i)
+{
+  if (horzSensorIncrementalSetpoints[i] == -1) return 255;
+  return map(vertSensorIncrementalSetpoints[i], vertLowCalibration[i], vertHighCalibration[i], 0, 254);
 }
 
 /**************************************************************************************
@@ -1138,7 +1154,7 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzAngleDeadband << "\t";
   }
-  USB_COM_PORT.print("\nHORZ_ANGLE_SLEW_RATE:   \t");
+  USB_COM_PORT.print("\nHORZ_ANGLE_SLEW_RATE:\t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << horzAngleSlewRate << "\t";
@@ -1185,7 +1201,7 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertAngleDeadband << "\t";
   }
-  USB_COM_PORT.print("\nVERT_ANGLE_SLEW_RATE:   \t");
+  USB_COM_PORT.print("\nVERT_ANGLE_SLEW_RATE:\t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertAngleSlewRate << "\t";
@@ -1610,7 +1626,7 @@ boolean runRS485CommunicationTest()
     digitalWrite(RS485_TX_ENABLE, HIGH);
     RS485_SERIAL.write('t');
     RS485_SERIAL.write(myModuleNumber);
-    delayMicroseconds(140);
+    RS485_SERIAL.flush();
     digitalWrite(RS485_TX_ENABLE, LOW);
     clearSerialBuffer(RS485_SERIAL, 2); 
     
