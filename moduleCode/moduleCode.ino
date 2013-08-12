@@ -27,6 +27,7 @@
 #include "modulePins.h"
 #include "PIDcontrol.h"
 #include "OneWireNXP.h"
+#include "MemoryFree.h"
 
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
@@ -817,7 +818,21 @@ void manualStraightenHorizontal()
   setHorzAngleSetpoint(2, 127);
   setHorzAngleSetpoint(3, 127);
   setHorzAngleSetpoint(4, 127);  
-  manualGoToSetpoints();
+
+  // reset timeout timers
+  for (int i = 0; i < 5; ++i)
+  {
+    horzTimerArray[i] = millis();
+  }
+  
+  // Do three seconds of movement
+  unsigned long startTime = millis();
+  while (millis() - startTime < actuatorTimeout)
+  {
+    executePID(manualMotorSpeed, true, false);
+    delay(pidLoopTime);
+  }
+  stopMovement();
 }
 
 /**************************************************************************************
@@ -833,7 +848,21 @@ void manualStraightenVertical()
   setVertAngleSetpoint(2, 127);
   setVertAngleSetpoint(3, 127);
   setVertAngleSetpoint(4, 127);  
-  manualGoToSetpoints();
+
+  // reset timeout timers
+  for (int i = 0; i < 5; ++i)
+  {
+    vertTimerArray[i] = millis();
+  }
+  
+  // Do three seconds of movement
+  unsigned long startTime = millis();
+  while (millis() - startTime < actuatorTimeout)
+  {
+    executePID(manualMotorSpeed, false, true);
+    delay(pidLoopTime);
+  }
+  stopMovement();
 }
 
 /**************************************************************************************
@@ -1907,6 +1936,14 @@ void manualSetVertAngleSetpoint()
 }
 
 /**************************************************************************************
+  manualPrintFreeMemory(): 
+ *************************************************************************************/
+void manualPrintFreeMemory()
+{
+  USB_COM_PORT << "There is " << freeMemory() << " bytes of free memory.\n";
+}
+
+/**************************************************************************************
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
 void displayMenu()
@@ -2058,6 +2095,9 @@ void manualControl()
           break;
         case 'a':
           printBatteryVoltage();
+          break;
+        case 'P':
+          manualPrintFreeMemory();
           break;
         case 'x':
           manualTurnMotorOn();
