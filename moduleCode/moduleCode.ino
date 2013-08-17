@@ -1750,17 +1750,14 @@ void manualTurnMotorOn()
 /**************************************************************************************
   manualGoToSetpoints(): Runs the PID loop for 3 seconds to achieve the setpoints.
  *************************************************************************************/
-void manualGoToSetpoints()
+void manualGoToSetpoint()
 {
-  USB_COM_PORT << "Moving... ";
+  USB_COM_PORT << "Vertibrae " << manualVertibraeSelect << " Moving ... ";
   
   // reset timeout timers
-  for (int i = 0; i < 5; ++i)
-  {
-    horzTimerArray[i] = millis();
-    vertTimerArray[i] = millis();
-  }
-  
+  horzTimerArray[manualVertibraeSelect] = millis();
+  vertTimerArray[manualVertibraeSelect] = millis();
+ 
   // Do three seconds of movement
   unsigned long startTime = millis();
   while (millis() - startTime < actuatorTimeout)
@@ -1771,30 +1768,6 @@ void manualGoToSetpoints()
   stopMovement();
   
   USB_COM_PORT << "Done.\n";
-}
-
- /**************************************************************************************
-  setAllVertAngleSetpoints(): 
- *************************************************************************************/
-void setAllVertAngleSetpoints(byte setpoint)
-{
-  setVertAngleSetpoint(0, setpoint);
-  setVertAngleSetpoint(1, setpoint);
-  setVertAngleSetpoint(2, setpoint);
-  setVertAngleSetpoint(3, setpoint);
-  setVertAngleSetpoint(4, setpoint);  
-}
-
- /**************************************************************************************
-  setAllHorzAngleSetpoints(): 
- *************************************************************************************/
-void setAllHorzAngleSetpoints(byte setpoint)
-{
-  setHorzAngleSetpoint(0, setpoint);
-  setHorzAngleSetpoint(1, setpoint);
-  setHorzAngleSetpoint(2, setpoint);
-  setHorzAngleSetpoint(3, setpoint);
-  setHorzAngleSetpoint(4, setpoint);  
 }
 
 /**************************************************************************************
@@ -1954,14 +1927,12 @@ void displayMenu()
     USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
     USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
     USB_COM_PORT.print("          w* - set horizontal setpoint where * is 0 to 255\n");
-    USB_COM_PORT.print("          z* - set vertical setpoint where * is 0 to 255\n");
-    USB_COM_PORT.print("          W - set all horizontals to 255 (disabled)\n");
-    USB_COM_PORT.print("          Z - set all verticals to 255 (disabled)\n");   
-    USB_COM_PORT.print("          j - go to setpoints\n\n"); 
+    USB_COM_PORT.print("          z* - set vertical setpoint where * is 0 to 255\n"); 
+    USB_COM_PORT.print("          j - move vertibrae to setpoints\n\n"); 
     
-    USB_COM_PORT.print("          c - calibrate horizontal\n");
+    USB_COM_PORT.print("          c - calibrate horizontals\n");
     USB_COM_PORT.print("          v - calibrate verticals\n");
-    USB_COM_PORT.print("          t - straighten horizontal\n");  
+    USB_COM_PORT.print("          t - straighten horizontals\n");  
     USB_COM_PORT.print("          y - straighten verticals\n\n");  
     
     USB_COM_PORT.print("          r - save current vertical position as straight\n");
@@ -2025,17 +1996,9 @@ void manualControl()
           break;
         case 'z':
           manualSetVertAngleSetpoint();
-          break;
-        case 'W':
-          USB_COM_PORT << "All Horizontals set to 255 (disabled)\n";
-          setAllHorzAngleSetpoints(255);
-          break;
-        case 'Z':
-          USB_COM_PORT << "All Verticals set to 255 (disabled)\n";
-          setAllVertAngleSetpoints(255);
-          break;         
+          break;     
         case 'j':
-          manualGoToSetpoints();
+          manualGoToSetpoint();
           break;
           
           
