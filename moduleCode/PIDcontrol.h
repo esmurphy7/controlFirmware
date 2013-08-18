@@ -91,6 +91,11 @@ public:
     setPoint = newSetPoint;
   }
   
+  void zeroIntegral()
+  {
+    integral = 0;
+  }
+  
   int updateOutput(){
     //sensor reading
     sensorReading = analogRead(sensorPin);
@@ -117,23 +122,32 @@ public:
     //calculate integral
     //integral constraint and decrementing for anti-windup
     integral += error;
-    if(integral > 0){
-      integral -= 1;
-    }
-    else if(integral < 0){
-      integral += 1;
-    }
-    integral = constrain(integral, -1024, 1024);
+    //if(integral > 0){
+    //  integral -= 5;
+    //}
+    //else if(integral < 0){
+    //  integral += 5;
+    //}
+    integral = constrain(integral, -2048, 2048);
     
     //calculate output
     //adjust fomula to change sensativity to constaints
-    output = kp*error - kd*derivative + ki*integral/128;
+    output = kp*error - kd*derivative + ki*integral/32;
     output = constrain(output, -250, 250);
-    
+ 
+     /*Serial.print(output);  
+     Serial.print(" = \t"); 
+     Serial.print(kp*error);  
+     Serial.print("\t +   ");   
+     Serial.print(ki*integral/32);    
+     Serial.print("\t +   ");    */
     
     //add dithering
-    output = output + 20*int(sin(float(millis()/2)));
+    int dither = 0;//int(10*sin(float(millis()/2)));
+    output = output + dither;
     output = constrain(output, -255, 255);
+    
+     //Serial.println(dither); 
     
     //apply output
     if(output >= 0){

@@ -73,8 +73,8 @@ boolean lights[30];
 const int horzLeftAngle = 10;
 const int horzRightAngle = 244;
 const int horzStraightAngle = 127;
-const int vertUpAngle = 50;
-const int vertDownAngle = 204;
+const int vertUpAngle = 87;
+const int vertDownAngle = 167;
 const int vertStraightAngle = 127;
 const int longDelayBetweenHeartBeats = 1100; 
 const int shortDelayBetweenHeartBeats = 250;
@@ -585,7 +585,7 @@ void updateSetpoints()
     allowVerticalControl = false;
     for (int i = 0; i < 30; ++i)
     {
-      //vertSetpoints[i] = vertStraightAngle;
+      vertSetpoints[i] = vertStraightAngle;
     }
   }
 
@@ -595,20 +595,20 @@ void updateSetpoints()
       (millis() - lastUpdateTime > controller.propagationDelay))
   {
     // Propagation of all angles
-    /*for (int i = 29; i > 0; --i)
+    for (int i = 29; i > 0; --i)
     {
       horzSetpoints[i] = horzSetpoints[i - 1];
       vertSetpoints[i] = vertSetpoints[i - 1];     
-    }*/
+    }
     
     // The first actuator gets the new setpoints
     if (controller.right)
     {
-      horzSetpoints[8] = horzRightAngle;
+      horzSetpoints[0] = horzRightAngle;
     }
     else if (controller.left)
     {
-      horzSetpoints[8] = horzLeftAngle;
+      horzSetpoints[0] = horzLeftAngle;
     }
     else
     {
@@ -619,15 +619,15 @@ void updateSetpoints()
     // Allow new vertical setpoints if we're not doing auto straightening
     if (controller.up && allowVerticalControl)
     {
-      vertSetpoints[8] = vertUpAngle;
+      vertSetpoints[0] = vertUpAngle;
     }
     else if (controller.down && allowVerticalControl)
     {
-      vertSetpoints[8] = vertDownAngle;
+      vertSetpoints[0] = vertDownAngle;
     }
     else if ( allowVerticalControl )
     {
-      vertSetpoints[8] = vertStraightAngle;
+      vertSetpoints[0] = vertStraightAngle;
     }
       
     
@@ -706,7 +706,7 @@ void readAndRequestJoystickData()
       // If we've retried already, now we know the joystick is disconnected!
       if (joystickRetryAttempts > 0)
       {
-        DEBUG_STREAM << "ERROR: No joystick data. It is Disconnected.";
+        DEBUG_STREAM << "ERROR: No joystick data. It is Disconnected.\n";
         joystickIsConnected = false;
         controller.killSwitchPressed = false;
       }

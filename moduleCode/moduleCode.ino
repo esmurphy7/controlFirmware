@@ -23,11 +23,13 @@
   // Arduino Folder\hardware\arduino\cores\arduino
 #endif 
 
-#include  <EEPROM.h>
+#include <EEPROM.h>
+#include <avr/pgmspace.h>
 #include "modulePins.h"
 #include "PIDcontrol.h"
 #include "OneWireNXP.h"
 #include "MemoryFree.h"
+
 
 // Defines and constants
 #define HEAD_SERIAL Serial1             // Serial to the upstream module
@@ -90,13 +92,26 @@ const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz cal
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
-const byte horzAngleSlewRate = 4;       // When moving horizontals. Max number of angles to incriment each PID loop.
-const byte vertAngleSlewRate = 4;       // When moving verticals. Max number of angles to incriment each PID loop.
+const byte horzAngleSlewRate = 2;       // When moving horizontals. Max number of angles to incriment each PID loop.
+const byte vertAngleSlewRate = 2;       // When moving verticals. Max number of angles to incriment each PID loop.
 
 // Variables for manual mode
 int manualActuationDelay = 200;
 int manualVertibraeSelect = 0;
 
+// PID Constants
+const byte horzAngleP = 2;
+const byte horzAngleI = 2;
+const byte horzAngleD = 0;
+const byte vertAngleP = 2;
+const byte vertAngleI = 2;
+const byte vertAngleD = 0;
+int horzSensorP[5] = {-1,-1,-1,-1,-1};
+int horzSensorI[5] = {-1,-1,-1,-1,-1};
+int horzSensorD[5] = {-1,-1,-1,-1,-1};
+int vertSensorP[5] = {-1,-1,-1,-1,-1};
+int vertSensorI[5] = {-1,-1,-1,-1,-1};
+int vertSensorD[5] = {-1,-1,-1,-1,-1};
 
 // PID Controllers for the horizontal actuators
 // Declaration of horizontal PID controllers, default even and odd values applied here
@@ -172,13 +187,6 @@ void setup()
     pinMode(LED[i],OUTPUT);
   }
   
-  // Set the constants of the PID controllers
-  for(int i=0;i<5;i++)
-  {
-    PIDcontrollerHorizontal[i].setConstants(7,0,30);
-    PIDcontrollerVertical[i].setConstants(5,0,10);
-  }
-
   // Load previous calibration from EEPROM
   setModuleNumber(EEPROM.read(MY_MODULE_NUMBER_ADDRESS));
   
@@ -230,6 +238,8 @@ void setup()
   // Used for the pid interrupt
   TIMSK1 |= _BV(TOIE1);
   runPidLoop = true;
+   
+  USB_COM_PORT << "There are " << freeMemory() << " bytes of free memory.\n\n";
 }
 
 /***********************************************************************************
@@ -295,7 +305,6 @@ void loop()
     byte data = TAIL_SERIAL.read();
     HEAD_SERIAL.write(data);
   }
-
 }//end loop()
 
 /************************************************************************************
@@ -457,7 +466,9 @@ void processNewSettingsAndSetpoints()
     for (int i = 0; i < 5; ++i)
     {
       horzTimerArray[i] = millis();
+      PIDcontrollerHorizontal[i].zeroIntegral();
       vertTimerArray[i] = millis();
+      PIDcontrollerVertical[i].zeroIntegral();
     }
   }
   killSwitchPressed = newKillSwitchPressed;
@@ -482,6 +493,16 @@ byte calculateChecksum(byte* array, int count)
   }
   //USB_COM_PORT << "\n\n\n\n";
   return checksum;
+}
+
+/**************************************************************************************
+  printProgMemString(): Print a string stored in program memory to USB_COM_PORT
+ *************************************************************************************/
+void printProgMemString(const prog_uchar *str)
+{
+  char c;
+  while(c = pgm_read_byte(str++))
+    USB_COM_PORT.write(c);
 }
 
 /**************************************************************************************
@@ -682,9 +703,23 @@ void calculateSensorDeadbandsAndSpeeds()
     horzSensorSlewRates[i] = map(horzAngleSlewRate, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorSlewRates[i] = map(vertAngleSlewRate, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
     
+    horzSensorP[i] = map(horzAngleP, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    horzSensorI[i] = map(horzAngleI, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    horzSensorD[i] = map(horzAngleD, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    vertSensorP[i] = map(vertAngleP, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    vertSensorI[i] = map(vertAngleI, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
+    vertSensorD[i] = map(vertAngleD, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);   
+    
     // Ensure we never get 0 slew rate due to a bad calibration. 
     if (horzSensorSlewRates[i] == 0) horzSensorSlewRates[i] = 1;
     if (vertSensorSlewRates[i] == 0) vertSensorSlewRates[i] = 1;  
+  }
+  
+  // Update the constants in the PID controllers
+  for(int i=0;i<5;i++)
+  {
+    PIDcontrollerHorizontal[i].setConstants(horzSensorP[i], horzSensorD[i], horzSensorI[i]);
+    PIDcontrollerVertical[i].setConstants(vertSensorP[i], vertSensorD[i], vertSensorI[i]);
   }
 }
 
@@ -703,7 +738,8 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
   
   // Wait for "pidLoopTime" milliseconds to occur
   if ((count << 1) > pidLoopTime) // bitshift left to multiple by 2 (i.e. 2 milliseconds per count)
-  {    
+  {      
+    count = 0;
     if (killSwitchPressed)
     {
       executePID(runtimeMotorSpeed, true, true); 
@@ -711,8 +747,7 @@ ISR(TIMER1_OVF_vect, ISR_NOBLOCK)
     else
     {
       stopMovement();
-    }      
-    count = 0;
+    }
   }
 }
 
@@ -817,8 +852,8 @@ void manualStraightenHorizontal()
   setHorzAngleSetpoint(1, 127);
   setHorzAngleSetpoint(2, 127);
   setHorzAngleSetpoint(3, 127);
-  setHorzAngleSetpoint(4, 127);  
-
+  setHorzAngleSetpoint(4, 127);
+  
   // reset timeout timers
   for (int i = 0; i < 5; ++i)
   {
@@ -1188,6 +1223,21 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzAngleSlewRate << "\t";
   }
+  USB_COM_PORT.print("\nVERT_ANGLE_P:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleP << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_I:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleI << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_D:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzAngleD << "\t";
+  }
   USB_COM_PORT << "\n";
 
 
@@ -1211,7 +1261,22 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzSensorSlewRates[i] << "\t";
   }
-  USB_COM_PORT << "\n";
+  USB_COM_PORT.print("\nVERT_SENSOR_P:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorP[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_I:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorI[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_D:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzSensorD[i] << "\t";
+  }
+  USB_COM_PORT << "\n\n";
   
   
   USB_COM_PORT.print("\nVertical\n");
@@ -1235,6 +1300,21 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertAngleSlewRate << "\t";
   }
+  USB_COM_PORT.print("\nVERT_ANGLE_P:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleP << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_I:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleI << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_ANGLE_D:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertAngleD << "\t";
+  }
   USB_COM_PORT << "\n";
   
 
@@ -1257,6 +1337,21 @@ void printSensorValuesAndSetpoints()
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << vertSensorSlewRates[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_P:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorP[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_I:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorI[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_D:\t\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertSensorD[i] << "\t";
   }
   USB_COM_PORT << "\n\n";
 
@@ -1450,7 +1545,7 @@ void manualHorizontalActuatorMove(char dir)
   stopMovement(); 
    
   USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " " <<
-    ((dir == 'e') ? "Hoirzontal Extend" : "Horizontal Contract") << " (" << manualActuationDelay << "ms)\n";  
+    ((dir == 'e') ? "Horizontal Extend" : "Horizontal Contract") << " (" << manualActuationDelay << "ms)\n";  
 }
 
 
@@ -1492,7 +1587,7 @@ void setModuleNumber(int value)
   myModuleNumber = value;
  
   // setup even/odd for even modules
-  if (myModuleNumber % 2 == 0)
+  if (myModuleNumber % 2 == 1)
   {  
     PIDcontrollerVertical[0].setEven(false);
     PIDcontrollerVertical[1].setEven(true);
@@ -1606,7 +1701,8 @@ boolean runSerialChainCommunicationTest()
     // If we didn't recieve 't' from the last module.
     if (!error && !gotLastModuleT)
     {
-      USB_COM_PORT << "ERROR: Did not recieve 't' from the last module. Is the serial terminator plugged in?\n";
+      static prog_uchar toPrint[] PROGMEM = "ERROR: Did not recieve 't' from the last module. Is the serial terminator plugged in?\n";
+      printProgMemString(toPrint);
       error = true;
     }
     USB_COM_PORT << "\n";
@@ -1617,11 +1713,13 @@ boolean runSerialChainCommunicationTest()
   // Give the result of the tests
   if (numberOfErrors > 0)
   {
-    USB_COM_PORT << "RESULT: ERROR! Some serial chain communication tests failed.\n\n";
+    static prog_uchar toPrint[] PROGMEM = "RESULT: ERROR! Some serial chain communication tests failed.\n\n";
+    printProgMemString(toPrint);
   }
   else
   {
-    USB_COM_PORT << "RESULT: SUCCESS! All serial chain communication tests passed.\n\n";
+    static prog_uchar toPrint[] PROGMEM = "RESULT: SUCCESS! All serial chain communication tests passed.\n\n";
+    printProgMemString(toPrint);
   }
   delay(500);
   clearSerialBuffer(TAIL_SERIAL);
@@ -1706,11 +1804,13 @@ boolean runRS485CommunicationTest()
   // Give the result of the tests
   if (numberOfErrors > 0)
   {
-    USB_COM_PORT << "RESULT: ERROR! Some RS-485 communication tests failed.\n\n";
+    static prog_uchar toPrint[] PROGMEM = "RESULT: ERROR! Some RS-485 communication tests failed.\n\n";
+    printProgMemString(toPrint);
   }
   else
   {
-    USB_COM_PORT << "RESULT: SUCCESS! All RS-485 communication tests passed.\n\n";
+    static prog_uchar toPrint[] PROGMEM = "RESULT: SUCCESS! All RS-485 communication tests passed.\n\n";
+    printProgMemString(toPrint);
   }
   delay(500);
   clearSerialBuffer(RS485_SERIAL);
@@ -1731,15 +1831,18 @@ void manualTurnMotorOn()
   switch (speedSelect)
   {
     case '1':
-      USB_COM_PORT << "Motor running at speed 80 (SEND 's' TO TURN OFF).\n";
+      static prog_uchar toPrint1[] PROGMEM = "Motor running at speed 80 (SEND 's' TO TURN OFF).\n";
+      printProgMemString(toPrint1);
       analogWrite(MOTOR_CONTROL, 80);      
       break;
     case '2':
-      USB_COM_PORT << "Motor running at speed 160 (SEND 's' TO TURN OFF).\n";
+      static prog_uchar toPrint2[] PROGMEM = "Motor running at speed 160 (SEND 's' TO TURN OFF).\n";
+      printProgMemString(toPrint2);
       analogWrite(MOTOR_CONTROL, 160);  
       break;
     case '3':
-      USB_COM_PORT << "Motor running at speed 240 (SEND 's' TO TURN OFF).\n";
+      static prog_uchar toPrint3[] PROGMEM = "Motor running at speed 240 (SEND 's' TO TURN OFF).\n";
+      printProgMemString(toPrint3);
       analogWrite(MOTOR_CONTROL, 240);      
       break;    
     default:
@@ -1750,13 +1853,13 @@ void manualTurnMotorOn()
 /**************************************************************************************
   manualGoToSetpoints(): Runs the PID loop for 3 seconds to achieve the setpoints.
  *************************************************************************************/
-void manualGoToSetpoint()
+void manualGoToSetpoint(char actuator)
 {
-  USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1 << " Moving ... ";
+  USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1) << " Moving ... ";
   
   // reset timeout timers
-  horzTimerArray[manualVertibraeSelect] = millis();
-  vertTimerArray[manualVertibraeSelect] = millis();
+  if (actuator == 'h') horzTimerArray[manualVertibraeSelect] = millis();
+  if (actuator == 'v') vertTimerArray[manualVertibraeSelect] = millis();
  
   // Do three seconds of movement
   unsigned long startTime = millis();
@@ -1792,11 +1895,12 @@ void setHorzAngleSetpoint(int actuator, byte angle)
      
     // If this is a new setpoint, reset the PID timout timer
     if (newHorzSetpoint != horzSensorSetpoints[i])
-    {
+    {      
+      PIDcontrollerHorizontal[i].zeroIntegral();
       horzTimerArray[i] = millis();
       horzSensorSetpoints[i] = newHorzSetpoint;
       horzAngleSetpoints[i] = angle;
-    }
+    }   
 }
 
 /**************************************************************************************
@@ -1832,10 +1936,11 @@ void setVertAngleSetpoint(int actuator, byte angle)
     // If this is a new setpoint, copy it in and reset the timeout timer.
     if (newVertSetpoint != vertSensorSetpoints[i])
     {
+      PIDcontrollerVertical[i].zeroIntegral();
       vertTimerArray[i] = millis();
       vertSensorSetpoints[i] = newVertSetpoint;
       vertAngleSetpoints[i] = angle;
-    }  
+    }
 }
 
 /**************************************************************************************
@@ -1867,7 +1972,7 @@ boolean getNumberFromUsbComPort(int &number)
 /**************************************************************************************
   manualSetHorizontalAngle(): For manual mode. Set the horizonal angle of the selected vertibrae.
  *************************************************************************************/
- void manualSetHorizontalAngle()
+ void manualSetHorizontalAngleAndMove()
  {
    int angle = 0;
    if (getNumberFromUsbComPort(angle))
@@ -1884,12 +1989,13 @@ boolean getNumberFromUsbComPort(int &number)
    {
       USB_COM_PORT << "Invalid entry. (" << angle << ")\n";     
    }
+   manualGoToSetpoint('h');
  }
  
  /**************************************************************************************
   manualSetVertAngleSetpoint(): For manual mode. Set the vertical angle of the selected vertibrae.
  *************************************************************************************/
-void manualSetVertAngleSetpoint()
+void manualSetVerticalAngleAndMove()
 {  
   int angle = 0;
   if (getNumberFromUsbComPort(angle))
@@ -1905,7 +2011,8 @@ void manualSetVertAngleSetpoint()
   else
   {
     USB_COM_PORT << "Invalid entry. (" << angle << ")\n";     
-  }   
+  }
+   manualGoToSetpoint('v');
 }
 
 /**************************************************************************************
@@ -1920,37 +2027,39 @@ void manualPrintFreeMemory()
   displayMenu(): Shows the command menu for manual control over usb serial
  *************************************************************************************/
 void displayMenu()
-{
-    USB_COM_PORT.print("\nManual Control Mode\n");
-    USB_COM_PORT.print("commands: 1-5 to select vertebrae\n");
-    USB_COM_PORT.print("          k/l - horizontal actuation - extend/contract\n");
-    USB_COM_PORT.print("          o/i - vertical actuation - extend/contract\n");
-    USB_COM_PORT.print("          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n");
-    USB_COM_PORT.print("          w* - set horizontal setpoint where * is 0 to 255\n");
-    USB_COM_PORT.print("          z* - set vertical setpoint where * is 0 to 255\n"); 
-    USB_COM_PORT.print("          j - move vertibrae to setpoints\n\n"); 
-    
-    USB_COM_PORT.print("          c - calibrate horizontals\n");
-    USB_COM_PORT.print("          v - calibrate verticals\n");
-    USB_COM_PORT.print("          t - straighten horizontals\n");  
-    USB_COM_PORT.print("          y - straighten verticals\n\n");  
-    
-    USB_COM_PORT.print("          r - save current vertical position as straight\n");
-    USB_COM_PORT.print("          a - print battery voltage\n");  
-    USB_COM_PORT.print("          b - print calibration values\n");
-    USB_COM_PORT.print("          f - print hydraulic pressure\n"); 
-    USB_COM_PORT.print("          p - print sensor values and setpoints\n");
-    USB_COM_PORT.print("          P - print memory consumption.\n\n");
-    
-    USB_COM_PORT.print("          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n");
-    USB_COM_PORT.print("          s - stop motor\n");  
-    USB_COM_PORT.print("          n/m - all leds on/off\n");
-    USB_COM_PORT.print("          g - run serial chain communication test to downstram modules\n");
-    USB_COM_PORT.print("          G - run RS-485 communication test to downstram modules\n");
-    USB_COM_PORT.print("          u - manually set myModuleNumber\n\n");
+{  
+  static prog_uchar menu[] PROGMEM =
+    "\nManual Control Mode\n"                
+    "commands: 1-5 to select vertebrae\n"                
+    "          k/l - horizontal actuation - extend/contract\n"                
+    "          o/i - vertical actuation - extend/contract\n"                
+    "          d* - adjust actuation delay where *=s(small), m(medium), l(large)\n"                
+    "          w* - move horizontal to angle where * is 0 to 255\n"                
+    "          z* - move vertical to angle where * is 0 to 255\n\n"                
   
-    USB_COM_PORT.print("          e - menu\n");
-    USB_COM_PORT.print("          q - quit\n\n");
+    "          c - calibrate horizontals\n"                
+    "          v - calibrate verticals\n"                
+    "          t - straighten horizontals\n"                  
+    "          y - straighten verticals\n\n"                  
+  
+    "          r - save current vertical position as straight\n"                
+    "          a - print battery voltage\n"                
+    "          b - print calibration values\n"                
+    "          f - print hydraulic pressure\n"                 
+    "          p - print setpoints, sensor values and constants\n"                
+    "          P - print memory consumption.\n\n"                
+  
+    "          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n"                
+    "          s - stop motor\n"                
+    "          n/m - all leds on/off\n"                
+    "          g - run serial chain communication test to downstram modules\n"                
+    "          G - run RS-485 communication test to downstram modules\n"                
+    "          u - manually set myModuleNumber\n\n"                
+  
+    "          e - menu\n"                
+    "          q - quit\n\n";
+                    
+  printProgMemString(menu);
 }
 
 /**************************************************************************************
@@ -1994,13 +2103,10 @@ void manualControl()
           displayMenu();
           break;
         case 'w':
-          manualSetHorizontalAngle();
+          manualSetHorizontalAngleAndMove();
           break;
         case 'z':
-          manualSetVertAngleSetpoint();
-          break;     
-        case 'j':
-          manualGoToSetpoint();
+          manualSetVerticalAngleAndMove();
           break;
           
           
