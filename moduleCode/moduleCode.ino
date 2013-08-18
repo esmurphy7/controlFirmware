@@ -1752,7 +1752,7 @@ void manualTurnMotorOn()
  *************************************************************************************/
 void manualGoToSetpoint()
 {
-  USB_COM_PORT << "Vertibrae " << manualVertibraeSelect << " Moving ... ";
+  USB_COM_PORT << "Vertibrae " << (manualVertibraeSelect + 1 << " Moving ... ";
   
   // reset timeout timers
   horzTimerArray[manualVertibraeSelect] = millis();
@@ -1913,7 +1913,7 @@ void manualSetVertAngleSetpoint()
  *************************************************************************************/
 void manualPrintFreeMemory()
 {
-  USB_COM_PORT << "There is " << freeMemory() << " bytes of free memory.\n";
+  USB_COM_PORT << "There are " << freeMemory() << " bytes of free memory. (MEGA has 8KB total of which only 7KB is usable) \n";
 }
 
 /**************************************************************************************
@@ -1940,13 +1940,15 @@ void displayMenu()
     USB_COM_PORT.print("          b - print calibration values\n");
     USB_COM_PORT.print("          f - print hydraulic pressure\n"); 
     USB_COM_PORT.print("          p - print sensor values and setpoints\n");
+    USB_COM_PORT.print("          P - print memory consumption.\n\n");
+    
     USB_COM_PORT.print("          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n");
     USB_COM_PORT.print("          s - stop motor\n");  
     USB_COM_PORT.print("          n/m - all leds on/off\n");
     USB_COM_PORT.print("          g - run serial chain communication test to downstram modules\n");
     USB_COM_PORT.print("          G - run RS-485 communication test to downstram modules\n");
     USB_COM_PORT.print("          u - manually set myModuleNumber\n\n");
-    
+  
     USB_COM_PORT.print("          e - menu\n");
     USB_COM_PORT.print("          q - quit\n\n");
 }
