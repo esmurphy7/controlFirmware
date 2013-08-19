@@ -102,7 +102,6 @@ public:
     
     prevUpdateTime = millis();
     
-    
     //calculate error
     error = setPoint - sensorReading;
     
@@ -125,29 +124,20 @@ public:
     //if(integral > 0){
     //  integral -= 5;
     //}
-    //else if(integral < 0){
+    //else if(integral < 0)
     //  integral += 5;
     //}
     integral = constrain(integral, -2048, 2048);
     
     //calculate output
     //adjust fomula to change sensativity to constaints
-    output = kp*error - kd*derivative + ki*integral/32;
+    output = kp*error/10 - kd*derivative/10 + ki*integral/320;
     output = constrain(output, -250, 250);
- 
-     /*Serial.print(output);  
-     Serial.print(" = \t"); 
-     Serial.print(kp*error);  
-     Serial.print("\t +   ");   
-     Serial.print(ki*integral/32);    
-     Serial.print("\t +   ");    */
-    
+   
     //add dithering
     int dither = 0;//int(10*sin(float(millis()/2)));
     output = output + dither;
     output = constrain(output, -255, 255);
-    
-     //Serial.println(dither); 
     
     //apply output
     if(output >= 0){

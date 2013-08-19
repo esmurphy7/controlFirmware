@@ -70,8 +70,8 @@ byte horzSetpoints[30];
 boolean lights[30];
 
 // Constants
-const int horzLeftAngle = 10;
-const int horzRightAngle = 244;
+const int horzLeftAngle = 60;
+const int horzRightAngle = 194;
 const int horzStraightAngle = 127;
 const int vertUpAngle = 87;
 const int vertDownAngle = 167;
@@ -307,6 +307,13 @@ void getAndBroadcastDiagnostics()
     return;
   }
   
+  // Add timestamp to end of packet
+  long headCodeTimestamp = millis();  
+  packet[121] = (byte)(headCodeTimestamp >> 24);
+  packet[122] = (byte)(headCodeTimestamp >> 16);
+  packet[123] = (byte)(headCodeTimestamp >> 8);
+  packet[124] = (byte)(headCodeTimestamp >> 0);  
+  
   // Send the diagnostics packet
   Udp.beginPacket(broadcastIP, broadcastPort);  
   for (int i = 0; i < 125; ++i)
@@ -351,7 +358,6 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
     buffer[i * 6 + 4 + 4] = data[4];
     buffer[i * 6 + 5 + 4] = data[5];
   }
-  return true;
 }
 
 /**************************************************************************************
@@ -591,8 +597,7 @@ void updateSetpoints()
 
   // Propagate setpoints if it's time to do so.
   if (controller.killSwitchPressed &&
-      true &&
-      (millis() - lastUpdateTime > controller.propagationDelay))
+      millis() - lastUpdateTime > controller.propagationDelay)
   {
     // Propagation of all angles
     for (int i = 29; i > 0; --i)
@@ -612,7 +617,7 @@ void updateSetpoints()
     }
     else
     {
-      horzSetpoints[8] = horzStraightAngle;
+      horzSetpoints[0] = horzStraightAngle;
     }
       
     

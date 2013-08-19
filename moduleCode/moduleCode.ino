@@ -87,7 +87,7 @@ boolean runPidLoop = false;             // Set to true if you want to run pid on
 byte runtimeMotorSpeed = 0;             // Runtime analog output motor speed. Set by joystick.
 const byte horzAngleDeadband = 5;       // The horizontal deadband, 0 to 254 range
 const byte vertAngleDeadband = 5;       // The vertical deadband, 0 to 254 range
-const int actuatorTimeout = 4000;       // Actuators have this many ms to get to the master setpoint
+const int actuatorTimeout = 5000;       // Actuators have this many ms to get to the master setpoint
 const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
@@ -100,11 +100,11 @@ int manualActuationDelay = 200;
 int manualVertibraeSelect = 0;
 
 // PID Constants
-const byte horzAngleP = 2;
-const byte horzAngleI = 2;
+const byte horzAngleP = 20;
+const byte horzAngleI = 20;
 const byte horzAngleD = 0;
-const byte vertAngleP = 2;
-const byte vertAngleI = 2;
+const byte vertAngleP = 20;
+const byte vertAngleI = 20;
 const byte vertAngleD = 0;
 int horzSensorP[5] = {-1,-1,-1,-1,-1};
 int horzSensorI[5] = {-1,-1,-1,-1,-1};
@@ -579,6 +579,9 @@ void sendHeadAndModuleDiagnostics()
   int batteryVoltage = map(analogRead(BAT_LEVEL_24V),0,1023,0,25000);
   int hydraulicPressure = map(analogRead(PRESSURE_SENSOR),102,921,0,2000);
   
+  batteryVoltage = constrain(batteryVoltage, 0, 25000);
+  hydraulicPressure = constrain(hydraulicPressure, 0, 2000);
+  
   byte data[6];
   data[0] = highByte(batteryVoltage);
   data[1] = lowByte(batteryVoltage);
@@ -586,12 +589,12 @@ void sendHeadAndModuleDiagnostics()
   data[3] = runtimeMotorSpeed;
   data[4] = highByte(hydraulicPressure);
   data[5] = lowByte(hydraulicPressure);
-
+  
   HEAD_SERIAL.write(data, 6);
 }
 
 /************************************************************************************
- * sendHorzAngleDiagnostics(): 
+ * sendAngleAndSetpointDiagnostics(): 
  ***********************************************************************************/
 void sendAngleAndSetpointDiagnostics()
 {
@@ -600,8 +603,8 @@ void sendAngleAndSetpointDiagnostics()
   {
     byte horzAngle = getCurrentHorizontalAngle(i);
     byte vertAngle = getCurrentVerticalAngle(i);
-    byte horzIncSetpoint = getCurrentHorizontalIncrimentalSetpoint(i);
-    byte vertIncSetpoint = getCurrentVerticalIncrimentalSetpoint(i);
+    byte horzIncSetpoint = getCurrentHorizIncrimentalSetpointAngle(i);
+    byte vertIncSetpoint = getCurrentVertIncrimentalSetpointAngle(i);
        
     data[i * 4 + 0] = horzIncSetpoint;
     data[i * 4 + 1] = horzAngle;
@@ -700,15 +703,17 @@ void calculateSensorDeadbandsAndSpeeds()
   {
     horzSensorDeadbands[i] = map(horzAngleDeadband, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorDeadbands[i] = map(vertAngleDeadband, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    
     horzSensorSlewRates[i] = map(horzAngleSlewRate, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     vertSensorSlewRates[i] = map(vertAngleSlewRate, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
     
     horzSensorP[i] = map(horzAngleP, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     horzSensorI[i] = map(horzAngleI, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
     horzSensorD[i] = map(horzAngleD, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
-    vertSensorP[i] = map(vertAngleP, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
-    vertSensorI[i] = map(vertAngleI, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);
-    vertSensorD[i] = map(vertAngleD, 0, 254, 0, horzHighCalibration[i] - horzLowCalibration[i]);   
+    
+    vertSensorP[i] = map(vertAngleP, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    vertSensorI[i] = map(vertAngleI, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);
+    vertSensorD[i] = map(vertAngleD, 0, 254, 0, vertHighCalibration[i] - vertLowCalibration[i]);   
     
     // Ensure we never get 0 slew rate due to a bad calibration. 
     if (horzSensorSlewRates[i] == 0) horzSensorSlewRates[i] = 1;
@@ -798,7 +803,7 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
 
     ///////////////////////    
     ////// VERTICAL ///////
-    if (vertSensorSetpoints[i] >= 0 && doVertical)
+    if (vertSensorSetpoints[i] >= 0 && doVertical && !(i == 4 && iAmLastModule))
     {
       int currentSensorValue = analogRead(VERT_POS_SENSOR[i]);
       
@@ -845,7 +850,7 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
  *************************************************************************************/
 void manualStraightenHorizontal()
 {
-  USB_COM_PORT << "Straightening horizontal. ";
+  USB_COM_PORT << "Straightening horizontal. \n";
   
   // Set setpoints to halfway between low and high calibration values
   setHorzAngleSetpoint(0, 127);
@@ -876,7 +881,7 @@ void manualStraightenHorizontal()
  *************************************************************************************/
 void manualStraightenVertical()
 {
-  USB_COM_PORT << "Straightening vertical. ";
+  USB_COM_PORT << "Straightening vertical.\n ";
   
   setVertAngleSetpoint(0, 127);
   setVertAngleSetpoint(1, 127);
@@ -1178,7 +1183,7 @@ byte getCurrentVerticalAngle(int i)
 /**************************************************************************************
   getCurrentHorizontalIncrimentalSetpoint(): 
  *************************************************************************************/
-byte getCurrentHorizontalIncrimentalSetpoint(int i)
+byte getCurrentHorizIncrimentalSetpointAngle(int i)
 {
   if (horzSensorIncrementalSetpoints[i] == -1) return 255;
   return map(horzSensorIncrementalSetpoints[i], horzLowCalibration[i], horzHighCalibration[i], 0, 254);
@@ -1187,9 +1192,9 @@ byte getCurrentHorizontalIncrimentalSetpoint(int i)
 /**************************************************************************************
   getCurrentVerticalIncrimentalSetpoint(): 
  *************************************************************************************/
-byte getCurrentVerticalIncrimentalSetpoint(int i)
+byte getCurrentVertIncrimentalSetpointAngle(int i)
 {
-  if (horzSensorIncrementalSetpoints[i] == -1) return 255;
+  if (vertSensorIncrementalSetpoints[i] == -1) return 255;
   return map(vertSensorIncrementalSetpoints[i], vertLowCalibration[i], vertHighCalibration[i], 0, 254);
 }
 
@@ -1587,7 +1592,7 @@ void setModuleNumber(int value)
   myModuleNumber = value;
  
   // setup even/odd for even modules
-  if (myModuleNumber % 2 == 1)
+  if (myModuleNumber % 2 == 0)
   {  
     PIDcontrollerVertical[0].setEven(false);
     PIDcontrollerVertical[1].setEven(true);
