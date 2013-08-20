@@ -47,10 +47,14 @@ template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg);
 #define VERTICAL_STRAIGHT_ADDRESS  (VERTICAL_CALIBRATION_ADDRESS + 25)
 
 // The master setpoints for all actuators. 
-int horzAngleSetpoints[] = {255,255,255,255,255};  // Target horizontal setpoints in angle space. (Range 0 - 254)
-int vertAngleSetpoints[] = {255,255,255,255,255};  // Target vertical setpoints int angle space. (255 = disabled)
+byte horzAngleSetpoints[] = {255,255,255,255,255};  // Target horizontal setpoints in angle space. (Range 0 - 254)
+byte vertAngleSetpoints[] = {255,255,255,255,255};  // Target vertical setpoints int angle space. (255 = disabled)
 int horzSensorSetpoints[] = {-1,-1,-1,-1,-1};      // Target horizontal setpoints in sensor space. (Range 0 to 1023)
 int vertSensorSetpoints[] = {-1,-1,-1,-1,-1};      // Target vertical setpoints in sensor space. (-1 = disabled)
+
+// Current valve outputs
+byte horzValveOutputs[] = {0,0,0,0,0};
+byte vertValveOutputs[] = {0,0,0,0,0};
 
 // Incrimental setpoints moving torwards the master setpoints. 
 // They are determined by the current position, the master setpoint and the slew rate 
@@ -92,20 +96,20 @@ const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz cal
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
 const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
-const byte horzAngleSlewRate = 2;       // When moving horizontals. Max number of angles to incriment each PID loop.
-const byte vertAngleSlewRate = 2;       // When moving verticals. Max number of angles to incriment each PID loop.
+byte horzAngleSlewRate = 2;       // When moving horizontals. Max number of angles to incriment each PID loop.
+byte vertAngleSlewRate = 2;       // When moving verticals. Max number of angles to incriment each PID loop.
 
 // Variables for manual mode
 int manualActuationDelay = 200;
 int manualVertibraeSelect = 0;
 
 // PID Constants
-const byte horzAngleP = 20;
-const byte horzAngleI = 20;
-const byte horzAngleD = 0;
-const byte vertAngleP = 20;
-const byte vertAngleI = 20;
-const byte vertAngleD = 0;
+byte horzAngleP = 20;
+byte horzAngleI = 20;
+byte horzAngleD = 0;
+byte vertAngleP = 20;
+byte vertAngleI = 20;
+byte vertAngleD = 0;
 int horzSensorP[5] = {-1,-1,-1,-1,-1};
 int horzSensorI[5] = {-1,-1,-1,-1,-1};
 int horzSensorD[5] = {-1,-1,-1,-1,-1};
@@ -206,7 +210,7 @@ void setup()
                             (EEPROM.read(i*5 + VERTICAL_CALIBRATION_ADDRESS + 3) << 8);   
   }
   
-  calculateSensorDeadbandsAndSpeeds();
+  mapAngleConstantsToSensorSpace();
 
   // Print out the initialization information
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
@@ -273,7 +277,7 @@ void loop()
     switch (command)
     {
       case 's':
-        processNewSettingsAndSetpoints();
+        processNewSetpoints();
         acknowledgeCommand();
         break;
       case 'd':
@@ -405,9 +409,9 @@ void processRS485CommunicationTestCommand()
 }
 
 /************************************************************************************
-  processNewSettingsAndSetpoints(): Recieves new settings and setpoints from the head
+  processNewSetpoints(): Recieves new settings and setpoints from the head
  ***********************************************************************************/
-void processNewSettingsAndSetpoints()
+void processNewSetpoints()
 {
   char chars[125];
   byte* settings;
@@ -475,6 +479,20 @@ void processNewSettingsAndSetpoints()
   
   // Copy new motor speed [Setting byte 72]
   runtimeMotorSpeed = settings[72];
+  
+  byte Ki = settings[73];
+  byte Kp = settings[74];
+  byte horzSlewRate = settings[75];
+  byte vertSlewRate = settings[76];
+  if (Ki != horzAngleI || Kp != horzAngleP || horzSlewRate != horzAngleSlewRate || vertSlewRate != vertAngleSlewRate)
+  {
+    vertAngleI = Ki;
+    vertAngleP = Kp;
+    horzAngleSlewRate = horzSlewRate;
+    vertAngleSlewRate = vertSlewRate;  
+    mapAngleConstantsToSensorSpace();
+  }
+
   //USB_COM_PORT.print(motorSpeed);
   //USB_COM_PORT.print("\t");
   //USB_COM_PORT.println(horzAngleArray[4]);
@@ -553,12 +571,15 @@ void processDiagnosticsCommand()
     sendHeadAndModuleDiagnostics();
     break;
   case 2:
-    sendAngleAndSetpointDiagnostics();
+    sendHorzAngleDiagnostics();
     break;
   case 3:
-    sendHorzCalibrationDiagnostics();
+    sendVertAngleDiagnostics();
     break;
   case 4:
+    sendHorzCalibrationDiagnostics();
+    break;
+  case 5:
     sendVertCalibrationDiagnostics();
     break;
   default:
@@ -582,34 +603,52 @@ void sendHeadAndModuleDiagnostics()
   batteryVoltage = constrain(batteryVoltage, 0, 25000);
   hydraulicPressure = constrain(hydraulicPressure, 0, 2000);
   
-  byte data[6];
+  byte data[15];
   data[0] = highByte(batteryVoltage);
   data[1] = lowByte(batteryVoltage);
   data[2] = 0;
   data[3] = runtimeMotorSpeed;
   data[4] = highByte(hydraulicPressure);
   data[5] = lowByte(hydraulicPressure);
+  //data[14] = lowByte(hydraulicPressure); Room for more bytes per module
   
-  HEAD_SERIAL.write(data, 6);
+  HEAD_SERIAL.write(data, 15);
 }
 
 /************************************************************************************
- * sendAngleAndSetpointDiagnostics(): 
+ * sendHorzAngleDiagnostics(): 
  ***********************************************************************************/
-void sendAngleAndSetpointDiagnostics()
+void sendHorzAngleDiagnostics()
 {
   byte data[20];
   for (int i = 0; i < 5; ++i)
   {
     byte horzAngle = getCurrentHorizontalAngle(i);
-    byte vertAngle = getCurrentVerticalAngle(i);
     byte horzIncSetpoint = getCurrentHorizIncrimentalSetpointAngle(i);
-    byte vertIncSetpoint = getCurrentVertIncrimentalSetpointAngle(i);
        
     data[i * 4 + 0] = horzIncSetpoint;
     data[i * 4 + 1] = horzAngle;
-    data[i * 4 + 2] = vertIncSetpoint;
-    data[i * 4 + 3] = vertAngle;
+    data[i * 4 + 2] = horzAngleSetpoints[i];
+    data[i * 4 + 3] = horzValveOutputs[i];
+  }
+  HEAD_SERIAL.write(data, 20);
+}
+
+/************************************************************************************
+ * sendVertAngleDiagnostics(): 
+ ***********************************************************************************/
+void sendVertAngleDiagnostics()
+{
+  byte data[20];
+  for (int i = 0; i < 5; ++i)
+  {
+    byte vertAngle = getCurrentVerticalAngle(i);
+    byte vertIncSetpoint = getCurrentVertIncrimentalSetpointAngle(i);
+       
+    data[i * 4 + 0] = vertIncSetpoint;
+    data[i * 4 + 1] = vertAngle;
+    data[i * 4 + 2] = vertAngleSetpoints[i];
+    data[i * 4 + 3] = vertValveOutputs[i];
   }
   HEAD_SERIAL.write(data, 20);
 }
@@ -694,10 +733,10 @@ void processHeadManualModeMotorPulseCommand()
 }
 
 /************************************************************************************
-  calculateSensorDeadbandsAndSpeeds(): Based on the calibration, map the deadbands from angle 
-                                       space (0-254) to sensor space (low to high calibration)
+  mapAngleConstantsToSensorSpace(): Based on the calibration, map the deadbands from angle 
+                                    space (0-254) to sensor space (low to high calibration)
  ***********************************************************************************/
-void calculateSensorDeadbandsAndSpeeds()
+void mapAngleConstantsToSensorSpace()
 {
   for (int i = 0; i < 5; ++i)
   {
@@ -786,19 +825,21 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
         
         PIDcontrollerHorizontal[i].setSetPoint(setpoint);
         analogWrite(MOTOR_CONTROL, motorSpeed);
-        PIDcontrollerHorizontal[i].updateOutput();
+        horzValveOutputs[i] = PIDcontrollerHorizontal[i].updateOutput();
         moved = true;
       }
       // We are in the deadband or we took too long to get there    
       else
       {
         analogWrite(HORZ_ACTUATOR[i],0);
+        horzValveOutputs[i] = 0;
       }
     }
     // Setpoint is uninitialized (-1) turn actuator off
     else
     {
       analogWrite(HORZ_ACTUATOR[i], 0);
+      horzValveOutputs[i] = 0;
     }
 
     ///////////////////////    
@@ -821,19 +862,21 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
         
         PIDcontrollerVertical[i].setSetPoint(setpoint);    
         analogWrite(MOTOR_CONTROL, motorSpeed);
-        PIDcontrollerVertical[i].updateOutput();
+        vertValveOutputs[i] = PIDcontrollerVertical[i].updateOutput();
         moved = true;
       }
       // We are in the deadband or we took too long to get there
       else
       {
         analogWrite(VERT_ACTUATOR[i], 0);
+        vertValveOutputs[i] = 0;
       }
     }
     // Setpoint is uninitialized (-1) turn actuator off
     else
     {
       analogWrite(VERT_ACTUATOR[i], 0);
+      vertValveOutputs[i] = 0;
     }
   }
   
@@ -1013,7 +1056,7 @@ void calibrateHorizontal()
   manualStraightenHorizontal();
   USB_COM_PORT << "Calibration Done\n";
   
-  calculateSensorDeadbandsAndSpeeds();
+  mapAngleConstantsToSensorSpace();
   printCalibrationValues();
   
 }//end calibrateHorizontal()
@@ -1158,7 +1201,7 @@ void calibrateVertical()
   manualStraightenVertical();
   USB_COM_PORT << "Calibration Done\n";
   
-  calculateSensorDeadbandsAndSpeeds();
+  mapAngleConstantsToSensorSpace();
   printCalibrationValues();
   
 }//end calibrateVertical()
@@ -2209,6 +2252,8 @@ void stopMovement()
   {
     analogWrite(VERT_ACTUATOR[i], 0);
     analogWrite(HORZ_ACTUATOR[i], 0);
+    vertValveOutputs[i] = 0;
+    horzValveOutputs[i] = 0;
   }
   analogWrite(MOTOR_CONTROL, 0);
   return;

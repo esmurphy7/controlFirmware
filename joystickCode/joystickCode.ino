@@ -130,10 +130,16 @@ void processSwitchAndKnobRequest()
   unsigned short propagationDelay = map(propagationDelayKnob, 0, 1023, 1000, 250);
   
   unsigned short spareKnob0 = analogRead(RSVD_0_PIN);
-  boolean straightenVertOnTheFly = (spareKnob0 > 512);
+  boolean straightenVertOnTheFly = false;//(spareKnob0 > 512);
+  byte horzSlewRate = 3;
+  byte vertSlewRate = map(spareKnob0, 0, 1023, 0, 6);
+  if (vertSlewRate == 6) vertSlewRate = 5;
   
   unsigned short unlabelledRightKnob = analogRead(RSVD_2_PIN);
+  byte Ki = map(unlabelledRightKnob, 0, 1023, 0, 150);
+  
   unsigned short unlabelledLeftKnob = analogRead(RSVD_4_PIN);
+  byte Kp = map(unlabelledLeftKnob, 0, 1023, 0, 150); 
   
   // Transmit
   byte packet[30];  
@@ -152,10 +158,10 @@ void processSwitchAndKnobRequest()
   packet[12] = motorSpeed;
   packet[13] = highByte(propagationDelay);
   packet[14] = lowByte(propagationDelay);
-  packet[15] = highByte(unlabelledRightKnob);
-  packet[16] = lowByte(unlabelledRightKnob);
-  packet[17] = highByte(unlabelledLeftKnob);
-  packet[18] = lowByte(unlabelledLeftKnob);
+  packet[15] = Ki;
+  packet[16] = Kp;
+  packet[17] = horzSlewRate;
+  packet[18] = vertSlewRate;
   packet[19] = 0; // Lots more spares 19 to 29
   
   XBEE_SERIAL.write(packet, 30);

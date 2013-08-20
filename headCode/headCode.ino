@@ -51,8 +51,10 @@ class ControllerData
   boolean calibrate;
   byte motorSpeed;
   unsigned short propagationDelay;
-  unsigned short unlabelledRightKnob;
-  unsigned short unlabelledLeftKnob;
+  byte Kp;
+  byte Ki;
+  byte horizontalSlewRate;
+  byte verticalSlewRate;
 } controller;
 
 // Ethernet/Wi-Fi variables
@@ -236,24 +238,40 @@ void initializeAngleArray()
 {
   USB_COM_PORT << "Trying to initialize angle array... ";
   
-  byte packet[125];
-  boolean result = getAngleAndSetpointDiagnostics(packet);
+  byte horzPacket[125];
   
-  
+  // Get horizontal angles
+  boolean result = getHorzAngleDiagnostics(horzPacket);  
   if (result)
   {
     for (int i = 0; i < numberOfModules; ++i)
     {
       for (int j = 0; j < 5; ++j)
       {
-        horzSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 1 + 1];
-        vertSetpoints[i * 5 + j] = packet[i * 20 + j * 4 + 3 + 1];
+        horzSetpoints[i * 5 + j] = horzPacket[i * 20 + j * 4 + 1 + 1];
       }
     }
-    anglesAreInitialized = true;
-    USB_COM_PORT << "Success!\n";
+    
+    // Get vertical angles
+    byte vertPacket[125];
+    result = getVertAngleDiagnostics(vertPacket);      
+    if (result)
+    {
+      for (int i = 0; i < numberOfModules; ++i)
+      {
+        for (int j = 0; j < 5; ++j)
+        {
+          vertSetpoints[i * 5 + j] = vertPacket[i * 20 + j * 4 + 1 + 1];
+        }
+      }
+      
+      // Got all we need!!
+      anglesAreInitialized = true;
+      USB_COM_PORT << "Success!\n";
+    }
   }
-  else
+  
+  if(!anglesAreInitialized)
   {
     USB_COM_PORT << "Failed (Modules not responding?)\n";
     delay(1000);
@@ -274,11 +292,11 @@ void getAndBroadcastDiagnostics()
   
   // What type of diagnostics packet should we send?
   // Cycle through each of the 5 packet each time this function is called.
-  static byte packetType = 0;
+  static byte packetType = 2;
   ++packetType;
-  if (packetType > 4)
+  if (packetType > 3)
   {
-    packetType = 1;
+    packetType = 2;
   }
 
   // Fill the packet with data
@@ -289,12 +307,15 @@ void getAndBroadcastDiagnostics()
       retVal = getHeadAndModuleDiagnostics(packet);
       break;
     case 2:
-      retVal = getAngleAndSetpointDiagnostics(packet);
+      retVal = getHorzAngleDiagnostics(packet);
       break;
     case 3:
-      retVal = getHorzCalibrationDiagnostics(packet);
+      retVal = getVertAngleDiagnostics(packet);
       break;
     case 4:
+      retVal = getHorzCalibrationDiagnostics(packet);
+      break;
+    case 5:
       retVal = getVertCalibrationDiagnostics(packet);
       break;
     default: 
@@ -335,6 +356,36 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
   buffer[1] = numberOfModules;
   buffer[2] = highByte(headBattery);
   buffer[3] = lowByte(headBattery);
+    
+  byte booleanByte = 0;
+  booleanByte += ((byte)controller.right) << 0;
+  booleanByte += ((byte)controller.left) << 1;
+  booleanByte += ((byte)controller.up) << 2;
+  booleanByte += ((byte)controller.down) << 3;
+  booleanByte += ((byte)controller.killSwitchPressed) << 4;
+  booleanByte += ((byte)controller.openJaw) << 5;
+  booleanByte += ((byte)controller.closeJaw) << 6;
+  booleanByte += ((byte)controller.calibrate) << 7;
+  buffer[4] = booleanByte;  
+  
+  booleanByte = 0;
+  booleanByte += ((byte)controller.straightenVertical) << 0;
+  booleanByte += ((byte)controller.straightenVertOnTheFly) << 1;
+  booleanByte += ((byte)joystickIsConnected) << 2;
+  booleanByte += ((byte)anglesAreInitialized) << 3;
+  booleanByte += ((byte)false) << 4;
+  booleanByte += ((byte)false) << 5;
+  booleanByte += ((byte)false) << 6;
+  booleanByte += ((byte)false) << 7;
+  buffer[5] = booleanByte;
+  
+  buffer[6] = controller.motorSpeed;
+  buffer[7] = highByte(controller.propagationDelay);
+  buffer[8] = lowByte(controller.propagationDelay);
+  buffer[9] = controller.Kp;
+  buffer[10] = controller.Ki;
+  buffer[11] = controller.horizontalSlewRate;
+  buffer[12] = controller.verticalSlewRate;
 
   // Tell modules to send us this type of diagnostics
   clearSerialBuffer(TAIL_SERIAL);
@@ -345,25 +396,26 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
   TAIL_SERIAL.setTimeout(30);      
   for (int i = 0; i < numberOfModules; ++i)
   {
-    char data[6];  
-    if (TAIL_SERIAL.readBytes(data, 6) < 6)
+    char data[15];  
+    if (TAIL_SERIAL.readBytes(data, 15) < 15)
     {
       DEBUG_STREAM << "ERROR: Did not recieve all Module info from module " << i + 1 << "\n";
       return false;
     }
-    buffer[i * 6 + 0 + 4] = data[0];
-    buffer[i * 6 + 1 + 4] = data[1];
-    buffer[i * 6 + 2 + 4] = data[2];
-    buffer[i * 6 + 3 + 4] = data[3];
-    buffer[i * 6 + 4 + 4] = data[4];
-    buffer[i * 6 + 5 + 4] = data[5];
+    buffer[i * 15 + 0 + 35] = data[0];
+    buffer[i * 15 + 1 + 35] = data[1];
+    buffer[i * 15 + 2 + 35] = data[2];
+    buffer[i * 15 + 3 + 35] = data[3];
+    buffer[i * 15 + 4 + 35] = data[4];
+    buffer[i * 15 + 5 + 35] = data[5];
+    //buffer[i * 15 + 14 + 35] = data[5]; Room for more bytes per module    
   }
 }
 
 /**************************************************************************************
-  getAngleAndSetpointDiagnostics(): Fills a 125 byte buffer with angle and setpoint information.
+  getHorzAngleDiagnostics(): Fills a 125 byte buffer with horzontal angle and setpoint information.
  *************************************************************************************/
-boolean getAngleAndSetpointDiagnostics(byte* buffer)
+boolean getHorzAngleDiagnostics(byte* buffer)
 {
   buffer[0] = 2;
   
@@ -379,7 +431,37 @@ boolean getAngleAndSetpointDiagnostics(byte* buffer)
     char data[20];  
     if (TAIL_SERIAL.readBytes(data, 20) < 20)
     {
-      DEBUG_STREAM << "ERROR: Did not recieve all AngleAndSetpoint info from module " << i + 1 << "\n";
+      DEBUG_STREAM << "ERROR: Did not recieve all HorzAngle info from module " << i + 1 << "\n";
+      return false;
+    }
+    for (int j = 0; j < 20; ++j)
+    {
+      buffer[i * 20 + j + 1] = data[j];  
+    }
+  }
+  return true;
+}
+
+/**************************************************************************************
+  getHorzAngleDiagnostics(): Fills a 125 byte buffer with horzontal angle and setpoint information.
+ *************************************************************************************/
+boolean getVertAngleDiagnostics(byte* buffer)
+{
+  buffer[0] = 3;
+  
+  // Tell modules to send us this type of diagnostics
+  clearSerialBuffer(TAIL_SERIAL);  
+  TAIL_SERIAL.write('d');   
+  TAIL_SERIAL.write(3);
+
+  // Fill in the packet with module info as it comes in
+  TAIL_SERIAL.setTimeout(30);      
+  for (int i = 0; i < numberOfModules; ++i)
+  {
+    char data[20];  
+    if (TAIL_SERIAL.readBytes(data, 20) < 20)
+    {
+      DEBUG_STREAM << "ERROR: Did not recieve all VertAngle info from module " << i + 1 << "\n";
       return false;
     }
     for (int j = 0; j < 20; ++j)
@@ -390,19 +472,18 @@ boolean getAngleAndSetpointDiagnostics(byte* buffer)
   return true;
 }
 
-
 /**************************************************************************************
   getHorzCalibrationDiagnostics(): Fills a 125 byte buffer with horizontal calibration info
  *************************************************************************************/
 boolean getHorzCalibrationDiagnostics(byte* buffer)
 {
   // Tell the wifi listeners what type of packet this is
-  buffer[0] = 3;
+  buffer[0] = 4;
   
   // Tell modules to send us this type of diagnostics
   clearSerialBuffer(TAIL_SERIAL);  
   TAIL_SERIAL.write('d');   
-  TAIL_SERIAL.write(3);
+  TAIL_SERIAL.write(4);
 
   // Fill in the packet with module info as it comes in
   TAIL_SERIAL.setTimeout(30);      
@@ -428,12 +509,12 @@ boolean getHorzCalibrationDiagnostics(byte* buffer)
 boolean getVertCalibrationDiagnostics(byte* buffer)
 {
   // Tell the wifi listeners what type of packet this is
-    buffer[0] = 4;
+    buffer[0] = 5;
   
   // Tell modules to send us this type of diagnostics
   clearSerialBuffer(TAIL_SERIAL);
   TAIL_SERIAL.write('d');   
-  TAIL_SERIAL.write(4);
+  TAIL_SERIAL.write(5);
 
   // Fill in the packet with module info as it comes in
   TAIL_SERIAL.setTimeout(30);      
@@ -548,6 +629,10 @@ void sendSetpointsAndSettings()
   settings[70] = 0;
   settings[70] += controller.killSwitchPressed & B00000001;
   settings[72] = controller.motorSpeed;
+  settings[73] = controller.Ki;
+  settings[74] = controller.Kp;
+  settings[75] = controller.horizontalSlewRate;
+  settings[76] = controller.verticalSlewRate;
   
   settings[124] = calculateChecksum(settings, 124); 
   
@@ -743,9 +828,11 @@ void readAndRequestJoystickData()
   controller.straightenVertOnTheFly = (boolean)packet[9];
   controller.motorSpeed = packet[12];
   controller.propagationDelay = word(packet[13], packet[14]);
-  controller.unlabelledRightKnob = word(packet[15], packet[16]);
-  controller.unlabelledLeftKnob = word(packet[17], packet[18]);
-
+  controller.Ki = packet[15];
+  controller.Kp = packet[16];
+  controller.horizontalSlewRate = packet[17];
+  controller.verticalSlewRate = packet[18];
+  
   // Request another joystick packet  
   lastJoystickRequestTime = millis();
   INPUT_SERIAL.write('j');  

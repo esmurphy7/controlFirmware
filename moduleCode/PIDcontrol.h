@@ -96,7 +96,7 @@ public:
     integral = 0;
   }
   
-  int updateOutput(){
+  byte updateOutput(){
     //sensor reading
     sensorReading = analogRead(sensorPin);
     
@@ -159,7 +159,7 @@ public:
       }
     }
     
-    return output;
+    return (output < 0) ? -output : output;
   }
   
 };
