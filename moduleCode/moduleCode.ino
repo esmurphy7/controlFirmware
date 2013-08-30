@@ -95,9 +95,9 @@ const int actuatorTimeout = 5000;       // Actuators have this many ms to get to
 const byte calibrateMotorSpeed = 150;   // Motor speed for vertical and horz calibration.
 const byte jawMotorSpeed = 90;          // Motor speed for jaw open/close. (the jaw uses the module 1 motor)
 const byte manualMotorSpeed = 200;      // Motor speed for manual mode operations.
-const int pidLoopTime = 30;             // We execute the pid loop on this interval (ms)
-byte horzAngleSlewRate = 2;       // When moving horizontals. Max number of angles to incriment each PID loop.
-byte vertAngleSlewRate = 2;       // When moving verticals. Max number of angles to incriment each PID loop.
+const int pidLoopTime = 15;             // We execute the pid loop on this interval (ms)
+byte horzAngleSlewRate = 2;             // When moving horizontals. Max number of angles to incriment each PID loop.
+byte vertAngleSlewRate = 2;             // When moving verticals. Max number of angles to incriment each PID loop.
 
 // Variables for manual mode
 int manualActuationDelay = 200;
@@ -210,7 +210,14 @@ void setup()
                             (EEPROM.read(i*5 + VERTICAL_CALIBRATION_ADDRESS + 3) << 8);   
   }
   
+  // We have values in 0-255 angle space that need to be mapped to sensor space.
   mapAngleConstantsToSensorSpace();
+  
+  for (int i = 0; i < 5; ++i)
+  {
+    horzSensorIncrementalSetpoints[i] = getCurrentHorizontalAngle(i);
+    vertSensorIncrementalSetpoints[i] = getCurrentVerticalAngle(i);
+  }
 
   // Print out the initialization information
   USB_COM_PORT.print("\nHi I'm Titanoboa, MODULE #: ");
@@ -815,7 +822,6 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
       if ((abs(currentSensorValue - horzSensorSetpoints[i]) > horzSensorDeadbands[i]) &&
           (millis() - horzTimerArray[i]) < actuatorTimeout)
       {
-        if (horzSensorIncrementalSetpoints[i] == -1) horzSensorIncrementalSetpoints[i] = currentSensorValue;
         signed int dir = (horzSensorIncrementalSetpoints[i] > horzSensorSetpoints[i]) ? -1 : 1;
         int setpoint = horzSensorIncrementalSetpoints[i] + dir * horzSensorSlewRates[i];
         
@@ -852,7 +858,6 @@ void executePID(byte motorSpeed, boolean doHorizontal, boolean doVertical)
       if ((abs(currentSensorValue - vertSensorSetpoints[i]) > vertSensorDeadbands[i]) &&
           (millis() - vertTimerArray[i]) < actuatorTimeout)
       {
-        if (vertSensorIncrementalSetpoints[i] == -1) vertSensorIncrementalSetpoints[i] = currentSensorValue;
         signed int dir = (vertSensorIncrementalSetpoints[i] > vertSensorSetpoints[i]) ? -1 : 1;
         int setpoint = vertSensorIncrementalSetpoints[i] + dir * vertSensorSlewRates[i];
         
@@ -1242,11 +1247,11 @@ byte getCurrentVertIncrimentalSetpointAngle(int i)
 }
 
 /**************************************************************************************
-  printSensorValuesAndSetpoints(): Print sensor values and setpoints to the USB Serial
+  printSensorDiagnostics(): Print sensor values and setpoints to the USB Serial
  *************************************************************************************/
-void printSensorValuesAndSetpoints()
+void printSensorDiagnostics()
 {
-  USB_COM_PORT.print("\nSensors and Setpoints\n");
+  USB_COM_PORT.print("\nSensor Diagnostics\n");
   USB_COM_PORT.print("Angles Values are 0-254: 255 = disabled\n");
   USB_COM_PORT.print("Sensors Values are 0-1023: -1 = disabled\n");
 
@@ -1286,10 +1291,26 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzAngleD << "\t";
   }
-  USB_COM_PORT << "\n";
+  
 
-
-  USB_COM_PORT.print("\nHORZ_SENSOR_SETPOINT:\t");
+  USB_COM_PORT.print("\n\nHORZ_SENSOR_CAL_HIGH: \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzHighCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_SENSOR_CAL_LOW:   \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzLowCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nHORZ_SENSOR_CAL_RANGE:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << horzHighCalibration[i] - horzLowCalibration[i] << "\t";
+  }
+  
+   
+  USB_COM_PORT.print("\n\nHORZ_SENSOR_SETPOINT:\t");
   for(int i=0;i<5;i++)
   {
     USB_COM_PORT << horzSensorSetpoints[i] << "\t";
@@ -1324,7 +1345,7 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << horzSensorD[i] << "\t";
   }
-  USB_COM_PORT << "\n\n";
+  USB_COM_PORT << "\n";
   
   
   USB_COM_PORT.print("\nVertical\n");
@@ -1363,9 +1384,29 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertAngleD << "\t";
   }
-  USB_COM_PORT << "\n";
   
 
+  USB_COM_PORT.print("\n\nVERT_SENSOR_CAL_HIGH:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertHighCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_CAL_LOW:\t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertLowCalibration[i] << "\t";
+  }
+  USB_COM_PORT.print("\nVERT_SENSOR_CAL_RANGE: \t");
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertHighCalibration[i] - vertLowCalibration[i] << "\t";
+  }  
+  
+  USB_COM_PORT.print("\n\nVERT_CAL_STRAIGHT:\t");  
+  for(int i=0;i<5;i++)
+  {
+    USB_COM_PORT << vertStraightArray[i] << "\t";
+  }
   USB_COM_PORT.print("\nVERT_SENSOR_SETPOINT:\t");
   for(int i=0;i<5;i++)
   {
@@ -1401,10 +1442,9 @@ void printSensorValuesAndSetpoints()
   {
     USB_COM_PORT << vertSensorD[i] << "\t";
   }
-  USB_COM_PORT << "\n\n";
+  USB_COM_PORT << "\n";
 
 }
-
 
 /**************************************************************************************
   printCalibrationValues(): Prints all calibration values.
@@ -1928,27 +1968,27 @@ void manualGoToSetpoint(char actuator)
  *************************************************************************************/
 void setHorzAngleSetpoint(int actuator, byte angle)
 {
-    int i = actuator;
-    int newHorzSetpoint = 0;
-    if (angle == 255)
-    {
-      // 255 means this actuator is disabled.
-      newHorzSetpoint = -1;
-    }
-    else
-    {
-      // Horizontal actuator is not disabled. Map to sensor space.
-      newHorzSetpoint = map(angle, 0, 254, horzLowCalibration[i], horzHighCalibration[i]);
-    }
-     
-    // If this is a new setpoint, reset the PID timout timer
-    if (newHorzSetpoint != horzSensorSetpoints[i])
-    {      
-      PIDcontrollerHorizontal[i].zeroIntegral();
-      horzTimerArray[i] = millis();
-      horzSensorSetpoints[i] = newHorzSetpoint;
-      horzAngleSetpoints[i] = angle;
-    }   
+  int i = actuator;
+  int newHorzSetpoint = 0;
+  if (angle == 255)
+  {
+    // 255 means this actuator is disabled.
+    newHorzSetpoint = -1;
+  }
+  else
+  {
+    // Horizontal actuator is not disabled. Map to sensor space.
+    newHorzSetpoint = map(angle, 0, 254, horzLowCalibration[i], horzHighCalibration[i]);
+  }
+   
+  // If this is a new setpoint, reset the PID timout timer
+  if (newHorzSetpoint != horzSensorSetpoints[i])
+  {      
+    PIDcontrollerHorizontal[i].zeroIntegral();
+    horzTimerArray[i] = millis();
+    horzSensorSetpoints[i] = newHorzSetpoint;
+    horzAngleSetpoints[i] = angle;
+  }
 }
 
 /**************************************************************************************
@@ -2091,10 +2131,9 @@ void displayMenu()
     "          y - straighten verticals\n\n"                  
   
     "          r - save current vertical position as straight\n"                
-    "          a - print battery voltage\n"                
-    "          b - print calibration values\n"                
+    "          a - print battery voltage\n"                  
     "          f - print hydraulic pressure\n"                 
-    "          p - print setpoints, sensor values and constants\n"                
+    "          p - print sensor diagnostics.\n"                
     "          P - print memory consumption.\n\n"                
   
     "          x* - turn motor on where *=1(slow), 2(medium), 3(fast)\n"                
@@ -2164,9 +2203,6 @@ void manualControl()
         case 'v':
           calibrateVertical();
           break;
-        case 'b':
-          printCalibrationValues();
-          break;
         case 't':
           manualStraightenHorizontal();
           break;
@@ -2174,7 +2210,7 @@ void manualControl()
           manualStraightenVertical();
           break;
         case 'p':
-          printSensorValuesAndSetpoints();
+          printSensorDiagnostics();
           break;
         case 'f':
           printHydraulicPressure();

@@ -72,8 +72,8 @@ byte horzSetpoints[30];
 boolean lights[30];
 
 // Constants
-const int horzLeftAngle = 60;
-const int horzRightAngle = 194;
+const int horzLeftAngle = 10;
+const int horzRightAngle = 245;
 const int horzStraightAngle = 127;
 const int vertUpAngle = 87;
 const int vertDownAngle = 167;
@@ -84,10 +84,12 @@ const int ledDelayWhenRunning = 30;
 
 // Global variables
 byte numberOfModules = 0;                // Number of modules stored in EEPROM
-boolean anglesAreInitialized = true;    // On initialization we wait for all modules to report their current angles
+boolean anglesAreInitialized = false;     // On initialization we wait for all modules to report their current angles
 boolean joystickIsConnected = false;     // True if we are recieving data from the joystick
+int lastLoopTime = 0;                    // Time it took to complete the main loop. (diagnostics, settings, etc)
+int actualPropagationDelay = 0;          // We are polling when when to do propagation. This is the actual delay we get.
 int manualActuatorSelect = 0;            // For selecting which actuator we are operating in manual mode
-int manualActuationDelay = 200;          // 
+int manualActuationDelay = 200;          // How long to open the valve for when pulsing actuators in manual mode.
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -166,6 +168,8 @@ void setup()
 **************************************************************************/
 void loop()
 {
+  long startTime = millis();
+  
   // The first thing we do before we are allowed to run is get the current 
   // angles from every module. 
   if (!anglesAreInitialized)
@@ -186,6 +190,8 @@ void loop()
     synchronizeWithJoystick();
     return;
   }
+  
+  lastLoopTime = millis() - startTime;
 }
 
 /*************************************************************************
@@ -244,12 +250,17 @@ void initializeAngleArray()
   boolean result = getHorzAngleDiagnostics(horzPacket);  
   if (result)
   {
-    for (int i = 0; i < numberOfModules; ++i)
+    for (int i = 0; i < 30; ++i)
     {
-      for (int j = 0; j < 5; ++j)
-      {
-        horzSetpoints[i * 5 + j] = horzPacket[i * 20 + j * 4 + 1 + 1];
-      }
+      byte angle = horzPacket[i * 4 + 1 + 1];
+      
+      // Force the actuator into left, straight of right
+      if (angle < (horzStraightAngle + horzLeftAngle) / 2)
+        horzSetpoints[i] = horzLeftAngle;
+      else if (angle > (horzStraightAngle + horzRightAngle) / 2) 
+        horzSetpoints[i] = horzRightAngle;
+      else 
+        horzSetpoints[i] = horzStraightAngle;
     }
     
     // Get vertical angles
@@ -257,13 +268,18 @@ void initializeAngleArray()
     result = getVertAngleDiagnostics(vertPacket);      
     if (result)
     {
-      for (int i = 0; i < numberOfModules; ++i)
-      {
-        for (int j = 0; j < 5; ++j)
-        {
-          vertSetpoints[i * 5 + j] = vertPacket[i * 20 + j * 4 + 1 + 1];
-        }
-      }
+    for (int i = 0; i < 30; ++i)
+    {
+      byte angle = vertPacket[i * 4 + 1 + 1];
+      
+      // Force the actuator into up, straight or down
+      if (angle < (vertStraightAngle + vertUpAngle) / 2)
+        vertSetpoints[i] = vertUpAngle;
+      else if (angle > (vertStraightAngle + vertDownAngle) / 2) 
+        vertSetpoints[i] = vertDownAngle;
+      else 
+        vertSetpoints[i] = vertStraightAngle;
+    }
       
       // Got all we need!!
       anglesAreInitialized = true;
@@ -292,11 +308,11 @@ void getAndBroadcastDiagnostics()
   
   // What type of diagnostics packet should we send?
   // Cycle through each of the 5 packet each time this function is called.
-  static byte packetType = 2;
+  static byte packetType = 1;
   ++packetType;
-  if (packetType > 3)
+  if (packetType > 5)
   {
-    packetType = 2;
+    packetType = 1;
   }
 
   // Fill the packet with data
@@ -386,6 +402,10 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
   buffer[10] = controller.Ki;
   buffer[11] = controller.horizontalSlewRate;
   buffer[12] = controller.verticalSlewRate;
+  buffer[13] = highByte(actualPropagationDelay);
+  buffer[14] = lowByte(actualPropagationDelay);
+  buffer[15] = highByte(lastLoopTime);
+  buffer[16] = lowByte(lastLoopTime);
 
   // Tell modules to send us this type of diagnostics
   clearSerialBuffer(TAIL_SERIAL);
@@ -681,9 +701,12 @@ void updateSetpoints()
   }
 
   // Propagate setpoints if it's time to do so.
+  int timeSinceLastUpdate = millis() - lastUpdateTime;
   if (controller.killSwitchPressed &&
-      millis() - lastUpdateTime > controller.propagationDelay)
+      timeSinceLastUpdate > controller.propagationDelay)
   {
+    actualPropagationDelay = timeSinceLastUpdate;
+    
     // Propagation of all angles
     for (int i = 29; i > 0; --i)
     {
