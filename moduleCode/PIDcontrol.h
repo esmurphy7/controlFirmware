@@ -131,12 +131,13 @@ public:
     
     //calculate output
     //adjust fomula to change sensativity to constaints
-    output = kp*error/10 - kd*derivative/10 + ki*integral/320;
+    output = (kp/10*error) - (kd/10*derivative) + (ki/320*integral);
     output = constrain(output, -250, 250);
    
     //add dithering
     int dither = 0;//int(10*sin(float(millis()/2)));
     output = output + dither;
+    
     output = constrain(output, -255, 255);
     
     //apply output

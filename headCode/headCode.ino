@@ -49,12 +49,6 @@ class ControllerData
   boolean straightenVertical;
   boolean straightenVertOnTheFly;
   boolean calibrate;
-  byte motorSpeed;
-  unsigned short propagationDelay;
-  byte Kp;
-  byte Ki;
-  byte horizontalSlewRate;
-  byte verticalSlewRate;
 } controller;
 
 // Ethernet/Wi-Fi variables
@@ -82,6 +76,7 @@ const int longDelayBetweenHeartBeats = 1100;
 const int shortDelayBetweenHeartBeats = 250;
 const int ledDelayWhenRunning = 30;
 
+
 // Global variables
 byte numberOfModules = 0;                // Number of modules stored in EEPROM
 boolean anglesAreInitialized = false;     // On initialization we wait for all modules to report their current angles
@@ -90,6 +85,19 @@ int lastLoopTime = 0;                    // Time it took to complete the main lo
 int actualPropagationDelay = 0;          // We are polling when when to do propagation. This is the actual delay we get.
 int manualActuatorSelect = 0;            // For selecting which actuator we are operating in manual mode
 int manualActuationDelay = 200;          // How long to open the valve for when pulsing actuators in manual mode.
+byte motorSpeed = 0; 
+unsigned short propagationDelay = 0;
+
+// PID and slew rate settings
+byte horzKp = 255;
+byte horzKi = 0;
+byte horzKd = 0;
+byte vertKp = 75;
+byte vertKi = 50;
+byte vertKd = 0;
+byte horizontalSlewRate = 0;
+byte verticalSlewRate = 0;
+
 
 /*************************************************************************
  setup(): Initializes serial ports, led and actuator pins
@@ -254,7 +262,7 @@ void initializeAngleArray()
     {
       byte angle = horzPacket[i * 4 + 1 + 1];
       
-      // Force the actuator into left, straight of right
+      // Force the actuator into left, straight or right
       if (angle < (horzStraightAngle + horzLeftAngle) / 2)
         horzSetpoints[i] = horzLeftAngle;
       else if (angle > (horzStraightAngle + horzRightAngle) / 2) 
@@ -395,17 +403,22 @@ boolean getHeadAndModuleDiagnostics(byte* buffer)
   booleanByte += ((byte)false) << 7;
   buffer[5] = booleanByte;
   
-  buffer[6] = controller.motorSpeed;
-  buffer[7] = highByte(controller.propagationDelay);
-  buffer[8] = lowByte(controller.propagationDelay);
-  buffer[9] = controller.Kp;
-  buffer[10] = controller.Ki;
-  buffer[11] = controller.horizontalSlewRate;
-  buffer[12] = controller.verticalSlewRate;
-  buffer[13] = highByte(actualPropagationDelay);
-  buffer[14] = lowByte(actualPropagationDelay);
-  buffer[15] = highByte(lastLoopTime);
-  buffer[16] = lowByte(lastLoopTime);
+  buffer[6] = motorSpeed;
+  buffer[7] = highByte(propagationDelay);
+  buffer[8] = lowByte(propagationDelay);
+  buffer[9] = highByte(actualPropagationDelay);
+  buffer[10] = lowByte(actualPropagationDelay);
+  buffer[11] = highByte(lastLoopTime);
+  buffer[12] = lowByte(lastLoopTime);
+  buffer[13] = horzKp;
+  buffer[14] = horzKi;
+  buffer[15] = horzKd;
+  buffer[16] = vertKp;
+  buffer[17] = vertKi;
+  buffer[18] = vertKd;
+  buffer[19] = horizontalSlewRate;
+  buffer[20] = verticalSlewRate;
+  
 
   // Tell modules to send us this type of diagnostics
   clearSerialBuffer(TAIL_SERIAL);
@@ -648,11 +661,15 @@ void sendSetpointsAndSettings()
   // Misc 
   settings[70] = 0;
   settings[70] += controller.killSwitchPressed & B00000001;
-  settings[72] = controller.motorSpeed;
-  settings[73] = controller.Ki;
-  settings[74] = controller.Kp;
-  settings[75] = controller.horizontalSlewRate;
-  settings[76] = controller.verticalSlewRate;
+  settings[72] = motorSpeed;
+  settings[73] = horzKp;
+  settings[74] = horzKi;
+  settings[75] = horzKd;
+  settings[76] = vertKp;
+  settings[77] = vertKi;
+  settings[78] = vertKd;
+  settings[79] = horizontalSlewRate;
+  settings[80] = verticalSlewRate;
   
   settings[124] = calculateChecksum(settings, 124); 
   
@@ -703,7 +720,7 @@ void updateSetpoints()
   // Propagate setpoints if it's time to do so.
   int timeSinceLastUpdate = millis() - lastUpdateTime;
   if (controller.killSwitchPressed &&
-      timeSinceLastUpdate > controller.propagationDelay)
+      timeSinceLastUpdate > propagationDelay)
   {
     actualPropagationDelay = timeSinceLastUpdate;
     
@@ -849,12 +866,13 @@ void readAndRequestJoystickData()
   controller.straightenVertical = (boolean)packet[7];
   controller.calibrate = (boolean)packet[8];
   controller.straightenVertOnTheFly = (boolean)packet[9];
-  controller.motorSpeed = packet[12];
-  controller.propagationDelay = word(packet[13], packet[14]);
-  controller.Ki = packet[15];
-  controller.Kp = packet[16];
-  controller.horizontalSlewRate = packet[17];
-  controller.verticalSlewRate = packet[18];
+  
+  motorSpeed = packet[12];
+  propagationDelay = word(packet[13], packet[14]);
+  vertKi = packet[15];
+  vertKp = packet[16];
+  horizontalSlewRate = packet[17];
+  verticalSlewRate = packet[18];
   
   // Request another joystick packet  
   lastJoystickRequestTime = millis();
